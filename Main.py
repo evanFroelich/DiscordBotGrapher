@@ -1,6 +1,7 @@
 import discord
 import sqlite3
 import os
+import configparser
 import time
 from discord.ext import tasks, commands
 from discord.utils import get
@@ -10,6 +11,7 @@ from collections import deque
 import pandas as pd
 import matplotlib.pyplot as plt
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+import logging
 
 
 
@@ -575,7 +577,13 @@ client = MyClient(intents=intents)
 
 
 
-
+log_file_path = 'E:\DATABOI_REPO\DiscordBotGrapher\log_file.log'
+logging.basicConfig(filename=log_file_path, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.info('Script started')
+script_dir = os.path.dirname(os.path.abspath(__file__))
+os.chdir(script_dir)
+logging.info('root dir changed')
 FOToken=open('Token/Token',"r")
+logging.info('Post token')
 token=FOToken.readline()
 client.run(token)

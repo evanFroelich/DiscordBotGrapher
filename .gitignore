@@ -3,3 +3,8 @@
 /RankedRoleConfig
 my_DB
 depricted functions
+config.ini
+errorLog
+log_file.log
+log.txt
+monitor.py
