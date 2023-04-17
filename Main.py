@@ -527,7 +527,7 @@ class MyClient(discord.Client):
                 #await message.channel.send(tmp)
             if (splitstr[0]=='ping' or splitstr[0]=='Ping'):
                 if message.author.id==100344687029665792:
-                    await message.channel.send("pong")
+                    await message.channel.send("prong")
                     
                     #await message.channel.send(outSTR)
                     
