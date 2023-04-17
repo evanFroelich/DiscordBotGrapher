@@ -380,6 +380,8 @@ class MyClient(discord.Client):
         #8 f=open(
         print('Logged on as {0}!'.format(self.user))
         print(random())
+        channel=client.get_channel(150421071676309504)
+        await channel.send("rebooted")
         #assignRoles.start()
         await assignRoles()
         sched=AsyncIOScheduler()
