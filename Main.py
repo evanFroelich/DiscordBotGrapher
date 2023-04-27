@@ -1,7 +1,6 @@
 import discord
 import sqlite3
 import os
-import configparser
 import time
 from discord.ext import tasks, commands
 from discord.utils import get
@@ -9,6 +8,8 @@ from random import random
 from datetime import datetime
 from collections import deque
 import pandas as pd
+#import matplotlib
+#matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import logging
@@ -76,6 +77,7 @@ async def assignRoles():
 #graphType, graphXaxis, numMessages, guildID, numLines, drillDownType, drillDownTarget, curs
 #qc='''SELECT * FROM (SELECT * FROM Master x where x.GuildID == ? order by UTCTime DESC LIMIT ?) sub ORDER by UTCTime ASC'''
 def Graph(graphType, graphXaxis, numMessages, guildID, numLines, drillDownTarget, curs):
+    st1=time.perf_counter()
     lineLabel=3
     param=(guildID, numMessages)
     #print('drillTarget: '+drillDownTarget)
@@ -101,13 +103,12 @@ def Graph(graphType, graphXaxis, numMessages, guildID, numLines, drillDownTarget
     dayList=[]
     
     #print(param)
+    et1=time.perf_counter()
+    logging.info("pre sql call time: "+str(et1-st1))
+    st1=time.perf_counter()
     for row in curs.execute(qc,param):
-        tstr=row[6]
-        tstr=tstr.split()
-        s1=tstr[0].split('-')
-        s2=tstr[1].split(':')
-        s3=s2[2].split('.')
-        dt=datetime(int(s1[0]),int(s1[1]),int(s1[2]),int(s2[0]),int(s2[1]),int(s3[0]))#,int(s3[1])
+        tstr = row[6]
+        dt = datetime.strptime(tstr, "%Y-%m-%d %H:%M:%S.%f")
         nameDict[str(row[lineLabel])]=str(row[lineLabel-1])
         if not dataDict:
             #print('dict empty')
@@ -180,6 +181,9 @@ def Graph(graphType, graphXaxis, numMessages, guildID, numLines, drillDownTarget
 #                 for key in outDict:
 #                     outSTR+=key + ':\t' + str(outDict[key]) + '\n'
     #await message.channel.send(outSTR)
+    et1=time.perf_counter()
+    logging.info("sql loop time:"+str(et1-st1))
+    st1=time.perf_counter()
     dataDict={k: dataDict[k] for k in sorted(dataDict, key=lambda k:sum(dataDict[k]), reverse=True)}
     tempData={}
     tempName={}
@@ -198,33 +202,25 @@ def Graph(graphType, graphXaxis, numMessages, guildID, numLines, drillDownTarget
             itr+=1
     except:
         print('required?')
-    #print(itr)
     print(dataDict)
-    #await message.channel.send(dataDict)
-    #await message.channel.send(nameDict)
-    df=pd.DataFrame(dataDict,index=dayList)
+    et1=time.perf_counter()
+    logging.info("data trimming time: "+str(et1-st1))
+    st1=time.perf_counter()
+    df = pd.DataFrame(dataDict, index=pd.to_datetime(dayList))
     df.columns = df.columns.to_series().map(nameDict)
-    df.index=pd.to_datetime(dayList)
-    #df.set_size_inches(35,20.5)
-    ax=df.plot()
-    ax.set_xticks(pd.to_datetime(dayList).to_numpy())
-    ax.set_xticklabels(dayList)
-    #lines=df.plot.line()
-    plt.xticks(rotation=90)
-    plt.gcf().set_size_inches(35,20.5)
-    plt.xticks(fontsize = 22)
-    plt.yticks(fontsize = 30)
-    plt.legend(prop={'size':20})
+    fig, ax = plt.subplots(figsize=(35, 20.5))
+    df.plot(ax=ax)
+    ax.set_xticks(df.index.to_numpy())
+    ax.set_xticklabels(dayList, rotation=90, fontsize=22)
+    ax.tick_params(axis='y', labelsize=30)
+    ax.legend(prop={'size': 20})
     print(dayList)
-    #ax.xaxis.set_ticks(dayList)
-    #plt.locator_params(axis="x",len(dayList))
-    #plt.xticks(dayList)
-    #plt.axes.Axes.set_xticklabels(dayList,fontdict=None)
-    #plt.axis.xaxis.set_ticks(dayList)
-    plt.savefig("images/"+guildID+".png")
+    plt.savefig("images/" + guildID + ".png")
+
+    et1=time.perf_counter()
+    logging.info("data frame construction time: "+str(et1-st1))
     #return dayList
     
-    #plt.show()
     return
 
 lastDate=""
@@ -265,12 +261,9 @@ def topChat(graphType, graphXaxis, numMessages, guildID, numLines, drillDownTarg
     
     #print(param)
     for row in curs.execute(qc,param):
-        tstr=row[6]
-        tstr=tstr.split()
-        s1=tstr[0].split('-')
-        s2=tstr[1].split(':')
-        s3=s2[2].split('.')
-        dt=datetime(int(s1[0]),int(s1[1]),int(s1[2]),int(s2[0]),int(s2[1]),int(s3[0]))#,int(s3[1])
+        tstr = row[6]
+        dt = datetime.strptime(tstr, "%Y-%m-%d %H:%M:%S.%f")
+
         nameDict[str(row[lineLabel])]=str(row[lineLabel-1])
         if not dataDict:
             #print('dict empty')
@@ -386,7 +379,7 @@ class MyClient(discord.Client):
         await assignRoles()
         sched=AsyncIOScheduler()
         sched.add_job(assignRoles,'interval',seconds=900)
-        sched.start()
+        #sched.start()
         
         
     async def on_thread_create(self,thread):
@@ -409,6 +402,7 @@ class MyClient(discord.Client):
         splitstr=message.content.split()
         if len(message.content)>0:
             if splitstr[0]=='..graph':
+                st1=time.perf_counter()
                 graphType='channels'
                 graphXaxis='day'
                 numMessages=99999
@@ -443,7 +437,12 @@ class MyClient(discord.Client):
                         
                 except IndexError:
                     await message.channel.send('incorrect parameter, using defaults')
+                et1=time.perf_counter()
+                await message.channel.send(str(et1-st1))
+                startTime=time.perf_counter()
                 Graph(graphType, graphXaxis, numMessages, guildID, int(numLines), drillDownTarget, curs)
+                endTime=time.perf_counter()
+                await message.channel.send(str(endTime-startTime))
                 await message.channel.send(file=discord.File("images/"+str(message.guild.id)+".png"))
                 
                     
@@ -579,11 +578,12 @@ client = MyClient(intents=intents)
 
 
 
-log_file_path = 'E:\DATABOI_REPO\DiscordBotGrapher\log_file.log'
-logging.basicConfig(filename=log_file_path, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logging.info('Script started')
+
 script_dir = os.path.dirname(os.path.abspath(__file__))
 os.chdir(script_dir)
+log_file_path = 'log_file.log'
+logging.basicConfig(filename=log_file_path, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.info('Script started')
 logging.info('root dir changed')
 FOToken=open('Token/Token',"r")
 logging.info('Post token')
