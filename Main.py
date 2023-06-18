@@ -108,7 +108,10 @@ def Graph(graphType, graphXaxis, numMessages, guildID, numLines, drillDownTarget
     st1=time.perf_counter()
     for row in curs.execute(qc,param):
         tstr = row[6]
-        dt = datetime.strptime(tstr, "%Y-%m-%d %H:%M:%S.%f")
+        try:
+            dt = datetime.strptime(tstr, "%Y-%m-%d %H:%M:%S.%f")
+        except:
+            dt = datetime.strptime(tstr, "%Y-%m-%d %H:%M:%S")
         nameDict[str(row[lineLabel])]=str(row[lineLabel-1])
         if not dataDict:
             #print('dict empty')
@@ -376,7 +379,7 @@ class MyClient(discord.Client):
         channel=client.get_channel(150421071676309504)
         await channel.send("rebooted")
         #assignRoles.start()
-        await assignRoles()
+        #await assignRoles()
         sched=AsyncIOScheduler()
         sched.add_job(assignRoles,'interval',seconds=900)
         #sched.start()
