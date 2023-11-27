@@ -590,17 +590,20 @@ class MyClient(discord.Client):
                 if emoji.id==int(match.group('id')):
                     isInServer=1
             if isInServer==1:
-                await message.channel.send('emoji in guild')
+                #await message.channel.send('emoji in guild')
                 insertStr='''INSERT INTO InServerEmoji (GuildName,GuildID, UserName, UserID, ChannelName, ChannelID, UTCTime, EmojiID, AnimatedFlag) VALUES (?,?,?,?,?,?,?,?,?);'''
                 Emojidata=(message.guild.name,str(message.guild.id),message.author.name,str(message.author.id),message.channel.name,str(message.channel.id),str(message.created_at.utcnow()),match.group('id'),match.group('animated'))
                 curs.execute(insertStr,Emojidata)
             else:
-                await message.channel.send('emoji not in guild')
+                print('emoji not in guild')
+                #await message.channel.send('emoji not in guild')
 
             if match.group('animated')=='a':
-                await message.channel.send('<a:'+match.group('name')+':'+match.group('id')+'>')
+                print('animated')
+                #await message.channel.send('<a:'+match.group('name')+':'+match.group('id')+'>')
             else:
-                await message.channel.send('<:'+match.group('name')+':'+match.group('id')+'>')
+                print('not animated')
+                #await message.channel.send('<:'+match.group('name')+':'+match.group('id')+'>')
 
         conn.commit()
         #Close DB
