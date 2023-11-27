@@ -13,6 +13,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import logging
+import re
 
 
 
@@ -224,7 +225,7 @@ def Graph(graphType, graphXaxis, numMessages, guildID, numLines, drillDownTarget
     logging.info("data frame construction time: "+str(et1-st1))
     #return dayList
     
-    return
+    return nameDict,dataDict
 
 lastDate=""
 dateQueue=deque(maxlen=4)
@@ -396,9 +397,17 @@ class MyClient(discord.Client):
             #print('bot!')
             return
         
+       
+        #await message.channel.send('<a:bubble_irl:1039925482998743160>')
+        #for emoji in message.guild.emojis:
+            #print(emoji.name)
+            #print(emoji.id)
         DB_NAME = "My_DB"
         conn = sqlite3.connect(DB_NAME)
         curs = conn.cursor()
+
+        with open('Emote_Graph_Schema.sql') as f:
+            curs.executescript(f.read())
         
         #print('Message from {0.author}: {0.content}'.format(message))
         print(message.guild.name)
@@ -441,12 +450,18 @@ class MyClient(discord.Client):
                 except IndexError:
                     await message.channel.send('incorrect parameter, using defaults')
                 et1=time.perf_counter()
-                await message.channel.send(str(et1-st1))
+                #await message.channel.send(str(et1-st1))
                 startTime=time.perf_counter()
                 Graph(graphType, graphXaxis, numMessages, guildID, int(numLines), drillDownTarget, curs)
                 endTime=time.perf_counter()
-                await message.channel.send(str(endTime-startTime))
-                await message.channel.send(file=discord.File("images/"+str(message.guild.id)+".png"))
+                graphFile=discord.File("images/"+str(message.guild.id)+".png", filename="graph.png")
+                #await message.channel.send(str(endTime-startTime))
+                guildName=message.guild.name
+                embed=discord.Embed(title="Activity Graph",color=0x228a65)
+                embed.set_image(url="attachment://graph.png")
+                embed.set_author(name=guildName, icon_url=message.guild.icon.url)
+                await message.channel.send(file=graphFile, embed=embed)
+                #await message.channel.send(file=discord.File("images/"+str(message.guild.id)+".png"))
                 
                     
         #try:
@@ -563,6 +578,30 @@ class MyClient(discord.Client):
         tp='''INSERT INTO Master (GuildName,GuildID, UserName, UserID, ChannelName, ChannelID, UTCTime) VALUES (?,?,?,?,?,?,?);'''
         data=(message.guild.name,str(message.guild.id),message.author.name,str(message.author.id),message.channel.name,str(message.channel.id),str(message.created_at.utcnow()))
         curs.execute(tp,data)
+
+        print(message.content)
+        pattern=r'<(?P<animated>a?):(?P<name>[a-zA-Z0-9_]{2,32}):(?P<id>[0-9]{18,22})>'
+        for match in re.finditer(pattern, message.content):
+            #print(match.group('name'))
+            #print(match.group('id'))
+            #print(match.group('animated'))
+            isInServer=0
+            for emoji in message.guild.emojis:
+                if emoji.id==int(match.group('id')):
+                    isInServer=1
+            if isInServer==1:
+                await message.channel.send('emoji in guild')
+                insertStr='''INSERT INTO InServerEmoji (GuildName,GuildID, UserName, UserID, ChannelName, ChannelID, UTCTime, EmojiID, AnimatedFlag) VALUES (?,?,?,?,?,?,?,?,?);'''
+                Emojidata=(message.guild.name,str(message.guild.id),message.author.name,str(message.author.id),message.channel.name,str(message.channel.id),str(message.created_at.utcnow()),match.group('id'),match.group('animated'))
+                curs.execute(insertStr,Emojidata)
+            else:
+                await message.channel.send('emoji not in guild')
+
+            if match.group('animated')=='a':
+                await message.channel.send('<a:'+match.group('name')+':'+match.group('id')+'>')
+            else:
+                await message.channel.send('<:'+match.group('name')+':'+match.group('id')+'>')
+
         conn.commit()
         #Close DB
         curs.close()
