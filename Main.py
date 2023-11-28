@@ -600,13 +600,13 @@ class MyClient(discord.Client):
                     isInServer=1
             if isInServer==1:
                 #await message.channel.send('emoji in guild')
-                insertStr='''INSERT INTO InServerEmoji (GuildName,GuildID, UserName, UserID, ChannelName, ChannelID, UTCTime, EmojiID, AnimatedFlag) VALUES (?,?,?,?,?,?,?,?,?);'''
-                Emojidata=(message.guild.name,str(message.guild.id),message.author.name,str(message.author.id),message.channel.name,str(message.channel.id),str(message.created_at.utcnow()),match.group('id'),match.group('animated'))
+                insertStr='''INSERT INTO InServerEmoji (GuildName,GuildID, UserName, UserID, ChannelName, ChannelID, UTCTime, EmojiID, EmojiName, AnimatedFlag) VALUES (?,?,?,?,?,?,?,?,?,?);'''
+                Emojidata=(message.guild.name,str(message.guild.id),message.author.name,str(message.author.id),message.channel.name,str(message.channel.id),str(message.created_at.utcnow()),match.group('id'), match.group('name'),match.group('animated'))
                 curs.execute(insertStr,Emojidata)
             else:
                 print('emoji not in guild')
-                insertStr='''INSERT INTO OutOfServerEmoji (GuildName,GuildID, UserName, UserID, ChannelName, ChannelID, UTCTime, EmojiName) VALUES (?,?,?,?,?,?,?,?);'''
-                Emojidata=(message.guild.name,str(message.guild.id),message.author.name,str(message.author.id),message.channel.name,str(message.channel.id),str(message.created_at.utcnow()),match.group('name'))
+                insertStr='''INSERT INTO OutOfServerEmoji (GuildName,GuildID, UserName, UserID, ChannelName, ChannelID, UTCTime, EmojiID, EmojiName, AnimatedFlag) VALUES (?,?,?,?,?,?,?,?,?,?);'''
+                Emojidata=(message.guild.name,str(message.guild.id),message.author.name,str(message.author.id),message.channel.name,str(message.channel.id),str(message.created_at.utcnow()),match.group('id'), match.group('name'),match.group('animated'))
                 curs.execute(insertStr,Emojidata)
                 #await message.channel.send('emoji not in guild')
 
