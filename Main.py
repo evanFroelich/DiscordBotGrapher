@@ -386,8 +386,9 @@ class MyClient(discord.Client):
         with open('Emote_Graph_Schema.sql') as f:
             curs.executescript(f.read())
         
-        curs.commit()  
+        conn.commit()  
         curs.close()
+        conn.close()
         #assignRoles.start()
         #await assignRoles()
         sched=AsyncIOScheduler()
