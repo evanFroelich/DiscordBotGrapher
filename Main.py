@@ -379,6 +379,15 @@ class MyClient(discord.Client):
         print(random())
         channel=client.get_channel(150421071676309504)
         await channel.send("rebooted")
+        DB_NAME = "My_DB"
+        conn = sqlite3.connect(DB_NAME)
+        curs = conn.cursor()
+
+        with open('Emote_Graph_Schema.sql') as f:
+            curs.executescript(f.read())
+        
+        curs.commit()  
+        curs.close()
         #assignRoles.start()
         #await assignRoles()
         sched=AsyncIOScheduler()
@@ -406,8 +415,7 @@ class MyClient(discord.Client):
         conn = sqlite3.connect(DB_NAME)
         curs = conn.cursor()
 
-        with open('Emote_Graph_Schema.sql') as f:
-            curs.executescript(f.read())
+    
         
         #print('Message from {0.author}: {0.content}'.format(message))
         print(message.guild.name)
@@ -596,6 +604,9 @@ class MyClient(discord.Client):
                 curs.execute(insertStr,Emojidata)
             else:
                 print('emoji not in guild')
+                insertStr='''INSERT INTO OutOfServerEmoji (GuildName,GuildID, UserName, UserID, ChannelName, ChannelID, UTCTime, EmojiName) VALUES (?,?,?,?,?,?,?,?);'''
+                Emojidata=(message.guild.name,str(message.guild.id),message.author.name,str(message.author.id),message.channel.name,str(message.channel.id),str(message.created_at.utcnow()),match.group('name'))
+                curs.execute(insertStr,Emojidata)
                 #await message.channel.send('emoji not in guild')
 
             if match.group('animated')=='a':

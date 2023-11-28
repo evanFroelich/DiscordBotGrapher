@@ -1,3 +1,4 @@
+drop table if exists InServerEmoji;
 create table if not exists InServerEmoji(
  GuildName text,
  GuildID text,
@@ -7,10 +8,12 @@ create table if not exists InServerEmoji(
  ChannelID text,
  UTCTime text,
  EmojiID text,
+ EmojiName text,
  AnimatedFlag text
 );
 
-create table if not exists OutOfServerEmotji(
+drop table if exists OutOfServerEmoji;
+create table if not exists OutOfServerEmoji(
  GuildName text,
  GuildID text,
  UserName text,
@@ -18,6 +21,8 @@ create table if not exists OutOfServerEmotji(
  ChannelName text,
  ChannelID text,
  UTCTime text,
- EmojiName text
+ EmojiID text,
+ EmojiName text,
+ AnimatedFlag text
 );
 
