@@ -77,155 +77,105 @@ async def assignRoles():
 #lineLabel, numItems, guildID, curs, scale, topNum, drillType, drillName
 #graphType, graphXaxis, numMessages, guildID, numLines, drillDownType, drillDownTarget, curs
 #qc='''SELECT * FROM (SELECT * FROM Master x where x.GuildID == ? order by UTCTime DESC LIMIT ?) sub ORDER by UTCTime ASC'''
+
+
+#write a function that returns the sum of 2 numbers
+
+
 def Graph(graphType, graphXaxis, numMessages, guildID, numLines, drillDownTarget, curs):
-    st1=time.perf_counter()
-    lineLabel=3
-    param=(guildID, numMessages)
-    #print('drillTarget: '+drillDownTarget)
+    st1 = time.perf_counter()
+    lineLabel = 3
+    param = (guildID, numMessages)
     
     if graphType == 'channels':
-        lineLabel=5
-    #if graphType == 'user'
-    qc='''SELECT * FROM (SELECT * FROM Master x where x.GuildID == ? order by UTCTime DESC LIMIT ?) sub ORDER by UTCTime ASC'''
-    if graphType=='singleChannel':
-        print('single channel')
-        param=(guildID, drillDownTarget, numMessages)
-        qc='''SELECT * FROM (SELECT * FROM Master x where x.GuildID == ? and x.ChannelID == ? order by UTCTime DESC LIMIT ?) sub ORDER by UTCTime ASC'''
-    if graphType=='singleUser':
-        print('single user')
-        param=(guildID, drillDownTarget, numMessages)
-        qc='''SELECT * FROM (SELECT * FROM Master x where x.GuildID == ? and x.UserID == ? order by UTCTime DESC LIMIT ?) sub ORDER by UTCTime ASC'''
-        lineLabel=5
-    outSTR=''
-    outDict={}
-    dataDict={}
-    nameDict={}
-    curDay=''
-    dayList=[]
+        lineLabel = 5
     
-    #print(param)
-    et1=time.perf_counter()
-    logging.info("pre sql call time: "+str(et1-st1))
-    st1=time.perf_counter()
-    for row in curs.execute(qc,param):
+    if graphType == 'singleChannel' or graphType == 'singleUser':
+        print(graphType)
+        param = (guildID, drillDownTarget, numMessages)
+        if graphType == 'singleUser':
+            lineLabel = 5
+    
+    qc = '''SELECT * FROM (SELECT * FROM Master x where x.GuildID == ? order by UTCTime DESC LIMIT ?) sub ORDER by UTCTime ASC'''
+    
+    if graphType == 'singleChannel':
+        qc = '''SELECT * FROM (SELECT * FROM Master x where x.GuildID == ? and x.ChannelID == ? order by UTCTime DESC LIMIT ?) sub ORDER by UTCTime ASC'''
+    
+    if graphType == 'singleUser':
+        qc = '''SELECT * FROM (SELECT * FROM Master x where x.GuildID == ? and x.UserID == ? order by UTCTime DESC LIMIT ?) sub ORDER by UTCTime ASC'''
+    
+    outSTR = ''
+    outDict = {}
+    dataDict = {}
+    nameDict = {}
+    curDay = ''
+    dayList = []
+    
+    et1 = time.perf_counter()
+    logging.info("pre sql call time: " + str(et1 - st1))
+    st1 = time.perf_counter()
+    
+    curs.execute(qc, param)
+    rows = curs.fetchall()
+    
+    for row in rows:
         tstr = row[6]
         try:
             dt = datetime.strptime(tstr, "%Y-%m-%d %H:%M:%S.%f")
         except:
             dt = datetime.strptime(tstr, "%Y-%m-%d %H:%M:%S")
-        nameDict[str(row[lineLabel])]=str(row[lineLabel-1])
-        if not dataDict:
-            #print('dict empty')
-            dataDict[row[lineLabel]]=[]
-            dataDict[row[lineLabel]].append(0)
-        if not (row[lineLabel] in dataDict):
-            #print("not here")
-            dataDict[row[lineLabel]]=[]
-            for key in dataDict:
-                for item in dataDict[key]:
-                    dataDict[row[lineLabel]].append(0)
-                break
-        #print(dt.date())
-        if graphXaxis=='hour':
-            if curDay=='':
-                curDay=dt.strftime("%m / %d / %Y, %H")
-                #curDay=str(dt.date())
-                #curDay=curDay+str(dt.hour)
+        
+        nameDict[str(row[lineLabel])] = str(row[lineLabel - 1])
+        
+        if row[lineLabel] not in dataDict:
+            dataDict[row[lineLabel]] = [0] * len(dayList)
+        
+        if graphXaxis in {'hour', 'day'}:
+            if curDay == '':
+                curDay = dt.strftime("%m / %d / %Y") if graphXaxis == 'day' else dt.strftime("%m / %d / %Y, %H")
                 dayList.append(curDay)
-            if curDay==dt.strftime("%m / %d / %Y, %H"):#str(dt.date()):
-                dataDict[row[lineLabel]][len(dataDict[row[lineLabel]])-1]+=1
-            else:
-                curDay=dt.strftime("%m / %d / %Y, %H")
-                #curDay=str(dt.date())
-                #curDay=curDay+str(dt.hour)
+            
+            if curDay != (dt.strftime("%m / %d / %Y") if graphXaxis == 'day' else dt.strftime("%m / %d / %Y, %H")):
+                curDay = dt.strftime("%m / %d / %Y") if graphXaxis == 'day' else dt.strftime("%m / %d / %Y, %H")
                 dayList.append(curDay)
-                for key in dataDict:
-                    dataDict[key].append(0)
-                dataDict[row[lineLabel]][len(dataDict[row[lineLabel]])-1]+=1
                 
-        elif graphXaxis=='day':
-            if curDay=='':
-                curDay=dt.strftime("%m / %d / %Y")
-                #curDay=str(dt.date())
-                #curDay=curDay+str(dt.hour)
-                dayList.append(curDay)
-            if curDay==dt.strftime("%m / %d / %Y"):#str(dt.date()):
-                dataDict[row[lineLabel]][len(dataDict[row[lineLabel]])-1]+=1
-            else:
-                curDay=dt.strftime("%m / %d / %Y")
-                #curDay=str(dt.date())
-                #curDay=curDay+str(dt.hour)
-                dayList.append(curDay)
                 for key in dataDict:
                     dataDict[key].append(0)
-                dataDict[row[lineLabel]][len(dataDict[row[lineLabel]])-1]+=1
-        #vvvdepricated currentlyvvv
-        elif graphXaxis=='day-hour':
-            if curDay=='':
-                curDay=dt.strftime("%m / %d / %Y, %H")
-                #curDay=str(dt.date())
-                #curDay=curDay+str(dt.hour)
-                dayList.append(curDay)
-            if curDay==dt.strftime("%m / %d / %Y, %H"):#str(dt.date()):
-                dataDict[row[lineLabel]][len(dataDict[row[lineLabel]])-1]+=1
-            else:
-                curDay=dt.strftime("%m / %d / %Y, %H")
-                #curDay=str(dt.date())
-                #curDay=curDay+str(dt.hour)
-                dayList.append(curDay)
-                for key in dataDict:
-                    dataDict[key].append(0)
-                dataDict[row[lineLabel]][len(dataDict[row[lineLabel]])-1]+=1
-#                     if str(dt.date()) in outDict:
-#                         outDict[str(dt.date())]+=1
-#                     else:
-#                         outDict[str(dt.date())]=1
-#                     #outSTR+=tstr[0]+'\n'
-#                 
-#                 for key in outDict:
-#                     outSTR+=key + ':\t' + str(outDict[key]) + '\n'
-    #await message.channel.send(outSTR)
-    et1=time.perf_counter()
-    logging.info("sql loop time:"+str(et1-st1))
-    st1=time.perf_counter()
-    dataDict={k: dataDict[k] for k in sorted(dataDict, key=lambda k:sum(dataDict[k]), reverse=True)}
-    tempData={}
-    tempName={}
-    itr=0
-    #print(numLines+" lines")
-    try:
-        for item in list(dataDict.keys()):
-            #print('itr')
-            if numLines>0:
-                numLines-=1
-            else:
-                #print('deleting')
-                del dataDict[item]
-                del nameDict[item]
-            #print('itr2') 
-            itr+=1
-    except:
-        print('required?')
-    print(dataDict)
-    et1=time.perf_counter()
-    logging.info("data trimming time: "+str(et1-st1))
-    st1=time.perf_counter()
+        
+        dataDict[row[lineLabel]][-1] += 1
+    
+    et1 = time.perf_counter()
+    logging.info("sql loop time:" + str(et1 - st1))
+    st1 = time.perf_counter()
+    
+    dataDict = dict(sorted(dataDict.items(), key=lambda item: sum(item[1]), reverse=True)[:numLines])
+    nameDict = {k: nameDict[k] for k in dataDict}
+    
+    et1 = time.perf_counter()
+    logging.info("data trimming time: " + str(et1 - st1))
+    st1 = time.perf_counter()
+    
+    date_formats = {
+        'hour': "%m / %d / %Y, %H",
+        'day': "%m / %d / %Y"
+    }
+    
     df = pd.DataFrame(dataDict, index=pd.to_datetime(dayList))
     df.columns = df.columns.to_series().map(nameDict)
+    
     fig, ax = plt.subplots(figsize=(35, 20.5))
     df.plot(ax=ax)
     ax.set_xticks(df.index.to_numpy())
     ax.set_xticklabels(dayList, rotation=90, fontsize=22)
     ax.tick_params(axis='y', labelsize=30)
     ax.legend(prop={'size': 20})
-    print(dayList)
-    plt.savefig("images/" + guildID + ".png")
-
-    et1=time.perf_counter()
-    logging.info("data frame construction time: "+str(et1-st1))
-    #return dayList
     
-    return nameDict,dataDict
+    plt.savefig("images/" + guildID + ".png")
+    
+    et1 = time.perf_counter()
+    logging.info("data frame construction time: " + str(et1 - st1))
+    
+    return nameDict, dataDict
 
 lastDate=""
 dateQueue=deque(maxlen=4)
@@ -509,50 +459,13 @@ class MyClient(discord.Client):
                 role=get(message.guild.roles, id=1016131254497845280)
                 await message.channel.send(len(role.members))
                 
-            if message.content=='Who is Lune?' and message.author.id==100344687029665792:
-                await message.channel.send("Who is Lune?")
-                time.sleep(1.5)
-                m1=await message.channel.send("*Deep breath*")
-                time.sleep(1.5)
-                await m1.delete()
-                time.sleep(2)
-                await message.channel.send("For the blind, :see_no_evil:")
-                time.sleep(1.5)
-                await message.channel.send("She is the light. :bulb:")
-                time.sleep(3)
-                await message.channel.send("For the famished, :persevere:")
-                time.sleep(1.5)
-                await message.channel.send("She is sustinance. :bread:")
-                time.sleep(3.2)
-                await message.channel.send("For the sick, :mask:")
-                time.sleep(1.6)
-                await message.channel.send("She is the cure. :syringe:")
-                time.sleep(3.3)
-                await message.channel.send("For the sad, :sob:")
-                time.sleep(1.6)
-                await message.channel.send("She is joy. :blush:")
-                time.sleep(3.3)
-                await message.channel.send("For the poor, :no_entry_sign: :coin:")
-                time.sleep(1.5)
-                await message.channel.send("She is the treasure. :moneybag:")
-                time.sleep(3.3)
-                await message.channel.send("For the debtor, :pensive:")
-                time.sleep(1.4)
-                await message.channel.send("She is forgivness. :pray:")
-                time.sleep(2.3)
-                m1=await message.channel.send("(pause for effect)")
-                time.sleep(1.2)
-                await m1.delete()
-                time.sleep(2)
-                await message.channel.send("And on my chessboard,")
-                time.sleep(2)
-                await message.channel.send("...")
-                time.sleep(2)
-                await message.channel.send("She is my queen.")
-                time.sleep(.75)
-                await message.channel.send(":face_holding_back_tears:")
-            
-                #await message.channel.send(tmp)
+
+            if "girlcockx.com" in message.content:
+                resposneImage=discord.File("images/based_on_recent_events.png", filename="response.png")
+                await message.reply(file=resposneImage)
+                print("hold")
+
+
             if (splitstr[0]=='ping' or splitstr[0]=='Ping'):
                 if message.author.id==100344687029665792:
                     await message.channel.send("prong")
