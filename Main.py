@@ -88,6 +88,7 @@ def mostUsedEmojis(guildID, curs):
             EmojiID,
             EmojiName,
             COUNT(EmojiID) AS EmojiCount,
+            AnimatedFlag,
             MAX(UTCTime) AS LastUsedTime
         FROM InServerEmoji
         WHERE GuildID = ?  
@@ -100,6 +101,7 @@ def mostUsedEmojis(guildID, curs):
             EmojiID,
             EmojiName,
             EmojiCount,
+            AnimatedFlag,
             LastUsedTime,
             RANK() OVER (PARTITION BY UserID ORDER BY EmojiCount DESC, LastUsedTime DESC) AS Rank
         FROM EmojiUsage
@@ -110,6 +112,7 @@ def mostUsedEmojis(guildID, curs):
         EmojiID,
         EmojiName,
         EmojiCount,
+        AnimatedFlag,
         LastUsedTime
     FROM RankedEmojis
     WHERE Rank = 1
@@ -506,7 +509,10 @@ class MyClient(discord.Client):
                 emojiList=mostUsedEmojis(str(message.guild.id), curs)
                 output=""
                 for entry in emojiList:
-                    output+=str(entry[1])+" : <:"+str(entry[3])+":"+ str(entry[2])+"> : "+str(entry[4])+" uses\n"
+                    if entry[5]=="a":
+                        output+=str(entry[1])+" : <a:"+str(entry[3])+":"+ str(entry[2])+"> : "+str(entry[4])+" uses\n"
+                    else:
+                        output+=str(entry[1])+" : <:"+str(entry[3])+":"+ str(entry[2])+"> : "+str(entry[4])+" uses\n"
                 await message.channel.send(output)
 
 
