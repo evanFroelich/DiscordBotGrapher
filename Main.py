@@ -79,7 +79,44 @@ async def assignRoles():
 #qc='''SELECT * FROM (SELECT * FROM Master x where x.GuildID == ? order by UTCTime DESC LIMIT ?) sub ORDER by UTCTime ASC'''
 
 
-#write a function that returns the sum of 2 numbers
+def mostUsedEmojis(guildID, curs):
+    query = """
+    WITH EmojiUsage AS (
+        SELECT 
+            UserID,
+            UserName,
+            EmojiID,
+            EmojiName,
+            COUNT(EmojiID) AS EmojiCount,
+            MAX(UTCTime) AS LastUsedTime
+        FROM InServerEmoji
+        WHERE GuildID = ?  
+        GROUP BY UserID, EmojiID
+    ),
+    RankedEmojis AS (
+        SELECT 
+            UserID,
+            UserName,
+            EmojiID,
+            EmojiName,
+            EmojiCount,
+            LastUsedTime,
+            RANK() OVER (PARTITION BY UserID ORDER BY EmojiCount DESC, LastUsedTime DESC) AS Rank
+        FROM EmojiUsage
+    )
+    SELECT 
+        UserID,
+        UserName,
+        EmojiID,
+        EmojiName,
+        EmojiCount,
+        LastUsedTime
+    FROM RankedEmojis
+    WHERE Rank = 1
+    ORDER BY EmojiCount DESC, LastUsedTime DESC;
+    """
+    sqlResponse=curs.execute(query, (guildID,))
+    return sqlResponse.fetchall()
 
 
 def Graph(graphType, graphXaxis, numMessages, guildID, numLines, drillDownTarget, curs):
@@ -464,6 +501,14 @@ class MyClient(discord.Client):
                 resposneImage=discord.File("images/based_on_recent_events.png", filename="response.png")
                 await message.reply(file=resposneImage)
                 print("hold")
+
+            if splitstr[0]=='mostUsedEmojis':
+                emojiList=mostUsedEmojis(str(message.guild.id), curs)
+                output=""
+                for entry in emojiList:
+                    output+=str(entry[1])+" : <:"+str(entry[3])+":"+ str(entry[2])+"> : "+str(entry[4])+" uses\n"
+                await message.channel.send(output)
+
 
 
             if (splitstr[0]=='ping' or splitstr[0]=='Ping'):
