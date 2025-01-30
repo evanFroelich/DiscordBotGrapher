@@ -9,8 +9,6 @@ from random import random
 from datetime import datetime
 from collections import deque
 import pandas as pd
-#import matplotlib
-#matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import logging
@@ -106,8 +104,17 @@ class MyClient(discord.Client):
         sched=AsyncIOScheduler()
         sched.add_job(assignRoles,'interval',seconds=900)
         #sched.start()
+
+        await client.tree.sync()
         
-        
+    def __init__(self, *, intents, **options):
+        super().__init__(intents=intents, **options)
+        self.tree = app_commands.CommandTree(self)
+
+    async def setup_hook(self):
+        await self.tree.sync()
+        print('synced')
+
     async def on_thread_create(self,thread):
         await thread.join()
 
@@ -313,26 +320,115 @@ client = MyClient(intents=intents)
 
 
 
-#@client.tree.command(name="ping", description="Replies with Pong!")
-    #async def ping(interaction: discord.Interaction):
-        #await interaction.response.send_message("Pong!")
+@client.tree.command(name="ping", description="Replies with Pong!")
+async def ping(interaction: discord.Interaction):
+    await interaction.response.send_message("Pong!")
 
-def mostUsedEmojis(guildID, curs):
-    query = """
-    WITH EmojiUsage AS (
-        SELECT 
-            UserID,
-            UserName,
-            EmojiID,
-            EmojiName,
-            COUNT(EmojiID) AS EmojiCount,
-            AnimatedFlag,
-            MAX(UTCTime) AS LastUsedTime
-        FROM InServerEmoji
-        WHERE GuildID = ?  
-        GROUP BY UserID, EmojiID
-    ),
-    RankedEmojis AS (
+@client.tree.command(name="pong", description="Replies with Ping!")
+async def pong(interaction: discord.Interaction):
+    await interaction.response.send_message("Ping!")
+
+@client.tree.command(name="mostusedemojis",description="Queries emoji data for this server.")
+@app_commands.choices(inorout=[
+    app_commands.Choice(name="inServerEmoji", value="in"),
+    app_commands.Choice(name="outOfServerEmoji", value="out")
+])
+@app_commands.choices(subtype=[
+    app_commands.Choice(name="server", value="server"),
+    app_commands.Choice(name="users", value="user")
+])
+async def mostUsedEmojis(interaction: discord.Interaction, inorout: app_commands.Choice[str], subtype: app_commands.Choice[str]):
+    DB_NAME = "My_DB"
+    conn = sqlite3.connect(DB_NAME)
+    curs = conn.cursor()
+
+    output=""
+    if inorout.value == 'in':
+        if subtype.value == 'user':
+            list=emojiQuery(str(interaction.guild.id), 1, curs)
+            for entry in list:
+                if entry[5]=="a":
+                    output+=str(entry[1])+" : <a:"+str(entry[3])+":"+ str(entry[2])+"> : "+str(entry[4])+" uses\n"
+                else:
+                    output+=str(entry[1])+" : <:"+str(entry[3])+":"+ str(entry[2])+"> : "+str(entry[4])+" uses\n"
+        elif subtype.value == 'server':
+            list=emojiQuery(str(interaction.guild.id), 3, curs)
+            for entry in list:
+                if entry[2]=="a":
+                    output+"<a:"+str(entry[0])+":"+ str(entry[1])+"> : "+str(entry[3])+" uses\n"
+                else:
+                    output+="<:"+str(entry[0])+":"+ str(entry[1])+"> : "+str(entry[3])+" uses\n"
+
+    if inorout.value == 'out':
+        if subtype.value == 'user':
+            list=emojiQuery(str(interaction.guild.id), 2, curs)
+            for entry in list:
+                if entry[5]=="a":
+                    output+=str(entry[1])+" : <a:"+str(entry[3])+":"+ str(entry[2])+"> : "+str(entry[4])+" uses\n"
+                else:
+                    output+=str(entry[1])+" : <:"+str(entry[3])+":"+ str(entry[2])+"> : "+str(entry[4])+" uses\n"
+        elif subtype.value == 'server':
+            list=emojiQuery(str(interaction.guild.id), 4, curs)
+            for entry in list:
+                if entry[2]=="a":
+                    output+"<a:"+str(entry[0])+":"+ str(entry[1])+"> : "+str(entry[3])+" uses\n"
+                else:
+                    output+="<:"+str(entry[0])+":"+ str(entry[1])+"> : "+str(entry[3])+" uses\n"
+    if output=="":
+        output="no data found"
+    await interaction.response.send_message(output)
+
+    conn.commit()
+    #Close DB
+    curs.close()
+    conn.close()
+    return
+
+@client.tree.command(name="servergraph", description="Replies with a graph of activity")
+@app_commands.choices(subtype=[
+    app_commands.Choice(name="channel", value="channel"),
+    app_commands.Choice(name="user", value="user"),
+    app_commands.Choice(name="singleChannel", value="singleChannel"),
+    app_commands.Choice(name="singleUser", value="singleUser")
+])
+#@app_commands.describe(subtype="subtype of graph to display (channel, user, singleChannel, singleUser) <default: channel>")
+@app_commands.describe(numberofmessages="number of messages to include in graph <default: 1000>")
+@app_commands.describe(xaxislabel="x axis label (day, hour) <default: day>")
+@app_commands.describe(drilldowntarget="target of drill down if using single channel or single user [optional] (channelID or userID) <default: none>")
+@app_commands.describe(numberoflines="number of lines to display <default: 15>")
+
+async def servergraph(interaction: discord.Interaction, subtype: app_commands.Choice[str], numberofmessages: int = 1000, xaxislabel: str = 'day', drilldowntarget: str = '', numberoflines: int = 15):
+    await interaction.response.send_message("pong")
+#mode: 1=in server by user, 2= out of server by user, 3=in server by raw count, 4=out of server by raw count
+def emojiQuery(guildID, mode, curs):
+    query = ""
+    if mode == 1:
+        query = """
+        WITH EmojiUsage AS (
+            SELECT 
+                UserID,
+                UserName,
+                EmojiID,
+                EmojiName,
+                COUNT(EmojiID) AS EmojiCount,
+                AnimatedFlag,
+                MAX(UTCTime) AS LastUsedTime
+            FROM InServerEmoji
+            WHERE GuildID = ?  
+            GROUP BY UserID, EmojiID
+        ),
+        RankedEmojis AS (
+            SELECT 
+                UserID,
+                UserName,
+                EmojiID,
+                EmojiName,
+                EmojiCount,
+                AnimatedFlag,
+                LastUsedTime,
+                RANK() OVER (PARTITION BY UserID ORDER BY EmojiCount DESC, LastUsedTime DESC) AS Rank
+            FROM EmojiUsage
+        )
         SELECT 
             UserID,
             UserName,
@@ -340,25 +436,77 @@ def mostUsedEmojis(guildID, curs):
             EmojiName,
             EmojiCount,
             AnimatedFlag,
-            LastUsedTime,
-            RANK() OVER (PARTITION BY UserID ORDER BY EmojiCount DESC, LastUsedTime DESC) AS Rank
-        FROM EmojiUsage
-    )
-    SELECT 
-        UserID,
-        UserName,
-        EmojiID,
-        EmojiName,
-        EmojiCount,
-        AnimatedFlag,
-        LastUsedTime
-    FROM RankedEmojis
-    WHERE Rank = 1
-    ORDER BY EmojiCount DESC, LastUsedTime DESC;
-    """
+            LastUsedTime
+        FROM RankedEmojis
+        WHERE Rank = 1
+        ORDER BY EmojiCount DESC, LastUsedTime DESC;
+        """
+    elif mode == 2:
+        query = """
+        WITH EmojiUsage AS (
+            SELECT 
+                UserID,
+                UserName,
+                EmojiID,
+                EmojiName,
+                COUNT(EmojiID) AS EmojiCount,
+                AnimatedFlag,
+                MAX(UTCTime) AS LastUsedTime
+            FROM OutOfServerEmoji
+            WHERE GuildID = ?  
+            GROUP BY UserID, EmojiID
+        ),
+        RankedEmojis AS (
+            SELECT 
+                UserID,
+                UserName,
+                EmojiID,
+                EmojiName,
+                EmojiCount,
+                AnimatedFlag,
+                LastUsedTime,
+                RANK() OVER (PARTITION BY UserID ORDER BY EmojiCount DESC, LastUsedTime DESC) AS Rank
+            FROM EmojiUsage
+        )
+        SELECT 
+            UserID,
+            UserName,
+            EmojiID,
+            EmojiName,
+            EmojiCount,
+            AnimatedFlag,
+            LastUsedTime
+        FROM RankedEmojis
+        WHERE Rank = 1
+        ORDER BY EmojiCount DESC, LastUsedTime DESC;
+        """
+    elif mode == 3:
+        query="""
+        SELECT   
+            EmojiName, 
+            EmojiID,
+            AnimatedFlag, 
+            COUNT(*) AS EmojiUsageCount
+        FROM InServerEmoji
+        WHERE GuildID = ?
+        GROUP BY EmojiName, EmojiID
+        ORDER BY EmojiUsageCount DESC;
+        """
+    elif mode == 4:
+        query="""
+        SELECT   
+            EmojiName, 
+            EmojiID, 
+            AnimatedFlag,
+            COUNT(*) AS EmojiUsageCount
+        FROM OutOfServerEmoji
+        WHERE GuildID = ?
+        GROUP BY EmojiName, EmojiID
+        ORDER BY EmojiUsageCount DESC;
+        """
+
     sqlResponse=curs.execute(query, (guildID,))
     return sqlResponse.fetchall()
-
 
 def Graph(graphType, graphXaxis, numMessages, guildID, numLines, drillDownTarget, curs):
     st1 = time.perf_counter()
