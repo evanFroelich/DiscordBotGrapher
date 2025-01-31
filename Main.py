@@ -73,12 +73,6 @@ async def assignRoles():
 
 
 
-#lineLabel, numItems, guildID, curs, scale, topNum, drillType, drillName
-#graphType, graphXaxis, numMessages, guildID, numLines, drillDownType, drillDownTarget, curs
-#qc='''SELECT * FROM (SELECT * FROM Master x where x.GuildID == ? order by UTCTime DESC LIMIT ?) sub ORDER by UTCTime ASC'''
-
-
-
 
 class MyClient(discord.Client):
     ignoreList=[]
@@ -233,18 +227,7 @@ class MyClient(discord.Client):
                 await message.reply(file=resposneImage)
                 print("hold")
 
-            if splitstr[0]=='mostUsedEmojis':
-                emojiList=mostUsedEmojis(str(message.guild.id), curs)
-                output=""
-                for entry in emojiList:
-                    if entry[5]=="a":
-                        output+=str(entry[1])+" : <a:"+str(entry[3])+":"+ str(entry[2])+"> : "+str(entry[4])+" uses\n"
-                    else:
-                        output+=str(entry[1])+" : <:"+str(entry[3])+":"+ str(entry[2])+"> : "+str(entry[4])+" uses\n"
-                await message.channel.send(output)
-
-
-
+       
             if (splitstr[0]=='ping' or splitstr[0]=='Ping'):
                 if message.author.id==100344687029665792:
                     await message.channel.send("prong")
@@ -265,22 +248,15 @@ class MyClient(discord.Client):
                         await message.channel.send("kong")
                     else:
                         await message.channel.send("you found the special message. here is your gold star!")
-                    print("")
-        #except:
-            #print('error')
-                #await message.channel.send("")
-        #Connect or Create DB File
-#         DB_NAME = "My_DB"
-#         conn = sqlite3.connect(DB_NAME)
-#         curs = conn.cursor()
-        #curs.execute('''INSERT INTO StdSensorTypes (SensorCode, SensorType) VALUES ("s7", "Door-Windows Sensor")''')
-        #curs.execute('''INSERT INTO Master (GuildName, GuildID, UserName, UserID, ChannelName, ChannelID, UTCTime) VALUES (message.author.name)''')
-        #curs.execute('''INSERT INTO Master (GuildName) VALUES (?)''')
+
+        #inserting row into master db table          
         tp='''INSERT INTO Master (GuildName,GuildID, UserName, UserID, ChannelName, ChannelID, UTCTime) VALUES (?,?,?,?,?,?,?);'''
         data=(message.guild.name,str(message.guild.id),message.author.name,str(message.author.id),message.channel.name,str(message.channel.id),str(message.created_at.utcnow()))
         curs.execute(tp,data)
 
         print(message.content)
+
+        #inserting emote data into db table
         pattern=r'<(?P<animated>a?):(?P<name>[a-zA-Z0-9_]{2,32}):(?P<id>[0-9]{18,22})>'
         for match in re.finditer(pattern, message.content):
             #print(match.group('name'))
@@ -322,11 +298,23 @@ client = MyClient(intents=intents)
 
 @client.tree.command(name="ping", description="Replies with Pong!")
 async def ping(interaction: discord.Interaction):
-    await interaction.response.send_message("Pong!")
+    rand=random()
+    payload=""
+    if rand<.2:
+        payload="pong"
+    elif rand<.4:
+        payload="song"
+    elif rand<.6:
+        payload="dong"
+    elif rand<.8:
+        payload="long"
+    elif rand<.99:
+        payload="kong"
+    else:
+        payload="you found the special message. here is your gold star!"
+    #await interaction.channel.send(payload)
+    await interaction.response.send_message(payload)
 
-@client.tree.command(name="pong", description="Replies with Ping!")
-async def pong(interaction: discord.Interaction):
-    await interaction.response.send_message("Ping!")
 
 @client.tree.command(name="mostusedemojis",description="Queries emoji data for this server.")
 @app_commands.choices(inorout=[
@@ -386,19 +374,42 @@ async def mostUsedEmojis(interaction: discord.Interaction, inorout: app_commands
 
 @client.tree.command(name="servergraph", description="Replies with a graph of activity")
 @app_commands.choices(subtype=[
-    app_commands.Choice(name="channel", value="channel"),
-    app_commands.Choice(name="user", value="user"),
+    app_commands.Choice(name="channel", value="channels"),
+    app_commands.Choice(name="user", value="users"),
     app_commands.Choice(name="singleChannel", value="singleChannel"),
     app_commands.Choice(name="singleUser", value="singleUser")
 ])
+@app_commands.choices(xaxislabel=[
+    app_commands.Choice(name="day", value="day"),
+    app_commands.Choice(name="hour", value="hour")
+])
 #@app_commands.describe(subtype="subtype of graph to display (channel, user, singleChannel, singleUser) <default: channel>")
 @app_commands.describe(numberofmessages="number of messages to include in graph <default: 1000>")
-@app_commands.describe(xaxislabel="x axis label (day, hour) <default: day>")
+#@app_commands.describe(xaxislabel="x axis label (day, hour) <default: day>")
 @app_commands.describe(drilldowntarget="target of drill down if using single channel or single user [optional] (channelID or userID) <default: none>")
 @app_commands.describe(numberoflines="number of lines to display <default: 15>")
 
-async def servergraph(interaction: discord.Interaction, subtype: app_commands.Choice[str], numberofmessages: int = 1000, xaxislabel: str = 'day', drilldowntarget: str = '', numberoflines: int = 15):
-    await interaction.response.send_message("pong")
+async def servergraph(interaction: discord.Interaction, subtype: app_commands.Choice[str], numberofmessages: int = 1000, xaxislabel: app_commands.Choice[str]='day', drilldowntarget: str = '', numberoflines: int = 15):
+    DB_NAME = "My_DB"
+    conn = sqlite3.connect(DB_NAME)
+    curs = conn.cursor()
+
+    guildID=str(interaction.guild.id)
+    guildName=interaction.guild.name
+    Graph(subtype.value, xaxislabel.value, numberofmessages, guildID, numberoflines, drilldowntarget, curs)
+    graphFile=discord.File("images/"+str(guildID)+".png", filename="graph.png")
+    embed=discord.Embed(title="Activity Graph",color=0x228a65)
+    embed.set_image(url="attachment://graph.png")
+    embed.set_author(name=guildName, icon_url=interaction.guild.icon.url)
+    await interaction.response.send_message(file=graphFile, embed=embed)
+
+    conn.commit()
+    #Close DB
+    curs.close()
+    conn.close()
+    return
+
+
 #mode: 1=in server by user, 2= out of server by user, 3=in server by raw count, 4=out of server by raw count
 def emojiQuery(guildID, mode, curs):
     query = ""
