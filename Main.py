@@ -389,7 +389,7 @@ async def mostUsedEmojis(interaction: discord.Interaction, inorout: app_commands
 @app_commands.describe(drilldowntarget="target of drill down if using single channel or single user [optional] (channelID or userID) <default: none>")
 @app_commands.describe(numberoflines="number of lines to display <default: 15>")
 
-async def servergraph(interaction: discord.Interaction, subtype: app_commands.Choice[str], numberofmessages: int = 1000, xaxislabel: app_commands.Choice[str]='day', drilldowntarget: str = '', numberoflines: int = 15):
+async def servergraph(interaction: discord.Interaction, subtype: app_commands.Choice[str], xaxislabel: app_commands.Choice[str], numberofmessages: int = 1000, drilldowntarget: str = '', numberoflines: int = 15):
     DB_NAME = "My_DB"
     conn = sqlite3.connect(DB_NAME)
     curs = conn.cursor()
