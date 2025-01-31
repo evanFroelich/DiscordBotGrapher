@@ -390,6 +390,7 @@ async def mostUsedEmojis(interaction: discord.Interaction, inorout: app_commands
 @app_commands.describe(numberoflines="number of lines to display <default: 15>")
 
 async def servergraph(interaction: discord.Interaction, subtype: app_commands.Choice[str], xaxislabel: app_commands.Choice[str], numberofmessages: int = 1000, drilldowntarget: str = '', numberoflines: int = 15):
+    await interaction.response.defer(thinking=True)
     DB_NAME = "My_DB"
     conn = sqlite3.connect(DB_NAME)
     curs = conn.cursor()
@@ -401,7 +402,7 @@ async def servergraph(interaction: discord.Interaction, subtype: app_commands.Ch
     embed=discord.Embed(title="Activity Graph",color=0x228a65)
     embed.set_image(url="attachment://graph.png")
     embed.set_author(name=guildName, icon_url=interaction.guild.icon.url)
-    await interaction.response.send_message(file=graphFile, embed=embed)
+    await interaction.followup.send(file=graphFile, embed=embed)
 
     conn.commit()
     #Close DB
