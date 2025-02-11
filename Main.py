@@ -83,12 +83,19 @@ class MyClient(discord.Client):
         print(random())
         channel=client.get_channel(150421071676309504)
         await channel.send("rebooted")
+        channel=client.get_channel(1337282148054470808)
+        await channel.send("rebooted")
         DB_NAME = "My_DB"
         conn = sqlite3.connect(DB_NAME)
         curs = conn.cursor()
 
-        with open('Emote_Graph_Schema.sql') as f:
+        with open('Schemas.sql') as f:
             curs.executescript(f.read())
+
+        currentGuilds=[guild.id for guild in client.guilds]
+        print(currentGuilds)
+        for guild in currentGuilds:
+            curs.execute('''INSERT OR IGNORE INTO ServerSettings (GuildID) VALUES (?);''',(guild,))
         
         conn.commit()  
         curs.close()
@@ -112,6 +119,17 @@ class MyClient(discord.Client):
     async def on_thread_create(self,thread):
         await thread.join()
 
+    #untested
+    async def on_guild_join(self, guild):
+        DB_NAME = "My_DB"
+        conn = sqlite3.connect(DB_NAME)
+        curs = conn.cursor()
+        curs.execute('''INSERT OR IGNORE INTO ServerSettings (GuildID) VALUES (?);''',(guild.id,))
+        
+        conn.commit()  
+        curs.close()
+        conn.close()
+
     async def on_message(self, message):
         if message.author==client.user:
             return
@@ -134,58 +152,7 @@ class MyClient(discord.Client):
         print(message.guild.name)
         splitstr=message.content.split()
         if len(message.content)>0:
-            if splitstr[0]=='..graph':
-                st1=time.perf_counter()
-                graphType='channels'
-                graphXaxis='day'
-                numMessages=99999
-                guildID=str(message.guild.id)
-                numLines=15
-                drillDownType=''
-                drillDownTarget=''
-                try:
-                    if splitstr[1] == 'channel':
-                        graphType='channels'
-                    elif splitstr[1] == 'user':
-                        graphType='users'
-                    elif splitstr[1] == 'singleChannel':
-                        graphType='singleChannel'
-                    elif splitstr[1] == 'singleUser':
-                        graphType='singleUser'
-                    print('param1 set: '+graphType)
-                    numMessages=splitstr[2]
-                    print("param2 set")
-                    if splitstr[3] == 'day':
-                        graphXaxis='day'
-                    elif splitstr[3] == 'hour':
-                        graphXaxis='hour'
-                    print("param3 set")
                     
-                    numLines=splitstr[4]
-                    print('param4 set')
-                    if graphType == 'singleChannel' or graphType == 'singleUser':
-                       # drillDownType=splitstr[5]
-                        drillDownTarget=splitstr[5]
-                        await message.channel.send(drillDownTarget)
-                        
-                except IndexError:
-                    await message.channel.send('incorrect parameter, using defaults')
-                et1=time.perf_counter()
-                #await message.channel.send(str(et1-st1))
-                startTime=time.perf_counter()
-                Graph(graphType, graphXaxis, numMessages, guildID, int(numLines), drillDownTarget, curs)
-                endTime=time.perf_counter()
-                graphFile=discord.File("images/"+str(message.guild.id)+".png", filename="graph.png")
-                #await message.channel.send(str(endTime-startTime))
-                guildName=message.guild.name
-                embed=discord.Embed(title="Activity Graph",color=0x228a65)
-                embed.set_image(url="attachment://graph.png")
-                embed.set_author(name=guildName, icon_url=message.guild.icon.url)
-                await message.channel.send(file=graphFile, embed=embed)
-                #await message.channel.send(file=discord.File("images/"+str(message.guild.id)+".png"))
-                
-                    
-        #try:
             if splitstr[0]=='top3':
                 tmp,extra=topChat('users','day',300,str(message.guild.id),3,'',curs)
                 for key in tmp:
@@ -223,9 +190,12 @@ class MyClient(discord.Client):
                 
 
             if "girlcockx.com" in message.content:
-                resposneImage=discord.File("images/based_on_recent_events.png", filename="response.png")
-                await message.reply(file=resposneImage)
-                print("hold")
+                r=random()
+                #10% chance of response
+                if r<.1:
+                    resposneImage=discord.File("images/based_on_recent_events.png", filename="response.png")
+                    await message.reply(file=resposneImage)
+                    print("hold")
 
        
             if (splitstr[0]=='ping' or splitstr[0]=='Ping'):
@@ -249,12 +219,13 @@ class MyClient(discord.Client):
                     else:
                         await message.channel.send("you found the special message. here is your gold star!")
 
+
+
         #inserting row into master db table          
         tp='''INSERT INTO Master (GuildName,GuildID, UserName, UserID, ChannelName, ChannelID, UTCTime) VALUES (?,?,?,?,?,?,?);'''
         data=(message.guild.name,str(message.guild.id),message.author.name,str(message.author.id),message.channel.name,str(message.channel.id),str(message.created_at.utcnow()))
         curs.execute(tp,data)
 
-        print(message.content)
 
         #inserting emote data into db table
         pattern=r'<(?P<animated>a?):(?P<name>[a-zA-Z0-9_]{2,32}):(?P<id>[0-9]{18,22})>'
@@ -278,12 +249,6 @@ class MyClient(discord.Client):
                 curs.execute(insertStr,Emojidata)
                 #await message.channel.send('emoji not in guild')
 
-            if match.group('animated')=='a':
-                print('animated')
-                #await message.channel.send('<a:'+match.group('name')+':'+match.group('id')+'>')
-            else:
-                print('not animated')
-                #await message.channel.send('<:'+match.group('name')+':'+match.group('id')+'>')
 
         conn.commit()
         #Close DB
@@ -401,6 +366,7 @@ async def servergraph(interaction: discord.Interaction, subtype: app_commands.Ch
     graphFile=discord.File("images/"+str(guildID)+".png", filename="graph.png")
     embed=discord.Embed(title="Activity Graph",color=0x228a65)
     embed.set_image(url="attachment://graph.png")
+    #TODO: crashes out if guild has no icon
     embed.set_author(name=guildName, icon_url=interaction.guild.icon.url)
     await interaction.followup.send(file=graphFile, embed=embed)
 
@@ -555,7 +521,7 @@ def Graph(graphType, graphXaxis, numMessages, guildID, numLines, drillDownTarget
     
     curs.execute(qc, param)
     rows = curs.fetchall()
-    print("what is in here")
+    #print("what is in here")
     #print(rows)
     
     for row in rows:
@@ -771,8 +737,7 @@ def topChat(graphType, graphXaxis, numMessages, guildID, numLines, drillDownTarg
         print(nameDict[nameid]+": "+str(sum(dataDict[nameid])))
     return nameDict,dataDict
 
-def t_make():
-    print('')
+
 
 
 
