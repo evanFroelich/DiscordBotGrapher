@@ -348,13 +348,19 @@ async def mostUsedEmojis(interaction: discord.Interaction, inorout: app_commands
     app_commands.Choice(name="day", value="day"),
     app_commands.Choice(name="hour", value="hour")
 ])
+@app_commands.choices(logging=[
+    app_commands.Choice(name="true", value="true"),
+    app_commands.Choice(name="false", value="false")
+])
 #@app_commands.describe(subtype="subtype of graph to display (channel, user, singleChannel, singleUser) <default: channel>")
 @app_commands.describe(numberofmessages="number of messages to include in graph <default: 1000>")
 #@app_commands.describe(xaxislabel="x axis label (day, hour) <default: day>")
 @app_commands.describe(drilldowntarget="target of drill down if using single channel or single user [optional] (channelID or userID) <default: none>")
 @app_commands.describe(numberoflines="number of lines to display <default: 15>")
+#@app_commands.describe(logging="enable logging <default: false>")
 
-async def servergraph(interaction: discord.Interaction, subtype: app_commands.Choice[str], xaxislabel: app_commands.Choice[str], numberofmessages: int = 1000, drilldowntarget: str = '', numberoflines: int = 15):
+async def servergraph(interaction: discord.Interaction, subtype: app_commands.Choice[str], xaxislabel: app_commands.Choice[str], logging: app_commands.Choice[str], numberofmessages: int = 1000, drilldowntarget: str = '', numberoflines: int = 15):
+    time1 = time.perf_counter()
     await interaction.response.defer(thinking=True)
     DB_NAME = "My_DB"
     conn = sqlite3.connect(DB_NAME)
@@ -362,13 +368,37 @@ async def servergraph(interaction: discord.Interaction, subtype: app_commands.Ch
 
     guildID=str(interaction.guild.id)
     guildName=interaction.guild.name
-    Graph(subtype.value, xaxislabel.value, numberofmessages, guildID, numberoflines, drilldowntarget, curs)
+    time2=time.perf_counter()
+    t1=time2-time1
+    t2,t3,t4,t5,t6=Graph(subtype.value, xaxislabel.value, numberofmessages, guildID, numberoflines, drilldowntarget, curs)
+    time3=time.perf_counter()
+    t7=time3-time2
     graphFile=discord.File("images/"+str(guildID)+".png", filename="graph.png")
     embed=discord.Embed(title="Activity Graph",color=0x228a65)
     embed.set_image(url="attachment://graph.png")
     #TODO: crashes out if guild has no icon
     embed.set_author(name=guildName, icon_url=interaction.guild.icon.url)
     await interaction.followup.send(file=graphFile, embed=embed)
+    time4=time.perf_counter()
+    t8=time4-time1
+    if logging.value=='true':
+        log_file_path = 'logs/' + guildID + '.txt'
+        with open(log_file_path, 'w') as log_file:
+            log_file.write(f"t1: {round(t1,2)} seconds to complete pre flight code\n")
+            log_file.write(f"t2: {round(t2,2)} seconds to complete pre sql code\n")
+            log_file.write(f"t3: {round(t3,2)} seconds to complete the sql call\n")
+            log_file.write(f"t4: {round(t4,2)} seconds to complete dataframe assembly\n")
+            log_file.write(f"t5: {round(t5,2)} seconds to complete sorting data points\n")
+            log_file.write(f"t6: {round(t6,2)} seconds to complete graph image creation\n")
+            log_file.write(f"t7: {round(t7,2)} seconds to complete whole graph process\n")
+            log_file.write(f"t8: {round(t8,2)} seconds to complete entire command\n")
+        logFile=discord.File(log_file_path, filename=guildID+'.txt')
+        await interaction.channel.send(file=logFile)
+
+
+
+    
+
 
     conn.commit()
     #Close DB
@@ -517,13 +547,15 @@ def Graph(graphType, graphXaxis, numMessages, guildID, numLines, drillDownTarget
     
     et1 = time.perf_counter()
     logging.info("pre sql call time: " + str(et1 - st1))
+    ret1=et1-st1
     st1 = time.perf_counter()
     
     curs.execute(qc, param)
     rows = curs.fetchall()
-    #print("what is in here")
-    #print(rows)
+    et1 = time.perf_counter()
+    ret2=et1-st1
     
+    st1 = time.perf_counter()
     for row in rows:
         tstr = row[6]
         try:
@@ -566,6 +598,7 @@ def Graph(graphType, graphXaxis, numMessages, guildID, numLines, drillDownTarget
     
     et1 = time.perf_counter()
     logging.info("sql loop time:" + str(et1 - st1))
+    ret3=et1-st1
     st1 = time.perf_counter()
     
     dataDict = dict(sorted(dataDict.items(), key=lambda item: sum(item[1]), reverse=True)[:numLines])
@@ -573,6 +606,7 @@ def Graph(graphType, graphXaxis, numMessages, guildID, numLines, drillDownTarget
     
     et1 = time.perf_counter()
     logging.info("data trimming time: " + str(et1 - st1))
+    ret4=et1-st1
     st1 = time.perf_counter()
     
     date_formats = {
@@ -594,9 +628,12 @@ def Graph(graphType, graphXaxis, numMessages, guildID, numLines, drillDownTarget
     
     et1 = time.perf_counter()
     logging.info("data frame construction time: " + str(et1 - st1))
+    ret5=et1-st1
     
-    return nameDict, dataDict
+    return ret1, ret2, ret3, ret4, ret5
 
+
+#TODO: remove these globals, what was I thinking?
 lastDate=""
 dateQueue=deque(maxlen=4)
 def topChat(graphType, graphXaxis, numMessages, guildID, numLines, drillDownTarget, curs):
