@@ -378,9 +378,9 @@ async def servergraph(interaction: discord.Interaction, subtype: app_commands.Ch
     embed.set_image(url="attachment://graph.png")
     #TODO: crashes out if guild has no icon
     embed.set_author(name=guildName, icon_url=interaction.guild.icon.url)
-    await interaction.followup.send(file=graphFile, embed=embed)
     time4=time.perf_counter()
     t8=time4-time1
+    await interaction.followup.send(file=graphFile, embed=embed)
     if logging.value=='true':
         log_file_path = 'logs/' + guildID + '.txt'
         with open(log_file_path, 'w') as log_file:
@@ -390,6 +390,7 @@ async def servergraph(interaction: discord.Interaction, subtype: app_commands.Ch
             log_file.write(f"t4: {round(t4,2)} seconds to complete dataframe assembly\n")
             log_file.write(f"t5: {round(t5,2)} seconds to complete sorting data points\n")
             log_file.write(f"t6: {round(t6,2)} seconds to complete graph image creation\n")
+            log_file.write(f"-----------------------------------------------------\n")
             log_file.write(f"t7: {round(t7,2)} seconds to complete whole graph process\n")
             log_file.write(f"t8: {round(t8,2)} seconds to complete entire command\n")
         logFile=discord.File(log_file_path, filename=guildID+'.txt')
