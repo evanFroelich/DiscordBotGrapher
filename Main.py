@@ -98,6 +98,13 @@ class MyClient(discord.Client):
             curs.execute('''INSERT OR IGNORE INTO ServerSettings (GuildID) VALUES (?);''',(guild,))
         
         conn.commit()  
+        curs.execute('''CREATE INDEX IF NOT EXISTS idx_guild_time ON Master (GuildID, UTCTime)''')
+        
+        curs.execute("PRAGMA temp_store = MEMORY;")  # Use RAM for temp storage
+        curs.execute("PRAGMA synchronous = NORMAL;")  # Speeds up writes
+        curs.execute("PRAGMA journal_mode = WAL;")  # Allows concurrent reads/writes
+        curs.execute("PRAGMA cache_size = 1000000;")  # Increases cache size
+        conn.commit()
         curs.close()
         conn.close()
         #assignRoles.start()
@@ -124,7 +131,7 @@ class MyClient(discord.Client):
         DB_NAME = "My_DB"
         conn = sqlite3.connect(DB_NAME)
         curs = conn.cursor()
-        curs.execute('''INSERT OR IGNORE INTO ServerSettings (GuildID) VALUES (?);''',(guild.id,))
+        curs.execute('''INSERT OR IGNORE INTO ServerSettings (GuildID) VALUES (?);''',(guild.id))
         
         conn.commit()  
         curs.close()
@@ -370,7 +377,7 @@ async def servergraph(interaction: discord.Interaction, subtype: app_commands.Ch
     guildName=interaction.guild.name
     time2=time.perf_counter()
     t1=time2-time1
-    t2,t3,t4,t5,t6=Graph(subtype.value, xaxislabel.value, numberofmessages, guildID, numberoflines, drilldowntarget, curs)
+    t2,t3,t4,t5,t6,t3a,t3b=Graph(subtype.value, xaxislabel.value, numberofmessages, guildID, numberoflines, drilldowntarget, curs)
     time3=time.perf_counter()
     t7=time3-time2
     graphFile=discord.File("images/"+str(guildID)+".png", filename="graph.png")
@@ -387,6 +394,8 @@ async def servergraph(interaction: discord.Interaction, subtype: app_commands.Ch
             log_file.write(f"t1: {round(t1,2)} seconds to complete pre flight code\n")
             log_file.write(f"t2: {round(t2,2)} seconds to complete pre sql code\n")
             log_file.write(f"t3: {round(t3,2)} seconds to complete the sql call\n")
+            log_file.write(f"--t3a: {round(t3a,2)} seconds to execute sql\n")
+            log_file.write(f"--t3b: {round(t3b,2)} seconds to fetchall\n")
             log_file.write(f"t4: {round(t4,2)} seconds to complete dataframe assembly\n")
             log_file.write(f"t5: {round(t5,2)} seconds to complete sorting data points\n")
             log_file.write(f"t6: {round(t6,2)} seconds to complete graph image creation\n")
@@ -552,9 +561,12 @@ def Graph(graphType, graphXaxis, numMessages, guildID, numLines, drillDownTarget
     st1 = time.perf_counter()
     
     curs.execute(qc, param)
+    et2 = time.perf_counter()
     rows = curs.fetchall()
     et1 = time.perf_counter()
     ret2=et1-st1
+    ret2a=et2-st1
+    ret2b=et1-et2
     
     st1 = time.perf_counter()
     for row in rows:
@@ -631,7 +643,7 @@ def Graph(graphType, graphXaxis, numMessages, guildID, numLines, drillDownTarget
     logging.info("data frame construction time: " + str(et1 - st1))
     ret5=et1-st1
     
-    return ret1, ret2, ret3, ret4, ret5
+    return ret1, ret2, ret3, ret4, ret5, ret2a, ret2b
 
 
 #TODO: remove these globals, what was I thinking?
