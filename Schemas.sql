@@ -41,6 +41,7 @@ create table if not exists OutOfServerEmoji(
 create table if not exists ServerSettings (
     GuildID    TEXT UNIQUE,
     TopChatTracking    INTEGER DEFAULT 0,
+    PatchNotes    INTEGER DEFAULT 0,
     PRIMARY KEY(GuildID)
 );
 
@@ -60,4 +61,10 @@ CREATE TABLE if not exists TopChatData (
     UserID    INTEGER,
     Count    INTEGER,
     PRIMARY KEY(GuildID,Position)
+);
+
+CREATE TABLE if not exists PatchNotesSettings(
+    GuildID    TEXT UNIQUE,
+    ChannelID    INTEGER,
+    PRIMARY KEY(GuildID)
 );

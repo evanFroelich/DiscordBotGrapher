@@ -131,7 +131,7 @@ class MyClient(discord.Client):
         DB_NAME = "My_DB"
         conn = sqlite3.connect(DB_NAME)
         curs = conn.cursor()
-        curs.execute('''INSERT OR IGNORE INTO ServerSettings (GuildID) VALUES (?);''',(guild.id))
+        curs.execute('''INSERT OR IGNORE INTO ServerSettings (GuildID) VALUES (?);''',(guild.id,))
         
         conn.commit()  
         curs.close()
@@ -416,6 +416,138 @@ async def servergraph(interaction: discord.Interaction, subtype: app_commands.Ch
     conn.close()
     return
 
+
+class ServerSettingsView(discord.ui.View):
+    def __init__(self, guild_id):
+        super().__init__(timeout=None)  # No timeout
+        self.guild_id = guild_id  # Store the Guild ID
+        conn= sqlite3.connect("My_DB")
+        curs=conn.cursor()
+        curs.execute("SELECT * FROM ServerSettings WHERE GuildID = ?", (guild_id,))
+        self.featureStatus=curs.fetchall()
+        print(self.featureStatus)
+        conn.commit()
+        curs.close()
+        conn.close()
+
+        # Button 1: Toggle Top Chatter Tracking
+        if self.featureStatus[0][1]==1:
+            l1="Toggle Top Chatter Tracking<not working>: ✅ Enabled"
+            s1=discord.ButtonStyle.success
+        else:
+            l1="Toggle Top Chatter Tracking<not working>: ❌ Disabled"
+            s1=discord.ButtonStyle.danger
+        self.button1 = discord.ui.Button(label=l1, style=s1)
+        self.button1.callback = self.toggle_top_chatter
+        self.add_item(self.button1)
+
+        # Button 2: Toggle Patch Notes
+        if self.featureStatus[0][2]==1:
+            l2="Toggle Patch Notes ✅ Enabled"
+            s2=discord.ButtonStyle.success
+        else:
+            l2="Toggle Patch Notes ❌ Disabled"
+            s2=discord.ButtonStyle.danger
+        self.button2 = discord.ui.Button(label=l2, style=s2)
+        self.button2.callback = self.toggle_patch_notes
+        self.add_item(self.button2)
+
+    async def toggle_top_chatter(self, interaction: discord.Interaction):
+        """Toggles Top Chatter Tracking in the database."""
+        newStatus = toggle_feature(self.guild_id, "TopChatTracking")  # Toggles in DB
+        # Update button label and style based on new status
+        if newStatus == 1:
+            self.button1.label = "Toggle Top Chatter Tracking<working>: ✅ Enabled"
+            self.button1.style = discord.ButtonStyle.success
+            newText="✅ Top Chatter Tracking is now enabled"
+        else:
+            self.button1.label = "Toggle Top Chatter Tracking<not working>: ❌ Disabled"
+            self.button1.style = discord.ButtonStyle.danger
+            newText="❌ Top Chatter Tracking is now disabled"
+        await interaction.response.edit_message(content=newText, view=self)
+
+    async def toggle_patch_notes(self, interaction: discord.Interaction):
+        """Toggles Patch Notes in the database (placeholder function)."""
+        newStatus = toggle_feature(self.guild_id, "PatchNotes")  # Toggles in DB
+        if newStatus == 1:
+            self.button2.label = "Toggle Patch Notes<not working>: ✅ Enabled"
+            self.button2.style = discord.ButtonStyle.success
+            newText="✅ Patch notes feature is now enabled"
+        else:
+            newText="❌ Patch notes feature is now disabled"
+            self.button2.label = "Toggle Patch Notes<not working>: ❌ Disabled"
+            self.button2.style = discord.ButtonStyle.danger
+        await interaction.response.edit_message(content=newText, view=self)
+
+# Utility function to toggle a feature in the database
+def toggle_feature(guild_id, feature_name):
+    conn = sqlite3.connect("My_DB")
+    curs = conn.cursor()
+
+    # Ensure the column exists (optional safety check)
+    curs.execute(f"PRAGMA table_info(ServerSettings);")
+    existing_columns = {row[1] for row in curs.fetchall()}
+    if feature_name not in existing_columns:
+        curs.execute(f"ALTER TABLE ServerSettings ADD COLUMN {feature_name} INTEGER DEFAULT 0;")
+        conn.commit()
+
+    # Toggle the feature
+    curs.execute(f"SELECT {feature_name} FROM ServerSettings WHERE GuildID = ?", (guild_id,))
+    row = curs.fetchone()
+
+    
+    if (row is None or row[0] == 0):
+        newStatus=1
+    else:
+        newStatus=0
+    curs.execute(f"UPDATE ServerSettings SET {feature_name} = ? WHERE GuildID = ?", (newStatus, guild_id))
+    conn.commit()
+    conn.close()
+
+    return newStatus  # Return new status for UI updates
+
+# Slash command to send the settings menu
+@client.tree.command(name="serversettings", description="Use buttons to set server settings")
+async def serversettings(interaction: discord.Interaction):
+    guild_id = str(interaction.guild.id)
+    guild_name = interaction.guild.name
+
+    embed = discord.Embed(title="Server Settings", color=0x228a65)
+    embed.set_author(name=guild_name, icon_url=interaction.guild.icon.url)
+    embed.add_field(name="Server ID", value=guild_id, inline=False)
+    embed.add_field(name="Server Name", value=guild_name, inline=False)
+    embed.add_field(name="Server Settings", value="Click the buttons below to set server settings.", inline=False)
+
+    view = ServerSettingsView(guild_id)  # Create an interactive button view
+    await interaction.response.send_message(embed=embed, view=view)
+
+class PatchNotesModal(discord.ui.Modal):
+    def __init__(self):
+        super().__init__(title="settings")
+        self.channel=discord.ui.TextInput(label="Patch Notes Channel ID", placeholder="Enter the channel ID for patch notes",max_length=24,style=discord.TextStyle.short)
+        self.add_item(self.channel)
+
+    async def on_submit(self, interaction):
+        #grab the channel ID from the input
+        channelID = self.children[0].value
+        conn= sqlite3.connect("My_DB")
+        curs=conn.cursor()
+        curs.execute("INSERT OR REPLACE INTO PatchNotesSettings (GuildID, ChannelID) VALUES (?, ?)", (interaction.guild.id, channelID))
+        await interaction.response.send_message(f"Patch notes channel ID set to: <#{channelID}>")
+        conn.commit()
+        conn.close()
+
+
+#set up a modal to set the settings for patch notes
+@client.tree.command(name="changesettings", description="select which feature to change settings")
+@app_commands.choices(feature=[
+    #app_commands.Choice(name="Top Chatter Tracking", value="topChatterTracking"),
+    app_commands.Choice(name="Patch Notes", value="patchNotes")
+])
+async def changesettings(interaction: discord.Interaction, feature: app_commands.Choice[str]):
+    if feature.value == "patchNotes":
+        modal = PatchNotesModal()
+        await interaction.response.send_modal(modal)
 
 #mode: 1=in server by user, 2= out of server by user, 3=in server by raw count, 4=out of server by raw count
 def emojiQuery(guildID, mode, curs):
