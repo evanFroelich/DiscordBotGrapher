@@ -142,6 +142,11 @@ class MyClient(discord.Client):
             return
         if message.author.bot:
             #print('bot!')
+            if message.author.id==510016054391734273:
+                splitstr=message.content.split()
+                if "RUINED" in splitstr:
+                    time.sleep(3)
+                    await message.channel.send("https://tenor.com/view/death-stranding-2-sisyphus-on-the-beach-hideo-kojima-mountain-climb-gif-9060768058445058879")
             return
         
        
@@ -548,6 +553,10 @@ async def changesettings(interaction: discord.Interaction, feature: app_commands
     if feature.value == "patchNotes":
         modal = PatchNotesModal()
         await interaction.response.send_modal(modal)
+
+
+
+
 
 #mode: 1=in server by user, 2= out of server by user, 3=in server by raw count, 4=out of server by raw count
 def emojiQuery(guildID, mode, curs):

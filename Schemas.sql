@@ -68,3 +68,4 @@ CREATE TABLE if not exists PatchNotesSettings(
     ChannelID    INTEGER,
     PRIMARY KEY(GuildID)
 );
+
