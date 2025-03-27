@@ -145,7 +145,7 @@ class MyClient(discord.Client):
             if message.author.id==510016054391734273:
                 splitstr=message.content.split()
                 if "RUINED" in splitstr:
-                    time.sleep(3)
+                    time.sleep(5)
                     await message.channel.send("https://tenor.com/view/death-stranding-2-sisyphus-on-the-beach-hideo-kojima-mountain-climb-gif-9060768058445058879")
             return
         
