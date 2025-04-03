@@ -209,7 +209,14 @@ class MyClient(discord.Client):
                     await message.reply(file=resposneImage)
                     print("hold")
 
-       
+            if "horse" in message.content.lower():
+                r=random()
+                #10% chance of response
+                if r<.25:
+                    resposneImage=discord.File("images/horse.gif", filename="respoonse.gif")
+                    await message.reply(file=resposneImage)
+                    print("hold")
+
             if (splitstr[0]=='ping' or splitstr[0]=='Ping'):
                 if message.author.id==100344687029665792:
                     await message.channel.send("prong")
