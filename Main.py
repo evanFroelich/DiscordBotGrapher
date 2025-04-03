@@ -227,10 +227,13 @@ class MyClient(discord.Client):
                     for user in userList:
                         if user.id == 966695034340663367:
                             r= random()
-                            if r<.05:
+                            if r<.95:
                                 time.sleep(1)  # give it a second to make it more dramatic
                                 resposneImage=discord.File("images/cat_laugh.gif", filename="cat_laugh.gif")
                                 await message.reply(file=resposneImage)
+                            else:
+                                #log to the log file that we did not respond
+                                logging.info(f"Cat reaction not triggered for message {message.id} by {user.name} (r={r})")
 
 
             if (splitstr[0]=='ping' or splitstr[0]=='Ping'):
