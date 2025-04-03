@@ -219,7 +219,7 @@ class MyClient(discord.Client):
 
             if splitstr[0]=='cat':
                 #check for a reaction made by a specific userid after waiting .1 seconds anf the reaction is there, print
-                time.sleep(.1)  # wait a bit for reactions to register
+                time.sleep(.5)  # wait a bit for reactions to register
                 newMessage= await message.channel.fetch_message(message.id)
                 reactions = newMessage.reactions
                 for reaction in reactions:
