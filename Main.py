@@ -217,6 +217,22 @@ class MyClient(discord.Client):
                     await message.reply(file=resposneImage)
                     print("hold")
 
+            if splitstr[0]=='cat':
+                #check for a reaction made by a specific userid after waiting .1 seconds anf the reaction is there, print
+                time.sleep(.1)  # wait a bit for reactions to register
+                newMessage= await message.channel.fetch_message(message.id)
+                reactions = newMessage.reactions
+                for reaction in reactions:
+                    userList=[user async for user in reaction.users()]
+                    for user in userList:
+                        if user.id == 966695034340663367:
+                            r= random()
+                            if r<.05:
+                                time.sleep(1)  # give it a second to make it more dramatic
+                                resposneImage=discord.File("images/cat_laugh.gif", filename="cat_laugh.gif")
+                                await message.reply(file=resposneImage)
+
+
             if (splitstr[0]=='ping' or splitstr[0]=='Ping'):
                 if message.author.id==100344687029665792:
                     await message.channel.send("prong")
