@@ -217,7 +217,7 @@ class MyClient(discord.Client):
                     await message.reply(file=resposneImage)
                     print("hold")
 
-            if splitstr[0]=='cat':
+            if splitstr[0]=='cat' or splitstr[0]=='Cat':
                 #check for a reaction made by a specific userid after waiting .1 seconds anf the reaction is there, print
                 time.sleep(1)  # wait a bit for reactions to register
                 newMessage= await message.channel.fetch_message(message.id)
