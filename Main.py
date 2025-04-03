@@ -219,7 +219,7 @@ class MyClient(discord.Client):
 
             if splitstr[0]=='cat':
                 #check for a reaction made by a specific userid after waiting .1 seconds anf the reaction is there, print
-                time.sleep(.5)  # wait a bit for reactions to register
+                time.sleep(1)  # wait a bit for reactions to register
                 newMessage= await message.channel.fetch_message(message.id)
                 reactions = newMessage.reactions
                 for reaction in reactions:
@@ -227,13 +227,11 @@ class MyClient(discord.Client):
                     for user in userList:
                         if user.id == 966695034340663367:
                             r= random()
-                            if r<.95:
-                                time.sleep(1)  # give it a second to make it more dramatic
+                            if r<.05:
+                                time.sleep(.5)  # give it a second to make it more dramatic
                                 resposneImage=discord.File("images/cat_laugh.gif", filename="cat_laugh.gif")
                                 await message.reply(file=resposneImage)
-                            else:
-                                #log to the log file that we did not respond
-                                logging.info(f"Cat reaction not triggered for message {message.id} by {user.name} (r={r})")
+                            
 
 
             if (splitstr[0]=='ping' or splitstr[0]=='Ping'):
