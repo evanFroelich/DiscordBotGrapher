@@ -211,14 +211,13 @@ class MyClient(discord.Client):
 
             if "horse" in message.content.lower():
                 r=random()
-                #10% chance of response
+                #25% chance of response
                 if r<.25:
                     resposneImage=discord.File("images/horse.gif", filename="respoonse.gif")
                     await message.reply(file=resposneImage)
                     print("hold")
 
             if splitstr[0]=='cat' or splitstr[0]=='Cat':
-                #check for a reaction made by a specific userid after waiting .1 seconds anf the reaction is there, print
                 time.sleep(1)  # wait a bit for reactions to register
                 newMessage= await message.channel.fetch_message(message.id)
                 reactions = newMessage.reactions
@@ -236,7 +235,7 @@ class MyClient(discord.Client):
 
             if (splitstr[0]=='ping' or splitstr[0]=='Ping'):
                 if message.author.id==100344687029665792:
-                    await message.channel.send("prong")
+                    await message.channel.send("pong")
                     
                     #await message.channel.send(outSTR)
                     
