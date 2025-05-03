@@ -231,7 +231,12 @@ class MyClient(discord.Client):
                                 resposneImage=discord.File("images/cat_laugh.gif", filename="cat_laugh.gif")
                                 await message.reply(file=resposneImage)
                             
-
+            if message.author.id==101755961496076288:
+                r=random()
+                if r<.005:
+                    resposneImage=discord.File("images/marathon.gif", filename="respoonse.gif")
+                    await message.reply(file=resposneImage)
+                    print("hold")
 
             if (splitstr[0]=='ping' or splitstr[0]=='Ping'):
                 if message.author.id==100344687029665792:
