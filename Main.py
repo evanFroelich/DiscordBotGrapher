@@ -231,9 +231,9 @@ class MyClient(discord.Client):
                                 resposneImage=discord.File("images/cat_laugh.gif", filename="cat_laugh.gif")
                                 await message.reply(file=resposneImage)
                             
-            if message.author.id==101755961496076288:
+            if message.author.id==101755961496076288 or message.channel.id==1360302184297791801 or "marathon" in message.content.lower():
                 r=random()
-                if r<.005:
+                if r<.001:
                     resposneImage=discord.File("images/marathon.gif", filename="respoonse.gif")
                     await message.reply(file=resposneImage)
                     print("hold")
