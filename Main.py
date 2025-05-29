@@ -232,11 +232,20 @@ class MyClient(discord.Client):
                                 await message.reply(file=resposneImage)
                             
             if message.author.id==101755961496076288 or message.channel.id==1360302184297791801 or "marathon" in message.content.lower():
-                r=random()
-                if r<.001:
-                    resposneImage=discord.File("images/marathon.gif", filename="respoonse.gif")
-                    await message.reply(file=resposneImage)
-                    print("hold")
+                #make sure the message is not in any channels from the channel block list
+                #open the block list file from the global ignore folder
+                ignoreList=[]
+                try:
+                    with open('globalIgnore/channelblocklist.txt', 'r') as f:
+                        ignoreList = f.read().splitlines()
+                except FileNotFoundError:
+                    ignoreList = []
+                if str(message.channel.id) not in ignoreList:
+                    r=random()
+                    if r<.001:
+                        resposneImage=discord.File("images/marathon.gif", filename="respoonse.gif")
+                        await message.reply(file=resposneImage)
+                        print("hold")
 
             if (splitstr[0]=='ping' or splitstr[0]=='Ping'):
                 if message.author.id==100344687029665792:
