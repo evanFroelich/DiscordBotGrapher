@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import logging
 import re
+import asyncio
 
 
 
@@ -76,6 +77,7 @@ async def assignRoles():
 
 class MyClient(discord.Client):
     ignoreList=[]
+    activeGameMessaages=[]
     #lastDate=""
     async def on_ready(self):
         #8 f=open(
@@ -137,6 +139,20 @@ class MyClient(discord.Client):
         curs.close()
         conn.close()
 
+    async def on_reaction_add(self, reaction, user):
+        if user.bot:
+            return
+        gameDB= "games.db"
+        game_conn = sqlite3.connect(gameDB)
+        game_curs = game_conn.cursor()
+        if reaction.emoji=='✅' and reaction.message.id in self.activeGameMessaages:
+            game_curs.execute('''INSERT INTO Scores (UserID, Category, Difficulty, Num_Correct, Num_Incorrect) VALUES (?, ?, ?, ?, ?) ON CONFLICT(UserID, Category, Difficulty) DO UPDATE SET Num_Correct = Num_Correct + 1;''', (user.id, 'bonus', 1, 1, 0))
+            game_conn.commit()
+            await reaction.message.clear_reaction(reaction.emoji)
+            self.activeGameMessaages.remove(reaction.message.id)
+        game_curs.close()
+        game_conn.close()
+
     async def on_message(self, message):
         if message.author==client.user:
             return
@@ -157,6 +173,17 @@ class MyClient(discord.Client):
         DB_NAME = "My_DB"
         conn = sqlite3.connect(DB_NAME)
         curs = conn.cursor()
+
+        #carve out for the new game
+        #make sure the message isnt in a blacklisted channel
+        ignoreList=[]
+        try:
+            with open('globalIgnore/channelblocklist.txt', 'r') as f:
+                ignoreList = f.read().splitlines()
+        except FileNotFoundError:
+            ignoreList = []
+        if str(message.channel.id) not in ignoreList:
+            await smrtGame(self, message, curs)
 
     
         
@@ -579,6 +606,29 @@ class PatchNotesModal(discord.ui.Modal):
         conn.commit()
         conn.close()
 
+@client.tree.command(name="leaderboard", description="new game points leaderboard")
+async def leaderboard(interaction: discord.Interaction):
+    """Displays the game points leaderboard."""
+    mainDB = "MY_DB"
+    gamesDB = "games.db"
+    main_conn = sqlite3.connect(mainDB)
+    games_conn = sqlite3.connect(gamesDB)
+    main_curs = main_conn.cursor()
+    games_curs = games_conn.cursor()
+    games_curs.execute('''SELECT UserID, SUM(Num_Correct) AS TotalPoints
+    FROM Scores
+    GROUP BY UserID
+    ORDER BY TotalPoints DESC''')
+    rows= games_curs.fetchall()
+    outstr=""
+    for row in rows:
+        user = main_curs.execute("SELECT UserName FROM Master WHERE UserID = ?", (row[0],)).fetchone()
+        if user:
+            outstr += f"{user[0]}: {row[1]} points\n"
+        else:
+            outstr += f"User ID {row[0]}: {row[1]} points\n"
+    await interaction.response.send_message(outstr)
+
 
 #set up a modal to set the settings for patch notes
 @client.tree.command(name="changesettings", description="select which feature to change settings")
@@ -965,7 +1015,14 @@ def topChat(graphType, graphXaxis, numMessages, guildID, numLines, drillDownTarg
         print(nameDict[nameid]+": "+str(sum(dataDict[nameid])))
     return nameDict,dataDict
 
-
+async def smrtGame(self, message,curs):
+    r=random()
+    if r<1:
+        await message.add_reaction('✅')
+        self.activeGameMessaages.append(message.id)
+    #await message.add_reaction('❌')
+    #await message.add_reaction('❓')
+    return
 
 
 

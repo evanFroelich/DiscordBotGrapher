@@ -12,3 +12,6 @@ log.txt
 monitor.py
 My_DB-shm
 My_DB-wal
+TODO.txt
+games.db
+games.db-journal
