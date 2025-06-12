@@ -628,6 +628,8 @@ async def leaderboard(interaction: discord.Interaction):
             outstr += f"{user[0]}: {row[1]} points\n"
         else:
             outstr += f"User ID {row[0]}: {row[1]} points\n"
+    if outstr == "":
+        outstr = "no points yet"
     await interaction.response.send_message(outstr)
 
 
