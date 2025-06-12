@@ -1032,7 +1032,7 @@ async def smrtGame(self, message,curs):
     multiplier=sigmoid(x)
     r=random()
     print("result: "+str(multiplier))
-    if r<1*multiplier:
+    if r<.01*multiplier:
         await message.add_reaction('✅')
         self.activeGameMessaages.append(message.id)
         self.lastSentBonusPip=curTime
