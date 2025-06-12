@@ -14,6 +14,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import logging
 import re
 import asyncio
+import numpy as np
 
 
 
@@ -72,12 +73,14 @@ async def assignRoles():
     conn.close()
     
 
-
+def sigmoid(x):
+    return 1 / (1 + np.exp(-x))
 
 
 class MyClient(discord.Client):
     ignoreList=[]
     activeGameMessaages=[]
+    lastSentBonusPip=""
     #lastDate=""
     async def on_ready(self):
         #8 f=open(
@@ -1019,12 +1022,20 @@ def topChat(graphType, graphXaxis, numMessages, guildID, numLines, drillDownTarg
     return nameDict,dataDict
 
 async def smrtGame(self, message,curs):
+    curTime=time.time()
+    delta=0
+    if self.lastSentBonusPip=="":
+        delta=10000000
+    else:
+        delta=curTime-self.lastSentBonusPip
+    x=.1*(delta-60)
+    multiplier=sigmoid(x)
     r=random()
-    if r<.01:
+    print("result: "+str(multiplier))
+    if r<1*multiplier:
         await message.add_reaction('✅')
         self.activeGameMessaages.append(message.id)
-    #await message.add_reaction('❌')
-    #await message.add_reaction('❓')
+        self.lastSentBonusPip=curTime
     return
 
 
