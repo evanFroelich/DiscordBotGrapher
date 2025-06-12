@@ -1017,7 +1017,7 @@ def topChat(graphType, graphXaxis, numMessages, guildID, numLines, drillDownTarg
 
 async def smrtGame(self, message,curs):
     r=random()
-    if r<1:
+    if r<.01:
         await message.add_reaction('✅')
         self.activeGameMessaages.append(message.id)
     #await message.add_reaction('❌')
