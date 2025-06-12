@@ -146,7 +146,7 @@ class MyClient(discord.Client):
         game_conn = sqlite3.connect(gameDB)
         game_curs = game_conn.cursor()
         if reaction.emoji=='✅' and reaction.message.id in self.activeGameMessaages:
-            game_curs.execute('''INSERT INTO Scores (UserID, Category, Difficulty, Num_Correct, Num_Incorrect) VALUES (?, ?, ?, ?, ?) ON CONFLICT(UserID, Category, Difficulty) DO UPDATE SET Num_Correct = Num_Correct + 1;''', (user.id, 'bonus', 1, 1, 0))
+            game_curs.execute('''INSERT INTO Scores ( GuildID, UserID, Category, Difficulty, Num_Correct, Num_Incorrect) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(GuildID, UserID, Category, Difficulty) DO UPDATE SET Num_Correct = Num_Correct + 1;''', (reaction.message.guild.id,user.id, 'bonus', 1, 1, 0))
             game_conn.commit()
             await reaction.message.clear_reaction(reaction.emoji)
             self.activeGameMessaages.remove(reaction.message.id)
@@ -609,6 +609,7 @@ class PatchNotesModal(discord.ui.Modal):
 @client.tree.command(name="leaderboard", description="new game points leaderboard")
 async def leaderboard(interaction: discord.Interaction):
     """Displays the game points leaderboard."""
+    guild_id = str(interaction.guild.id)
     mainDB = "MY_DB"
     gamesDB = "games.db"
     main_conn = sqlite3.connect(mainDB)
@@ -616,9 +617,9 @@ async def leaderboard(interaction: discord.Interaction):
     main_curs = main_conn.cursor()
     games_curs = games_conn.cursor()
     games_curs.execute('''SELECT UserID, SUM(Num_Correct) AS TotalPoints
-    FROM Scores
+    FROM Scores WHERE GuildID = ?
     GROUP BY UserID
-    ORDER BY TotalPoints DESC''')
+    ORDER BY TotalPoints DESC''', (guild_id,))
     rows= games_curs.fetchall()
     outstr=""
     for row in rows:
