@@ -80,7 +80,7 @@ def sigmoid(x):
 class MyClient(discord.Client):
     ignoreList=[]
     activeGameMessaages=[]
-    lastSentBonusPip=""
+    lastSentBonusPip={}
     #lastDate=""
     async def on_ready(self):
         #8 f=open(
@@ -1024,18 +1024,19 @@ def topChat(graphType, graphXaxis, numMessages, guildID, numLines, drillDownTarg
 async def smrtGame(self, message,curs):
     curTime=time.time()
     delta=0
-    if self.lastSentBonusPip=="":
+    #see if the key exists in the dict
+    if message.guild.id not in self.lastSentBonusPip:
         delta=10000000
     else:
-        delta=curTime-self.lastSentBonusPip
-    x=.1*(delta-60)
+        delta=curTime-self.lastSentBonusPip[message.guild.id]
+    x=.05*(delta-120)
     multiplier=sigmoid(x)
     r=random()
     print("result: "+str(multiplier))
-    if r<.01*multiplier:
+    if r<.02*multiplier:
         await message.add_reaction('✅')
         self.activeGameMessaages.append(message.id)
-        self.lastSentBonusPip=curTime
+        self.lastSentBonusPip[message.guild.id]=curTime
     return
 
 
