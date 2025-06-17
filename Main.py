@@ -612,6 +612,8 @@ class PatchNotesModal(discord.ui.Modal):
 @client.tree.command(name="leaderboard", description="new game points leaderboard")
 async def leaderboard(interaction: discord.Interaction):
     """Displays the game points leaderboard."""
+    await interaction.response.defer(thinking=True)
+    #time.sleep(10)  # Simulate processing time
     guild_id = str(interaction.guild.id)
     mainDB = "MY_DB"
     gamesDB = "games.db"
@@ -633,7 +635,7 @@ async def leaderboard(interaction: discord.Interaction):
             outstr += f"User ID {row[0]}: {row[1]} points\n"
     if outstr == "":
         outstr = "no points yet"
-    await interaction.response.send_message(outstr)
+    await interaction.followup.send(outstr)
 
 
 #set up a modal to set the settings for patch notes
