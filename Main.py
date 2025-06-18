@@ -628,14 +628,18 @@ async def leaderboard(interaction: discord.Interaction):
     rows= games_curs.fetchall()
     outstr=""
     for row in rows:
-        user = main_curs.execute("SELECT UserName FROM Master WHERE UserID = ?", (row[0],)).fetchone()
+        user=interaction.guild.get_member(int(row[0]))
         if user:
-            outstr += f"{user[0]}: {row[1]} points\n"
+            outstr += f"{user.display_name}: {row[1]} points\n"
         else:
             outstr += f"User ID {row[0]}: {row[1]} points\n"
     if outstr == "":
         outstr = "no points yet"
     await interaction.followup.send(outstr)
+    main_curs.close()
+    main_conn.close()
+    games_curs.close()
+    games_conn.close()
 
 
 #set up a modal to set the settings for patch notes
