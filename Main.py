@@ -6,15 +6,17 @@ from discord.ext import tasks, commands
 from discord.utils import get
 from discord import app_commands
 from random import random
-from datetime import datetime
+from datetime import datetime, timedelta
 from collections import deque
 import pandas as pd
 import matplotlib.pyplot as plt
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+import asyncio
 import logging
 import re
 import asyncio
 import numpy as np
+import json
 
 
 
@@ -79,13 +81,10 @@ def sigmoid(x):
 
 class MyClient(discord.Client):
     ignoreList=[]
-    activeGameMessaages=[]
-    lastSentBonusPip={}
-    #lastDate=""
     async def on_ready(self):
         #8 f=open(
         print('Logged on as {0}!'.format(self.user))
-        print(random())
+        #print(random())
         channel=client.get_channel(150421071676309504)
         await channel.send("rebooted")
         channel=client.get_channel(1337282148054470808)
@@ -94,14 +93,26 @@ class MyClient(discord.Client):
         conn = sqlite3.connect(DB_NAME)
         curs = conn.cursor()
 
-        with open('Schemas.sql') as f:
+        with open('mainDB_Schemas.sql') as f:
             curs.executescript(f.read())
+        
+        #mostly for creating the tables in prod
+        game_conn = sqlite3.connect("games.db")
+        game_curs = game_conn.cursor()
+        with open('gamesDB_Schemas.sql') as f:
+            game_curs.executescript(f.read())
+        game_conn.commit()
+        
 
         currentGuilds=[guild.id for guild in client.guilds]
         print(currentGuilds)
         for guild in currentGuilds:
             curs.execute('''INSERT OR IGNORE INTO ServerSettings (GuildID) VALUES (?);''',(guild,))
-        
+            game_curs.execute('''INSERT OR IGNORE INTO GoofsGaffs (GuildID) VALUES (?);''',(guild,))
+            game_curs.execute('''INSERT OR IGNORE INTO GamblingUnlockConditions (GuildID) VALUES (?);''',(guild,))
+            game_curs.execute('''INSERT OR IGNORE INTO FeatureTimers (GuildID) VALUES (?);''',(guild,))
+            game_curs.execute('''INSERT OR IGNORE INTO ServerSettings (GuildID) VALUES (?);''',(guild,))
+
         conn.commit()  
         curs.execute('''CREATE INDEX IF NOT EXISTS idx_guild_time ON Master (GuildID, UTCTime)''')
         
@@ -110,8 +121,11 @@ class MyClient(discord.Client):
         curs.execute("PRAGMA journal_mode = WAL;")  # Allows concurrent reads/writes
         curs.execute("PRAGMA cache_size = 1000000;")  # Increases cache size
         conn.commit()
+        game_conn.commit()
         curs.close()
         conn.close()
+        game_curs.close()
+        game_conn.close()
         #assignRoles.start()
         #await assignRoles()
         sched=AsyncIOScheduler()
@@ -131,7 +145,7 @@ class MyClient(discord.Client):
     async def on_thread_create(self,thread):
         await thread.join()
 
-    #untested
+    #doesnt run at all if bot is offline at guild invite. be careful
     async def on_guild_join(self, guild):
         DB_NAME = "My_DB"
         conn = sqlite3.connect(DB_NAME)
@@ -141,6 +155,15 @@ class MyClient(discord.Client):
         conn.commit()  
         curs.close()
         conn.close()
+        games_conn = sqlite3.connect("games.db")
+        games_curs = games_conn.cursor()    
+        games_curs.execute('''insert into GamblingUnlockConditions (GuildID) values (?)''', (guild.id,))
+        games_curs.execute('''INSERT INTO ServerSettings (GuildID) VALUES (?)''', (guild.id,))
+        games_curs.execute('''INSERT OR IGNORE INTO FeatureTimers (GuildID) VALUES (?);''',(guild.id,))
+        games_curs.execute('''INSERT OR IGNORE INTO GoofsGaffs (GuildID) VALUES (?);''',(guild.id,))
+        games_conn.commit()
+        games_curs.close()
+        games_conn.close()
 
     async def on_reaction_add(self, reaction, user):
         if user.bot:
@@ -148,11 +171,16 @@ class MyClient(discord.Client):
         gameDB= "games.db"
         game_conn = sqlite3.connect(gameDB)
         game_curs = game_conn.cursor()
-        if reaction.emoji=='✅' and reaction.message.id in self.activeGameMessaages:
+        #get the messageID from the featuretimers table pip column
+        game_curs.execute('''SELECT LastBonusPipMessage FROM FeatureTimers WHERE GuildID=?''', (reaction.message.guild.id,))
+        lastBonusPipMessage = game_curs.fetchone()
+        if reaction.emoji=='✅' and lastBonusPipMessage is not None and lastBonusPipMessage[0] == reaction.message.id:
             game_curs.execute('''INSERT INTO Scores ( GuildID, UserID, Category, Difficulty, Num_Correct, Num_Incorrect) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(GuildID, UserID, Category, Difficulty) DO UPDATE SET Num_Correct = Num_Correct + 1;''', (reaction.message.guild.id,user.id, 'bonus', 1, 1, 0))
             game_conn.commit()
             await reaction.message.clear_reaction(reaction.emoji)
-            self.activeGameMessaages.remove(reaction.message.id)
+            game_curs.execute('''UPDATE FeatureTimers SET LastBonusPipMessage=? WHERE GuildID=?''', (None,reaction.message.guild.id))
+            game_conn.commit()
+            await award_points(1, reaction.message.guild.id, user.id)  # Award 5 points for bonus pip
         game_curs.close()
         game_conn.close()
 
@@ -177,19 +205,9 @@ class MyClient(discord.Client):
         conn = sqlite3.connect(DB_NAME)
         curs = conn.cursor()
 
-        #carve out for the new game
-        #make sure the message isnt in a blacklisted channel
-        ignoreList=[]
-        try:
-            with open('globalIgnore/channelblocklist.txt', 'r') as f:
-                ignoreList = f.read().splitlines()
-        except FileNotFoundError:
-            ignoreList = []
-        if str(message.channel.id) not in ignoreList:
-            await smrtGame(self, message, curs)
-
-    
-        
+        if not await checkIgnoredChannels(message.channel.id, message.guild.id):
+            await smrtGame(message)
+            await questionSpawner(message)
         #print('Message from {0.author}: {0.content}'.format(message))
         print(message.guild.name)
         splitstr=message.content.split()
@@ -229,74 +247,92 @@ class MyClient(discord.Client):
                 print('not working yet')
                 role=get(message.guild.roles, id=1016131254497845280)
                 await message.channel.send(len(role.members))
-                
 
-            if "girlcockx.com" in message.content:
-                r=random()
-                #10% chance of response
-                if r<.1:
-                    resposneImage=discord.File("images/based_on_recent_events.png", filename="response.png")
-                    await message.reply(file=resposneImage)
-                    print("hold")
 
-            if "horse" in message.content.lower():
-                r=random()
-                #25% chance of response
-                if r<.25:
-                    resposneImage=discord.File("images/horse.gif", filename="respoonse.gif")
-                    await message.reply(file=resposneImage)
-                    print("hold")
+            games_path = "games.db"
+            games_conn = sqlite3.connect(games_path)
+            games_conn.row_factory = sqlite3.Row  # allows dict-like access
+            games_curs = games_conn.cursor()
 
-            if splitstr[0]=='cat' or splitstr[0]=='Cat':
-                time.sleep(1)  # wait a bit for reactions to register
-                newMessage= await message.channel.fetch_message(message.id)
-                reactions = newMessage.reactions
-                for reaction in reactions:
-                    userList=[user async for user in reaction.users()]
-                    for user in userList:
-                        if user.id == 966695034340663367:
-                            r= random()
-                            if r<.05:
-                                time.sleep(.5)  # give it a second to make it more dramatic
-                                resposneImage=discord.File("images/cat_laugh.gif", filename="cat_laugh.gif")
-                                await message.reply(file=resposneImage)
-                            
-            if message.author.id==101755961496076288 or message.channel.id==1360302184297791801 or "marathon" in message.content.lower():
-                #make sure the message is not in any channels from the channel block list
-                #open the block list file from the global ignore folder
-                ignoreList=[]
-                try:
-                    with open('globalIgnore/channelblocklist.txt', 'r') as f:
-                        ignoreList = f.read().splitlines()
-                except FileNotFoundError:
-                    ignoreList = []
-                if str(message.channel.id) not in ignoreList:
+            games_curs.execute("SELECT FlagGoofsGaffs FROM ServerSettings WHERE GuildID = ?", (message.guild.id,))  
+            row = games_curs.fetchone()
+            if not await checkIgnoredChannels(message.channel.id, message.guild.id) and row[0]==1:
+                games_curs.execute("SELECT * FROM GoofsGaffs WHERE GuildID = ?", (message.guild.id,))
+                row = games_curs.fetchone()
+                games_conn.close()
+
+                if not row:
+                    return None  # no record for this guild
+
+                # assign variables dynamically
+                FlagHorse = row["FlagHorse"]
+                HorseChance = row["HorseChance"]
+                FlagPing = row["FlagPing"]
+                FlagMarathon = row["FlagMarathon"]
+                MarathonChance = row["MarathonChance"]
+                FlagCat = row["FlagCat"]
+                CatChance = row["CatChance"]
+                FlagTwitterAlt = row["FlagTwitterAlt"]
+                TwitterAltChance = row["TwitterAltChance"]
+
+
+                if "girlcockx.com" in message.content and FlagTwitterAlt:
                     r=random()
-                    if r<.001:
+                    #10% chance of response
+                    if r<TwitterAltChance:
+                        resposneImage=discord.File("images/based_on_recent_events.png", filename="response.png")
+                        await message.reply(file=resposneImage)
+                        print("hold")
+
+                if "horse" in message.content.lower() and FlagHorse:
+                    r=random()
+                    #25% chance of response
+                    if r<HorseChance:
+                        resposneImage=discord.File("images/horse.gif", filename="respoonse.gif")
+                        await message.reply(file=resposneImage)
+                        print("hold")
+
+                if splitstr[0].lower()=='cat' and FlagCat:
+                    time.sleep(1)  # wait a bit for reactions to register
+                    newMessage= await message.channel.fetch_message(message.id)
+                    reactions = newMessage.reactions
+                    for reaction in reactions:
+                        userList=[user async for user in reaction.users()]
+                        for user in userList:
+                            if user.id == 966695034340663367:
+                                r= random()
+                                if r<CatChance:
+                                    time.sleep(.5)  # give it a second to make it more dramatic
+                                    resposneImage=discord.File("images/cat_laugh.gif", filename="cat_laugh.gif")
+                                    await message.reply(file=resposneImage)
+                                
+                if (message.author.id==101755961496076288 or message.channel.id==1360302184297791801 or "marathon" in message.content.lower()) and FlagMarathon:
+                    r=random()
+                    if r<MarathonChance:
                         resposneImage=discord.File("images/marathon.gif", filename="respoonse.gif")
                         await message.reply(file=resposneImage)
                         print("hold")
 
-            if (splitstr[0]=='ping' or splitstr[0]=='Ping'):
-                if message.author.id==100344687029665792:
-                    await message.channel.send("pong")
-                    
-                    #await message.channel.send(outSTR)
-                    
-                else:
-                    rand=random()
-                    if rand<.2:
+                if (splitstr[0].lower()=='ping' and FlagPing):
+                    if message.author.id==100344687029665792:
                         await message.channel.send("pong")
-                    elif rand<.4:
-                        await message.channel.send("song")
-                    elif rand<.6:
-                        await message.channel.send("dong")
-                    elif rand<.8:
-                        await message.channel.send("long")
-                    elif rand<.99:
-                        await message.channel.send("kong")
+                        
+                        #await message.channel.send(outSTR)
+                        
                     else:
-                        await message.channel.send("you found the special message. here is your gold star!")
+                        rand=random()
+                        if rand<.2:
+                            await message.channel.send("pong")
+                        elif rand<.4:
+                            await message.channel.send("song")
+                        elif rand<.6:
+                            await message.channel.send("dong")
+                        elif rand<.8:
+                            await message.channel.send("long")
+                        elif rand<.99:
+                            await message.channel.send("kong")
+                        else:
+                            await message.channel.send("you found the special message. here is your gold star!")
 
 
 
@@ -359,8 +395,469 @@ async def ping(interaction: discord.Interaction):
     #await interaction.channel.send(payload)
     await interaction.response.send_message(payload)
 
+async def ButtonLockout(interaction: discord.Interaction):
+    gamesDB = "games.db"
+    games_conn = sqlite3.connect(gamesDB)
+    games_curs = games_conn.cursor()
+    games_curs.execute('''select * from ActiveQuestions where messageID=? and RespondedUserID=?''', (interaction.message.id, interaction.user.id))
+    active_question = games_curs.fetchone()
+    #print(f"active question: {active_question}")
+    if active_question:
+        # If the question is already active, do not open a new modal
+        await interaction.response.send_message("You already interacted with this message.", ephemeral=True)
+        return False
+    # When the button is clicked, open a modal for the question
+    games_curs.execute('''INSERT INTO ActiveQuestions (messageID, RespondedUserID) VALUES (?, ?)''', (interaction.message.id, interaction.user.id))
+    games_conn.commit()
+    games_curs.close()
+    games_conn.close()
+    return True
 
-@client.tree.command(name="mostusedemojis",description="Queries emoji data for this server.")
+async def resetDailyQuestionCorrect(guildID, userID):
+    gamesDB = "games.db"
+    games_conn = sqlite3.connect(gamesDB)
+    games_curs = games_conn.cursor()
+
+    curTime = datetime.now()
+    games_curs.execute('''SELECT LastRandomQuestionTime FROM GamblingUserStats WHERE GuildID=? AND UserID=?''', (guildID, userID))
+    last_random_question_time = games_curs.fetchone()[0]
+    
+    games_curs.execute('''SELECT LastDailyQuestionTime FROM GamblingUserStats WHERE GuildID=? AND UserID=?''', (guildID, userID))
+    last_daily_question_time = games_curs.fetchone()[0]
+    if last_random_question_time is not None and last_daily_question_time is not None:
+        LRQT=datetime.strptime(last_random_question_time, '%Y-%m-%d %H:%M:%S')
+        LDQT= datetime.strptime(last_daily_question_time, '%Y-%m-%d %H:%M:%S') 
+        if LRQT.date() != curTime.date() and LDQT.date() != curTime.date():
+            # Reset the daily question count for the user
+            games_curs.execute('''UPDATE GamblingUserStats SET QuestionsAnsweredTodayCorrect = 0 WHERE GuildID=? AND UserID=?''', (guildID, userID))
+    games_conn.commit()
+    games_curs.close()
+    games_conn.close()
+
+class QuestionPickButton(discord.ui.Button):
+    def __init__(self, Question=None,isForced=False):
+        super().__init__()
+        self.question= Question  # Store the question data
+        self.question_id = Question[0]  # Question ID
+        self.question_label = Question[1]  # Question text
+        self.question_answers = Question[2]  # Answers
+        self.question_type = Question[3]  # Question type
+        self.question_difficulty = Question[4]  # Question difficulty
+        self.label = f"{self.question_type} {self.question_difficulty}"
+        self.isForced = isForced  # if this was created by the forced question command, we will not add to the questions per day limit
+        
+
+    async def callback(self, interaction: discord.Interaction):
+         await create_user_db_entry(interaction.guild.id, interaction.user.id)
+         if await ButtonLockout(interaction):
+            gamesDB = "games.db"
+            games_conn = sqlite3.connect(gamesDB)
+            games_curs = games_conn.cursor()
+            curTime = datetime.now()
+            curTimeString = curTime.strftime('%Y-%m-%d %H:%M:%S')
+            games_curs.execute('''SELECT LastRandomQuestionTime FROM GamblingUserStats WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
+            last_random_question_time = games_curs.fetchone()[0]
+            await resetDailyQuestionCorrect(interaction.guild.id, interaction.user.id)
+            if self.isForced == False:
+                if last_random_question_time is not None:
+                    #print(f"last_random_question_time: {last_random_question_time}")
+                    last_random_question_time = datetime.strptime(last_random_question_time, '%Y-%m-%d %H:%M:%S')
+                    if last_random_question_time.date() != curTime.date():
+                        #print("diff date")
+                        #set questions answered today to 0
+                        games_curs.execute('''UPDATE GamblingUserStats SET QuestionsAnsweredToday = 0 WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
+                        games_conn.commit()
+                games_curs.execute('''SELECT NumQuestionsPerDay FROM ServerSettings WHERE GuildID=?''', (interaction.guild.id,))
+                num_questions_per_day = games_curs.fetchone()
+                games_curs.execute('''SELECT QuestionsAnsweredToday FROM GamblingUserStats WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
+                questions_answered_today = games_curs.fetchone()
+                if questions_answered_today[0]>= num_questions_per_day[0]:
+                    await interaction.response.send_message("You have reached the daily limit for questions. Please try again tomorrow.", ephemeral=True)
+                    games_curs.close()
+                    games_conn.close()
+                    return
+                games_curs.execute('''UPDATE GamblingUserStats SET QuestionsAnsweredToday = QuestionsAnsweredToday + 1 WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
+                
+                games_curs.execute('''UPDATE GamblingUserStats SET LastRandomQuestionTime = ? WHERE GuildID=? AND UserID=?''', (curTimeString, interaction.guild.id, interaction.user.id))
+                games_conn.commit() 
+            modal = QuestionModal(Question=self.question)
+            await interaction.response.send_modal(modal)
+
+async def create_user_db_entry(guildID, userID):
+    gamesDB = "games.db"
+    games_conn = sqlite3.connect(gamesDB)
+    games_curs = games_conn.cursor()
+    #check to see if the user has an entry in the GamblingUserStats table
+    games_curs.execute('''SELECT * FROM GamblingUserStats WHERE GuildID=? AND UserID=?''', (guildID, userID))
+    user_stats = games_curs.fetchone()
+    if not user_stats:
+        # If no entry exists, create one
+        games_curs.execute('''INSERT INTO GamblingUserStats (GuildID, UserID) VALUES (?, ?)''', (guildID, userID))
+        games_conn.commit()
+    games_curs.close()
+    games_conn.close()
+    #print(f"User entry created or verified for GuildID: {guildID}, UserID: {userID}")
+
+async def create_guild_db_entry(guildID):
+    db_name="My_DB"
+    conn = sqlite3.connect(db_name)
+    curs = conn.cursor()
+    curs.execute('''INSERT OR IGNORE INTO ServerSettings (GuildID) VALUES (?);''',(guildID,))
+    conn.commit()
+    curs.close()
+    conn.close()
+
+    gamesDB = "games.db"
+    games_conn = sqlite3.connect(gamesDB)
+    games_curs = games_conn.cursor()
+    games_curs.execute('''insert into GamblingUnlockConditions (GuildID, Game1Condition1, Game1Condition2, Game1Condition3, Game2Condition1, Game2Condition2, Game2Condition3) values (?, ?, ?, ?, ?, ?, ?)''', (guildID, 500, 15, 3, 2000, 500, 3))
+    games_curs.execute('''INSERT INTO ServerSettings (GuildID) VALUES (?)''', (guildID,))
+    games_conn.commit()
+    games_curs.close()
+    games_conn.close()
+
+async def createQuestion(interaction: discord.Interaction = None, channel: discord.TextChannel = None, isForced=False):
+    gamesDB = "games.db"
+    games_conn = sqlite3.connect(gamesDB)
+    games_curs = games_conn.cursor()
+    questionTierList = [1, 2, 3, 4, 5]
+    questionPickList=[]
+    for i in range(3):
+        
+        question_tier = questionTierList[int(random() * len(questionTierList))]
+        questionPickList.append(question_tier)
+        questionTierList.remove(question_tier)
+        #print(f"i: {i}")
+    #print(f"list: {questionPickList}")
+
+    CategorySelectQuery='''
+    SELECT ID, Question, Answers, Type, Difficulty
+        FROM QuestionList
+        WHERE Difficulty = ?
+        ORDER BY RANDOM()
+        LIMIT 1;
+        '''
+    buttonList = []
+    for i in range(3):
+        games_curs.execute(CategorySelectQuery, (questionPickList[i],))
+        Question = games_curs.fetchone()
+        if Question:
+            #print(f"i: {i}")
+            buttonList.append(QuestionPickButton(Question=Question, isForced=isForced))
+    #check to see if we have met the unlock conditions for game 1 and if no row exists for our name yet, create it
+    #games_curs.execute('''SELECT * FROM GamblingUnlockMetricsView WHERE GuildID=? and UserID=?''', (interaction.guild.id,interaction.user.id))
+    #unlock_condition = games_curs.fetchone()
+    # if not unlock_condition:
+    #     games_curs.execute('''INSERT INTO GamblingUnlockMetricsView (GuildID, UserID) VALUES (?, ?)''', (interaction.guild.id, interaction.user.id))
+    #     games_conn.commit()
+    #buttonList.append(GamblingButton(label="🎰", user_id=interaction.user.id, guild_id=interaction.guild.id, style=discord.ButtonStyle.primary))
+    #send an ephemeral message with the buttons
+    if buttonList:
+        view = discord.ui.View(timeout=None)
+        for button in buttonList:
+            view.add_item(button)
+        if interaction is not None:
+            quizMessage=await interaction.followup.send("personal pop quiz:", ephemeral=True, view=view)
+        else:
+            quizMessage=await channel.send("pop quiz:", view=view)
+        #get the timeout from the server settings table
+        if interaction is not None:
+            games_curs.execute('''SELECT QuestionTimeout FROM ServerSettings WHERE GuildID=?''', (interaction.guild.id,))
+        else:   
+            games_curs.execute('''SELECT QuestionTimeout FROM ServerSettings WHERE GuildID=?''', (channel.guild.id,))
+        question_timeout = games_curs.fetchone()[0]
+        asyncio.create_task(delete_later(quizMessage, question_timeout))
+        #await asyncio.sleep(question_timeout)
+        #await quizMessage.delete() 
+        
+        games_curs.execute('''DELETE FROM ActiveQuestions WHERE messageID=?''', (quizMessage.id,))
+        games_conn.commit()
+        games_curs.close()
+        games_conn.close()
+        return
+    await interaction.followup.send("you should not be seeing this error.", ephemeral=True)
+
+
+@client.tree.command(name="daily-trivia", description="daily trivia question")
+async def test_question_message(interaction: discord.Interaction):
+    #defer so we dont timeout
+    await interaction.response.defer(thinking=True,ephemeral=True)
+    await create_user_db_entry(interaction.guild.id, interaction.user.id)
+    gamesDB = "games.db"
+    games_conn = sqlite3.connect(gamesDB)
+    games_curs = games_conn.cursor()
+    games_curs.execute('''SELECT LastDailyQuestionTime FROM GamblingUserStats WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
+    last_daily_question_time = games_curs.fetchone()
+    print(f"last_daily_question_time: {last_daily_question_time}")
+    curTime = datetime.now()
+    if last_daily_question_time[0] is not None:    
+        #print("we are valid")
+        LDQT= last_daily_question_time[0]
+        LDQT = datetime.strptime(LDQT, '%Y-%m-%d %H:%M:%S')
+        #curTime = datetime.now()
+        if LDQT.date() == curTime.date():
+            await interaction.followup.send("You have already answered a question today. Please try again tomorrow.", ephemeral=True)
+            games_curs.close()
+            games_conn.close()
+            return
+    await resetDailyQuestionCorrect(interaction.guild.id, interaction.user.id)
+    curTimeString = curTime.strftime('%Y-%m-%d %H:%M:%S')
+    games_curs.execute('''UPDATE GamblingUserStats SET LastDailyQuestionTime=? WHERE GuildID=? AND UserID=?''', (curTimeString, interaction.guild.id, interaction.user.id))
+    #subtract 1 from the QuestionsAnsweredToday column
+   # games_curs.execute('''UPDATE GamblingUserStats SET QuestionsAnsweredToday = QuestionsAnsweredToday - 1 WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
+    games_conn.commit()
+    games_curs.close()
+    games_conn.close()
+    await createQuestion(interaction=interaction, isForced=True)
+    
+    
+
+    
+
+class QuestionThankYouButton(discord.ui.Button):
+    def __init__(self):
+        super().__init__(label="Tip your Quizmaster", style=discord.ButtonStyle.primary)  # No timeout
+
+    async def callback(self, interaction: discord.Interaction):
+        gamesDB = "games.db"
+        games_conn = sqlite3.connect(gamesDB)
+        games_curs = games_conn.cursor()
+        games_curs.execute('''UPDATE GamblingUserStats SET TipsGiven = TipsGiven + 1 WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
+        games_conn.commit()
+        games_curs.close()
+        await award_points(1, interaction.guild.id, interaction.user.id)
+        self.disabled = True
+        #await interaction.edit_original_response(content="test",view=None)
+        await interaction.response.edit_message(content="Thanks for the tip!", view=None)
+        #await interaction.response.send_message("You're welcome! If you have more questions, feel free to ask!", ephemeral=True)
+
+
+class QuestionModal(discord.ui.Modal):
+    def __init__(self, Question=None):
+        super().__init__(title="Trivia Question")
+        self.question_id = Question[0]  # Question ID
+        self.question_text = Question[1]  # Question text
+        self.question_answers = Question[2]  # Answers
+        self.question_answers = self.question_answers.replace("'", '"')  # Ensure answers are in JSON format
+        self.question_answers = eval(self.question_answers)  # Convert string representation of list to actual list
+        self.question_type = Question[3]  # Question type
+        self.question_difficulty = Question[4]  # Question difficulty
+        self.question_ask = discord.ui.TextInput(label="Answer Below:", placeholder="answer", max_length=100, style=discord.TextStyle.short)
+        self.questionUI=discord.ui.TextDisplay(content=self.question_text)
+        self.add_item(self.questionUI)
+        self.add_item(self.question_ask)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        user_answer = self.children[0].value
+        gamesDB = "games.db"
+        games_conn = sqlite3.connect(gamesDB)
+        games_curs = games_conn.cursor()
+        #temp=""
+        #print(f"User answer: {user_answer.lower()} | Correct answers: {temp} | is true: {user_answer.lower() in self.question_answers}")
+        if user_answer.lower() in [answer.lower() for answer in self.question_answers]:
+            games_curs.execute('''INSERT INTO Scores (GuildID, UserID, Category, Difficulty, Num_Correct, Num_Incorrect) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(GuildID, UserID, Category, Difficulty) DO UPDATE SET Num_Correct = Num_Correct + 1;''', (interaction.guild.id, interaction.user.id, self.question_type, self.question_difficulty, 1, 0))
+            games_curs.execute('''UPDATE GamblingUserStats SET QuestionsAnsweredTodayCorrect = QuestionsAnsweredTodayCorrect + 1 WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
+            games_conn.commit()
+            gamblingPoints=self.question_difficulty*2+3
+            await award_points(gamblingPoints, interaction.guild.id, interaction.user.id)
+            #games_curs.execute('''UPDATE GamblingUserStats SET CurrentBalance = CurrentBalance + ? WHERE GuildID=? AND UserID=?;''', (gamblingPoints, interaction.guild.id, interaction.user.id))
+            games_conn.commit()
+            #buttonList = [] 
+            #buttonList.append(QuestionThankYouButton())
+            #button= QuestionThankYouButton()
+            questionAnsweredView = discord.ui.View(timeout=None)
+            button= QuestionThankYouButton()
+            questionAnsweredView.add_item(button)
+            #check to see if the user has met the metrics for unlocking game 1
+            games_curs.execute('''SELECT * FROM GamblingUnlockMetricsView WHERE GuildID=? and UserID=?''', (interaction.guild.id, interaction.user.id))
+            userStats = games_curs.fetchone()
+            games_curs.execute('''SELECT * FROM GamblingUnlockConditions WHERE GuildID=?''', (interaction.guild.id,))
+            unlockConditions = games_curs.fetchone()
+            if userStats and unlockConditions:
+                if userStats[2]>= unlockConditions[1] and userStats[3]>= unlockConditions[2] and userStats[4]>= unlockConditions[3]:
+                    questionAnsweredView.add_item(GamblingButton(label="🎰", user_id=interaction.user.id, guild_id=interaction.guild.id, style=discord.ButtonStyle.primary))
+            await interaction.response.send_message(f"Correct!", ephemeral=True, view=questionAnsweredView)
+        else:
+            games_curs.execute('''INSERT INTO Scores (GuildID, UserID, Category, Difficulty, Num_Correct, Num_Incorrect) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(GuildID, UserID, Category, Difficulty) DO UPDATE SET Num_Incorrect = Num_Incorrect + 1;''', (interaction.guild.id, interaction.user.id, self.question_type, self.question_difficulty, 0, 1))
+            games_conn.commit()
+            questionAnsweredView = discord.ui.View(timeout=None)
+            button= QuestionThankYouButton()
+            questionAnsweredView.add_item(button)
+            #check to see if the user has met the metrics for unlocking game 1
+            games_curs.execute('''SELECT * FROM GamblingUnlockMetricsView WHERE GuildID=? and UserID=?''', (interaction.guild.id, interaction.user.id))
+            userStats = games_curs.fetchone()
+            games_curs.execute('''SELECT * FROM GamblingUnlockConditions WHERE GuildID=?''', (interaction.guild.id,))
+            unlockConditions = games_curs.fetchone()
+            if userStats and unlockConditions:
+                if userStats[2]>= unlockConditions[1] and userStats[3]>= unlockConditions[2] and userStats[4]>= unlockConditions[3]:
+                    questionAnsweredView.add_item(GamblingButton(label="🎰", user_id=interaction.user.id, guild_id=interaction.guild.id, style=discord.ButtonStyle.primary))
+            await interaction.response.send_message(f"Incorrect answer. The correct answer(s) are: {self.question_answers}", ephemeral=True, view=questionAnsweredView)
+            games_curs.execute('''SELECT FlagShameChannel, ShameChannel FROM ServerSettings WHERE GuildID=?''', (interaction.guild.id,))
+            shameSettings = games_curs.fetchone()
+            if shameSettings and shameSettings[0] == 1:
+                shameChannel = interaction.guild.get_channel(shameSettings[1])
+                if shameChannel:
+                    await shameChannel.send(f"Oops! <@{interaction.user.id}> didn't know the answer to: {self.question_text}")
+
+        #await interaction.response.send_message(f"your answer: {user_answer}, correct answers: {self.question_answers}", ephemeral=True)
+        games_curs.close()
+        games_conn.close()
+
+async def award_points(amount, guild_id, user_id):
+    gamesDB = "games.db"
+    games_conn = sqlite3.connect(gamesDB)
+    games_curs = games_conn.cursor()
+    games_curs.execute('''UPDATE GamblingUserStats SET CurrentBalance = CurrentBalance + ? WHERE GuildID=? AND UserID=?;''', (amount, guild_id, user_id))
+    #also add the same amount to the LifetimeEarnings column
+    games_curs.execute('''UPDATE GamblingUserStats SET LifetimeEarnings = LifetimeEarnings + ? WHERE GuildID=? AND UserID=?;''', (amount, guild_id, user_id))
+    games_conn.commit()
+    games_curs.close()
+    games_conn.close()
+
+#@client.tree.command(name="testquestion", description="Test question command")
+#@app_commands.describe(question_tier="difficulty of random question <default: 1>")
+async def test_question(interaction: discord.Interaction, question_tier: int = 1):
+    await create_user_db_entry(interaction.guild.id, interaction.user.id)
+    
+    gamesDB = "games.db"
+    games_conn = sqlite3.connect(gamesDB)
+    games_curs = games_conn.cursor()
+    CategorySelectQuery='''
+    SELECT ID, Question, Answers, Type, Difficulty
+        FROM QuestionList
+        WHERE Difficulty = ?
+        ORDER BY RANDOM()
+        LIMIT 1;
+        '''
+    games_curs.execute(CategorySelectQuery, (question_tier,))
+    Question = games_curs.fetchone()
+    if not Question:
+        await interaction.response.send_message("No questions found for the specified difficulty.")
+        games_curs.close()
+        games_conn.close()
+        return
+    question_id=Question[0]
+    question_text= Question[1] 
+    answers = Question[2]
+    #answers is a json string, so we need to parse it
+    answers = answers.replace("'", '"')
+    answers = eval(answers)  # Convert string representation of list to actual list
+    #await interaction.response.send_message(f"Question: {question_text}\nAnswers: {answers}")
+
+    modal = QuestionModal(Question=question_text, Answers=answers, QuestionID=question_id)
+    await interaction.response.send_modal(modal)
+    
+    games_curs.close()
+    games_conn.close()
+
+async def CoinFlipGame(self, interaction: discord.Interaction, bet_amount: int):
+    gamesDB = "games.db"
+    games_conn = sqlite3.connect(gamesDB)
+    games_curs = games_conn.cursor()
+    games_curs.execute('''SELECT CurrentBalance FROM GamblingUserStats WHERE GuildID=? AND UserID=?''', (self.guild_id, self.user_id))
+    row = games_curs.fetchone()
+    if row is None or row[0] < bet_amount:
+        await interaction.response.send_message(f"You do not have enough funds to bet {bet_amount}.", ephemeral=True)
+        games_curs.close()
+        games_conn.close()
+        return
+
+    # Deduct the bet amount from the user's funds
+    games_curs.execute('''UPDATE GamblingUserStats SET CurrentBalance=CurrentBalance-? WHERE GuildID=? AND UserID=?''', (bet_amount, self.guild_id, self.user_id))
+    
+    # Simulate a win or loss
+    if random() < 0.5:  # 50% chance of winning
+        winnings = bet_amount * 2
+        await award_points(winnings, self.guild_id, self.user_id)
+        #games_curs.execute('''UPDATE GamblingUserStats SET CurrentBalance=CurrentBalance+? WHERE GuildID=? AND UserID=?''', (winnings, self.guild_id, self.user_id))
+        await interaction.response.send_message(f"You won {winnings}!", ephemeral=True)
+    else:
+        await interaction.response.send_message(f"You lost {bet_amount}.", ephemeral=True)
+
+    games_conn.commit()
+    games_curs.close()
+    games_conn.close()
+
+class GamblingIntroModal(discord.ui.Modal):
+    def __init__(self, user_id=None, guild_id=None):
+        super().__init__(title="Gambling Funds")
+        self.user_id = user_id
+        self.guild_id = guild_id
+        self.funds_input = discord.ui.TextInput(label="Enter your initial funds", placeholder="e.g. 1000", max_length=10, required=True)
+        self.add_item(self.funds_input) #i dont think i need this
+
+    async def on_submit(self, interaction: discord.Interaction):
+        funds = self.funds_input.value
+        # gamesDB = "games.db"
+        # games_conn = sqlite3.connect(gamesDB)
+        # games_curs = games_conn.cursor()
+        # games_curs.execute('''INSERT INTO GamblingFunds (GuildID, UserID, Funds) VALUES (?, ?, ?) ON CONFLICT(GuildID, UserID) DO UPDATE SET Funds = Funds + ?;''', (self.guild_id, self.user_id, funds, funds))
+        # games_conn.commit()
+        # await interaction.response.send_message(f"Your initial funds of {funds} have been set.", ephemeral=True)
+        # games_curs.close()
+        # games_conn.close()
+
+class GamblingButton(discord.ui.Button):
+    def __init__(self, label=None, user_id=None, guild_id=None, style=discord.ButtonStyle.primary):
+        super().__init__(label=label, style=style)
+        self.user_id = user_id
+        self.guild_id = guild_id
+
+    async def callback(self, interaction: discord.Interaction):
+        if await ButtonLockout(interaction):
+            await interaction.response.send_modal(GamblingIntroModal(user_id=self.user_id, guild_id=self.guild_id))
+            
+
+class FlipButton(discord.ui.Button):
+    def __init__(self, user_id=None, guild_id=None):
+        super().__init__(label="Flip a Coin", style=discord.ButtonStyle.primary)
+        self.user_id = user_id
+        self.guild_id = guild_id
+
+    async def callback(self, interaction: discord.Interaction):
+        result = 1 if random() < 0.5 else 0
+        #update the table with +1 if heads, set to 0 if tails
+        games_db = "games.db"
+        games_conn = sqlite3.connect(games_db)
+        games_curs = games_conn.cursor()
+        if result == 1:
+            #modify to also pass in the current timestamp
+            games_curs.execute('''UPDATE coinFlipLeaderboard SET CurrentStreak = CurrentStreak + 1, LastFlip=? WHERE UserID=?''', (datetime.now().strftime('%Y-%m-%d %H:%M:%S'), interaction.user.id))
+        else:
+            games_curs.execute('''UPDATE coinFlipLeaderboard SET CurrentStreak = 0, LastFlip=? WHERE UserID=?''', (datetime.now().strftime('%Y-%m-%d %H:%M:%S'), interaction.user.id))
+        games_conn.commit()
+        games_curs.execute('''SELECT * FROM coinFlipLeaderboard WHERE UserID=?''', (interaction.user.id,))
+        row = games_curs.fetchone()
+        #update the content of the message the button is attached to
+        await interaction.response.edit_message(content=f"The coin landed on {'heads' if result == 1 else 'tails'}! youre streak is now {row[1]}")
+        self.label = "Flip again?"
+        return
+    
+@client.tree.command(name="flip",description="Flip a coin")
+async def flip_coin(interaction: discord.Interaction):
+    #check if the user has a row with this guild in the coinFlipLeaderboard table
+    games_db = "games.db"
+    games_conn = sqlite3.connect(games_db)
+    games_curs = games_conn.cursor()
+    #check if the users row exists
+    games_curs.execute('''SELECT * FROM coinFlipLeaderboard WHERE UserID=?''', (interaction.user.id,))
+    row = games_curs.fetchone()
+    streak = 0
+    if row is None:
+        # If the row doesn't exist, create it
+        games_curs.execute('''INSERT INTO coinFlipLeaderboard (UserID) VALUES (?)''', (interaction.user.id,))
+    else:
+        streak = row[1]  # Get the current streak from the database
+    games_conn.commit()
+    description=f"Your current coin flip streak is {streak}."
+    flipButton = FlipButton(user_id=interaction.user.id, guild_id=interaction.guild.id)
+    view = discord.ui.View(timeout=None)
+    view.add_item(flipButton)
+    await interaction.response.send_message(description, ephemeral=True,view=view)
+    #result = "heads" if random() < 0.5 else "tails"
+    #await interaction.followup.send(f"The coin landed on {result}!")
+
+@client.tree.command(name="most-used-emojis",description="Queries emoji data for this server.")
 @app_commands.choices(inorout=[
     app_commands.Choice(name="inServerEmoji", value="in"),
     app_commands.Choice(name="outOfServerEmoji", value="out")
@@ -416,7 +913,7 @@ async def mostUsedEmojis(interaction: discord.Interaction, inorout: app_commands
     conn.close()
     return
 
-@client.tree.command(name="servergraph", description="Replies with a graph of activity")
+@client.tree.command(name="server-graph", description="Replies with a graph of activity")
 @app_commands.choices(subtype=[
     app_commands.Choice(name="channel", value="channels"),
     app_commands.Choice(name="user", value="users"),
@@ -431,14 +928,30 @@ async def mostUsedEmojis(interaction: discord.Interaction, inorout: app_commands
     app_commands.Choice(name="true", value="true"),
     app_commands.Choice(name="false", value="false")
 ])
-#@app_commands.describe(subtype="subtype of graph to display (channel, user, singleChannel, singleUser) <default: channel>")
 @app_commands.describe(numberofmessages="number of messages to include in graph <default: 1000>")
-#@app_commands.describe(xaxislabel="x axis label (day, hour) <default: day>")
 @app_commands.describe(drilldowntarget="target of drill down if using single channel or single user [optional] (channelID or userID) <default: none>")
 @app_commands.describe(numberoflines="number of lines to display <default: 15>")
-#@app_commands.describe(logging="enable logging <default: false>")
 
 async def servergraph(interaction: discord.Interaction, subtype: app_commands.Choice[str], xaxislabel: app_commands.Choice[str], logging: app_commands.Choice[str], numberofmessages: int = 1000, drilldowntarget: str = '', numberoflines: int = 15):
+    if not await isAuthorized(interaction.user.id, str(interaction.guild.id)):
+        await interaction.response.send_message("You are not authorized to use this command.")
+        return
+    if numberofmessages < 1:
+        await interaction.response.send_message("Invalid number of messages.")
+        return
+    if numberoflines < 1:
+        await interaction.response.send_message("Invalid number of lines.")
+        return
+    if subtype.value in ["singleChannel", "singleUser"]:
+        if subtype.value == "singleUser":
+            if not (drilldowntarget.isdigit() and int(drilldowntarget) in [user.id for user in interaction.guild.members]):
+                await interaction.response.send_message("Invalid drill down target.")
+                return
+        if subtype.value == "singleChannel":
+            if not (drilldowntarget.isdigit() and int(drilldowntarget) in [channel.id for channel in interaction.guild.text_channels]):
+                await interaction.response.send_message("Invalid drill down target.")
+                return
+
     time1 = time.perf_counter()
     await interaction.response.defer(thinking=True)
     DB_NAME = "My_DB"
@@ -579,8 +1092,11 @@ def toggle_feature(guild_id, feature_name):
     return newStatus  # Return new status for UI updates
 
 # Slash command to send the settings menu
-@client.tree.command(name="serversettings", description="Use buttons to set server settings")
+#@client.tree.command(name="server-settings-wip", description="Use buttons to set server settings")
 async def serversettings(interaction: discord.Interaction):
+    if not await isAuthorized(str(interaction.user.id), str(interaction.guild.id)):
+        await interaction.response.send_message("You are not authorized to use this command. ask an administrator to authorize you using the /addAuthorizedUser command.",ephemeral=True)
+        return
     guild_id = str(interaction.guild.id)
     guild_name = interaction.guild.name
 
@@ -609,41 +1125,370 @@ class PatchNotesModal(discord.ui.Modal):
         conn.commit()
         conn.close()
 
+@client.tree.command(name="game-settings-set", description="Manage game settings")
+@app_commands.describe(numberofquestionsperday="Number of random questions a user can answer per day")
+@app_commands.describe(questiontimeout="Timeout in seconds for random questions that appear in the chat")
+@app_commands.describe(pipchance="The base chance that a message will trigger a bonus pip reaction. chance goes from 0 -> X over a period of time to mitigate spam. .1=10% 1=100%")
+@app_commands.describe(questionchance="The base chance that a random question will be asked in chat following a users message. .1=10% 1=100%")
+@app_commands.describe(flagshamechannel="Flag to enable or disable the shame channel feature. 1 is on 0 is off")
+@app_commands.describe(shamechannel="Channel ID for the shame channel where incorrect answers are posted")
+@app_commands.describe(flagignoredchannels=" 1 is on 0 is off")
+@app_commands.describe(ignoredchannels="Channel ID for the ignored channels to add or remove")
+@app_commands.describe(flaggoofsgaffs="Flag to enable chat response goofs and gaffs. 1 is on 0 is off")
+async def gamesettingscommandset(interaction: discord.Interaction, numberofquestionsperday: int = None, questiontimeout: int = None, pipchance: float = None, questionchance: float = None, flagshamechannel: int = None, shamechannel: str = None, flagignoredchannels: int = None, ignoredchannels: str = None, flaggoofsgaffs: int = None):
+    if not await isAuthorized(str(interaction.user.id), str(interaction.guild.id)):
+        await interaction.response.send_message("You are not authorized to use this command. ask an administrator to authorize you using the /addAuthorizedUser command.",ephemeral=True)
+        return
+    #go through each parameter and if it is not none, update the database with its new value
+    games_db = "games.db"
+    games_conn = sqlite3.connect(games_db)
+    games_curs = games_conn.cursor()
+    changedSettings=""
+    errorString=""
+    if numberofquestionsperday is not None:
+        if numberofquestionsperday < 1:
+            errorString+=f"Number of questions per day must be at least 1.\n"
+        else:
+            games_curs.execute("UPDATE ServerSettings SET NumQuestionsPerDay = ? WHERE GuildID = ?", (numberofquestionsperday, interaction.guild.id))
+            changedSettings+=f"Number of questions per day updated to {numberofquestionsperday}\n"
+    if questiontimeout is not None:
+        if questiontimeout < 1:
+            errorString+=f"Question timeout must be at least 1 second.\n"
+        else:
+            games_curs.execute("UPDATE ServerSettings SET QuestionTimeout = ? WHERE GuildID = ? ", (questiontimeout, interaction.guild.id))
+            changedSettings+=f"Question timeout updated to {questiontimeout}\n"
+    if pipchance is not None:
+        if pipchance <= 0:
+            errorString+=f"Pip chance must be above 0.\n"
+        else:
+            games_curs.execute("UPDATE ServerSettings SET PipChance = ? WHERE GuildID = ?", (pipchance, interaction.guild.id))
+            changedSettings+=f"Pip chance updated to {pipchance}\n"
+    if questionchance is not None:
+        if questionchance <= 0:
+            errorString+=f"Question chance must be above 0.\n"
+        else:
+            games_curs.execute("UPDATE ServerSettings SET QuestionChance = ? WHERE GuildID = ?", (questionchance, interaction.guild.id))
+            changedSettings+=f"Question chance updated to {questionchance}\n"
+    if flagshamechannel is not None:
+        if flagshamechannel not in [0, 1]:
+            errorString+=f"Flag shame channel must be 0 or 1 to represent off or on.\n"
+        else:
+            games_curs.execute("UPDATE ServerSettings SET FlagShameChannel = ? WHERE GuildID = ?", (flagshamechannel, interaction.guild.id))
+            changedSettings+=f"Shame channel flag updated to {flagshamechannel}\n"
+    if shamechannel is not None:
+        #check to see if the id is a valid channel in this server
+        if int(shamechannel) not in [channel.id for channel in interaction.guild.text_channels]:
+            errorString+=f"Shame channel must be a valid text channel in this server.\n"
+        else:
+            games_curs.execute("UPDATE ServerSettings SET ShameChannel = ? WHERE GuildID = ?", (shamechannel, interaction.guild.id))
+            changedSettings+=f"Shame channel updated to <#{shamechannel}>\n"
+    if flagignoredchannels is not None:
+        if flagignoredchannels not in [0, 1]:
+            errorString+=f"Flag ignored channels must be 0 or 1 to represent off or on.\n"
+        else:
+            games_curs.execute("UPDATE ServerSettings SET FlagIgnoredChannels = ? WHERE GuildID = ?", (flagignoredchannels, interaction.guild.id))
+            changedSettings+=f"Ignored channels flag updated to {flagignoredchannels}\n"
+    if ignoredchannels is not None:
+        #check to see if the id is a valid channel in this server
+        if int(ignoredchannels) not in [channel.id for channel in interaction.guild.text_channels]:
+            errorString+=f"Ignored channels must be valid text channels in this server.\n"
+        else:
+            #pull list from db and turn the string back into a list
+            games_curs.execute("SELECT IgnoredChannels FROM ServerSettings WHERE GuildID = ?", (interaction.guild.id,))
+            result = games_curs.fetchone()
+            if result and result[0]:
+                ignoredchannels_list = json.loads(result[0])
+                if ignoredchannels not in ignoredchannels_list:
+                    ignoredchannels_list.append(ignoredchannels)
+                    ignoredchannels_json=json.dumps(ignoredchannels_list)
+                    #ignoredchannels = json.dumps(ignoredchannels_list)
+                    games_curs.execute("UPDATE ServerSettings SET IgnoredChannels = ? WHERE GuildID = ?", (ignoredchannels_json, interaction.guild.id))
+                    changedSettings+=f"Ignored channels added <#{ignoredchannels}>\n"
+                else:
+                    ignoredchannels_list.remove(ignoredchannels)
+                    ignoredchannels_json = json.dumps(ignoredchannels_list)
+                    games_curs.execute("UPDATE ServerSettings SET IgnoredChannels = ? WHERE GuildID = ?", (ignoredchannels_json, interaction.guild.id))
+                    changedSettings+=f"Ignored channels removed <#{ignoredchannels}>\n"
+            else:
+                ignoredchannels_json = json.dumps([ignoredchannels])
+                games_curs.execute("UPDATE ServerSettings SET IgnoredChannels = ? WHERE GuildID = ?", (ignoredchannels_json, interaction.guild.id))
+                changedSettings+=f"Ignored channels set to <#{ignoredchannels}>\n"
+
+    if flaggoofsgaffs is not None:
+        if flaggoofsgaffs not in [0, 1]:
+            errorString+=f"Flag goofs and gaffs must be 0 or 1 to represent off or on.\n"
+        else:
+            games_curs.execute("UPDATE ServerSettings SET FlagGoofsGaffs = ? WHERE GuildID = ?", (flaggoofsgaffs, interaction.guild.id))
+            changedSettings+=f"Goofs and gaffs flag updated to {flaggoofsgaffs}\n"
+    games_conn.commit()
+    games_curs.close()
+    games_conn.close()
+    outstr=""
+    if changedSettings!="":
+        outstr+=f"Changes:\n{changedSettings}\n"
+    if errorString!="":
+        outstr+=f"Errors:\n{errorString}"
+    if outstr=="":
+        outstr="No changes made."
+    await interaction.response.send_message(outstr)
+
+
+@client.tree.command(name="goofs-settings-set",description="Set goofs and gaffs settings")
+@app_commands.describe(flaghorse="1 is on 0 is off")
+@app_commands.describe(horsechance="0-1 decimal")
+@app_commands.describe(flagcat="1 is on 0 is off. requires catbot to work")
+@app_commands.describe(catchance="0-1 decimal")
+@app_commands.describe(flagping="1 is on 0 is off.")
+@app_commands.describe(flagmarathon="1 is on 0 is off.")
+@app_commands.describe(marathonchance="0-1 decimal")
+@app_commands.describe(flagtwitteralt="1 is on 0 is off.")
+@app_commands.describe(twitteraltchance="0-1 decimal")
+async def goofs_settings_command_set(interaction: discord.Interaction, flaghorse: int = None, horsechance: float = None, flagcat: int = None, catchance: float = None, flagping: int = None, flagmarathon: int = None, marathonchance: float = None, flagtwitteralt: int = None, twitteraltchance: float = None):
+    if not await isAuthorized(str(interaction.user.id), str(interaction.guild.id)):
+        await interaction.response.send_message("You are not authorized to use this command.")
+        return
+
+    games_db="games.db"
+    games_conn=sqlite3.connect(games_db)
+    games_curs=games_conn.cursor()
+    changedSettings=""
+    errorString=""
+    if flaghorse is not None:
+        if flaghorse not in [0, 1]:
+            errorString+=f"Flag horse must be 0 or 1 to represent off or on.\n"
+        else:
+            games_curs.execute("UPDATE GoofsGaffs SET FlagHorse = ? WHERE GuildID = ?", (flaghorse, interaction.guild.id))
+            changedSettings+=f"Horse flag updated to {flaghorse}\n"
+    if horsechance is not None:
+        if horsechance <= 0:
+            errorString+=f"Horse chance must be above 0.\n"
+        else:
+            games_curs.execute("UPDATE GoofsGaffs SET HorseChance = ? WHERE GuildID = ?", (horsechance, interaction.guild.id))
+            changedSettings+=f"Horse chance updated to {horsechance}\n"
+    if flagcat is not None:
+        if flagcat not in [0, 1]:
+            errorString+=f"Flag cat must be 0 or 1 to represent off or on.\n"
+        else:
+            games_curs.execute("UPDATE GoofsGaffs SET FlagCat = ? WHERE GuildID = ?", (flagcat, interaction.guild.id))
+            changedSettings+=f"Cat flag updated to {flagcat}\n"
+    if catchance is not None:
+        if catchance <= 0:
+            errorString+=f"Cat chance must be above 0.\n"
+        else:
+            games_curs.execute("UPDATE GoofsGaffs SET CatChance = ? WHERE GuildID = ?", (catchance, interaction.guild.id))
+            changedSettings+=f"Cat chance updated to {catchance}\n"
+    if flagping is not None:
+        if flagping not in [0, 1]:
+            errorString+=f"Flag ping must be 0 or 1 to represent off or on.\n"
+        else:
+            games_curs.execute("UPDATE GoofsGaffs SET FlagPing = ? WHERE GuildID = ?", (flagping, interaction.guild.id))
+            changedSettings+=f"Ping flag updated to {flagping}\n"
+    if flagmarathon is not None:
+        if flagmarathon not in [0, 1]:
+            errorString+=f"Flag marathon must be 0 or 1 to represent off or on.\n"
+        else:
+            games_curs.execute("UPDATE GoofsGaffs SET FlagMarathon = ? WHERE GuildID = ?", (flagmarathon, interaction.guild.id))
+            changedSettings+=f"Marathon flag updated to {flagmarathon}\n"
+    if marathonchance is not None:
+        if marathonchance <= 0:
+            errorString+=f"Marathon chance must be above 0.\n"
+        else:
+            games_curs.execute("UPDATE GoofsGaffs SET MarathonChance = ? WHERE GuildID = ?", (marathonchance, interaction.guild.id))
+            changedSettings+=f"Marathon chance updated to {marathonchance}\n"
+    if flagtwitteralt is not None:
+        if flagtwitteralt not in [0, 1]:
+            errorString+=f"Flag twitter alt must be 0 or 1 to represent off or on.\n"
+        else:
+            games_curs.execute("UPDATE GoofsGaffs SET FlagTwitterAlt = ? WHERE GuildID = ?", (flagtwitteralt, interaction.guild.id))
+            changedSettings+=f"Twitter alt flag updated to {flagtwitteralt}\n"
+    if twitteraltchance is not None:
+        if twitteraltchance <= 0:
+            errorString+=f"Twitter alt chance must be above 0.\n"
+        else:
+            games_curs.execute("UPDATE GoofsGaffs SET TwitterAltChance = ? WHERE GuildID = ?", (twitteraltchance, interaction.guild.id))
+            changedSettings+=f"Twitter alt chance updated to {twitteraltchance}\n"
+    games_conn.commit()
+    games_curs.close()
+    games_conn.close()
+    outstr=""
+    if changedSettings!="":
+        outstr+=f"Changes:\n{changedSettings}\n"
+    if errorString!="":
+        outstr+=f"Errors:\n{errorString}"
+    if outstr=="":
+        outstr="No changes made."
+    await interaction.response.send_message(outstr)
+
+
+@client.tree.command(name="goofs-settings-get",description="Get goofs and gaffs settings")
+async def goofs_settings_command_get(interaction: discord.Interaction):
+    # Get and display the goofs and gaffs setting for the given server
+    games_db = "games.db"
+    games_conn = sqlite3.connect(games_db)
+    games_curs = games_conn.cursor()
+    games_curs.execute("SELECT * FROM GoofsGaffs WHERE GuildID = ?", (interaction.guild.id,))
+    rows = games_curs.fetchall()
+    if not rows:
+        await interaction.response.send_message("No server settings found.")
+        return
+    columns= [desc[0] for desc in games_curs.description]
+    settings = "\n".join([f"{col}: {val}" for col, val in zip(columns, rows[0])])
+    await interaction.response.send_message(f"Goofs and Gaffs settings for {interaction.guild.name}:\n{settings}")
+
+    games_curs.close()
+    games_conn.close()
+
+
+@client.tree.command(name="game-settings-get", description="Get server settings")
+async def serversettingscommandget(interaction: discord.Interaction):
+    #get and display all values in the serversettings table for the given server
+    games_db = "games.db"
+    games_conn = sqlite3.connect(games_db)
+    games_curs = games_conn.cursor()
+    games_curs.execute("SELECT * FROM ServerSettings WHERE GuildID = ?", (interaction.guild.id,))
+    rows = games_curs.fetchall()
+    if not rows:
+        await interaction.response.send_message("No server settings found.")
+        return
+    columns= [desc[0] for desc in games_curs.description]
+    settings = "\n".join([f"{col}: {val}" for col, val in zip(columns, rows[0])])
+    await interaction.response.send_message(f"Server settings for {interaction.guild.name}:\n{settings}")
+
+    games_curs.close()
+    games_conn.close()
+
+@client.tree.command(name="add-authorized-user", description="User ID")
+async def add_authorized_user(interaction: discord.Interaction, userid: str):
+    if not await isAuthorized(interaction.user.id, str(interaction.guild.id)):
+        await interaction.response.send_message("You are not authorized to use this command.")
+        return
+    #validate that the user id is from a user in this guild
+    guild = client.get_guild(interaction.guild.id)
+    member = guild.get_member(int(userid))
+    if not member:
+        await interaction.response.send_message("User not found in this guild.")
+        return
+    main_db = "MY_DB"
+    main_conn = sqlite3.connect(main_db)
+    main_curs = main_conn.cursor()
+    main_curs.execute("SELECT AuthorizedUsers FROM ServerSettings WHERE GuildID = ?", (interaction.guild.id,))
+    result = main_curs.fetchone()
+    if result and result[0]:
+        authorized_users = json.loads(result[0])
+        if userid not in authorized_users:
+            authorized_users.append(userid)
+            main_curs.execute("UPDATE ServerSettings SET AuthorizedUsers = ? WHERE GuildID = ?", (json.dumps(authorized_users), interaction.guild.id))
+        else:
+            authorized_users.remove(userid)
+            main_curs.execute("UPDATE ServerSettings SET AuthorizedUsers = ? WHERE GuildID = ?", (json.dumps(authorized_users), interaction.guild.id))
+    else:
+        main_curs.execute("INSERT INTO ServerSettings (GuildID, AuthorizedUsers) VALUES (?, ?)", (interaction.guild.id, json.dumps([userid])))
+    main_conn.commit()
+    main_curs.close()
+    main_conn.close()
+    await interaction.response.send_message(f"User {userid  } has been added to the authorized users list.")
+
+async def isAuthorized(userID: str, guildID: str) -> bool:
+    #check if the user has admin privileges in this guild
+    guild = client.get_guild(int(guildID))
+    if not guild:
+        return False
+    member = guild.get_member(int(userID))
+    if not member:
+        return False
+    if member.guild_permissions.administrator:
+        return True
+    main_db = "MY_DB"
+    main_conn = sqlite3.connect(main_db)
+    main_curs = main_conn.cursor()
+    main_curs.execute("SELECT AuthorizedUsers FROM ServerSettings WHERE GuildID = ?", (guildID,))
+    result = main_curs.fetchone()
+    if result and result[0]:
+        authorized_users = json.loads(result[0])
+        if userID in authorized_users:
+            return True
+        return False
+    return False
+
+async def delete_later(message,time):
+    await asyncio.sleep(time)  # wait for the specified time
+    try:
+        await message.delete()
+    except Exception:
+        pass  # message might already be gone
+
+
 @client.tree.command(name="leaderboard", description="new game points leaderboard")
-async def leaderboard(interaction: discord.Interaction):
-    """Displays the game points leaderboard."""
-    await interaction.response.defer(thinking=True)
-    #time.sleep(10)  # Simulate processing time
-    guild_id = str(interaction.guild.id)
+@app_commands.choices(subtype=[
+    app_commands.Choice(name="bonus-points", value="pip"),
+    app_commands.Choice(name="coin-flip", value="flip")
+])
+async def leaderboard(interaction: discord.Interaction, subtype: app_commands.Choice[str]):
     mainDB = "MY_DB"
     gamesDB = "games.db"
     main_conn = sqlite3.connect(mainDB)
     games_conn = sqlite3.connect(gamesDB)
     main_curs = main_conn.cursor()
     games_curs = games_conn.cursor()
-    games_curs.execute('''SELECT UserID, SUM(Num_Correct) AS TotalPoints
-    FROM Scores WHERE GuildID = ?
-    GROUP BY UserID
-    ORDER BY TotalPoints DESC''', (guild_id,))
-    rows= games_curs.fetchall()
-    outstr=""
-    for row in rows:
-        user=interaction.guild.get_member(int(row[0]))
-        if user:
-            outstr += f"{user.display_name}: {row[1]} points\n"
+    if subtype.value == "pip":
+        """Displays the game points leaderboard."""
+        await interaction.response.defer(thinking=True)
+        #time.sleep(10)  # Simulate processing time
+        guild_id = str(interaction.guild.id)
+        
+        games_curs.execute('''SELECT UserID, SUM(Num_Correct) AS TotalPoints
+        FROM Scores WHERE GuildID = ?
+        GROUP BY UserID
+        ORDER BY TotalPoints DESC''', (guild_id,))
+        rows= games_curs.fetchall()
+        outstr=""
+        for row in rows:
+            user=interaction.guild.get_member(int(row[0]))
+            if user:
+                outstr += f"{user.display_name}: {row[1]} points\n"
+            else:
+                outstr += f"User ID {row[0]}: {row[1]} points\n"
+        if outstr == "":
+            outstr = "no points yet"
+        await interaction.followup.send(outstr)
+    if subtype.value == "flip":
+        await interaction.response.defer(thinking=True)
+        games_curs.execute('''SELECT UserID, CurrentStreak FROM CoinFlipLeaderboard ORDER BY CurrentStreak DESC, LastFlip DESC''')
+        rows= games_curs.fetchall()
+        leaderboard=[]
+        quitQ=0
+        participation=0
+        leaderboard.append(f"---Coin Flip Leaderboard---")
+        for UserID, CurrentStreak in rows:
+            #--TODO: see if i can pre capture the user ids so i only have to go out to discord once instead of every loop
+            user=interaction.guild.get_member(int(UserID))
+            if user:
+                if participation == 0 and CurrentStreak==1:
+                    leaderboard.append(f"---Participation Trophy---")
+                    participation=1
+                if quitQ==0 and CurrentStreak == 0:
+                    leaderboard.append(f"---Quitters---")
+                    quitQ=1
+                leaderboard.append(f"{user.display_name}: {CurrentStreak}")
+        #check if leaderboard is empty
+        if not leaderboard:
+            await interaction.followup.send("No users found in the coin flip leaderboard.")
         else:
-            outstr += f"User ID {row[0]}: {row[1]} points\n"
-    if outstr == "":
-        outstr = "no points yet"
-    await interaction.followup.send(outstr)
+            msg=await interaction.followup.send("\n".join(leaderboard))
+            asyncio.create_task(delete_later(message=msg,time=60))
+
     main_curs.close()
     main_conn.close()
     games_curs.close()
     games_conn.close()
 
 
+    
+
+
+
 #set up a modal to set the settings for patch notes
-@client.tree.command(name="changesettings", description="select which feature to change settings")
+#@client.tree.command(name="change-settings-wip", description="select which feature to change settings")
 @app_commands.choices(feature=[
     #app_commands.Choice(name="Top Chatter Tracking", value="topChatterTracking"),
     app_commands.Choice(name="Patch Notes", value="patchNotes")
@@ -654,8 +1499,55 @@ async def changesettings(interaction: discord.Interaction, feature: app_commands
         await interaction.response.send_modal(modal)
 
 
+@client.tree.command(name="grade-report", description="shows your grade report for the server")
+@app_commands.choices(visibility=[
+    app_commands.Choice(name="public", value="public"),
+    app_commands.Choice(name="private", value="private")
+])
+async def gradereport(interaction: discord.Interaction, visibility: app_commands.Choice[str]):
+    gamesDB = "games.db"
+    games_conn = sqlite3.connect(gamesDB)
+    games_curs = games_conn.cursor()
+    await create_user_db_entry(interaction.guild.id, interaction.user.id)
+    games_curs.execute('''select Category, Difficulty, Num_Correct, Num_Incorrect from Scores where GuildID = ? and UserID = ? order by category, difficulty''', (interaction.guild.id, interaction.user.id))
+    rows = games_curs.fetchall()
+    if not rows:
+        await interaction.response.send_message("You have no scores recorded for this server.", ephemeral=True)
+        games_curs.close()
+        games_conn.close()
+        return
+    outstr = "```Your Grade Report:\n"
+    for row in rows:
+        category = row[0]
+        difficulty = row[1]
+        num_correct = row[2]
+        num_incorrect = row[3]
+        total = num_correct + num_incorrect
+        if total > 0:
+            percentage = (num_correct / total) * 100
+            grade = await numToGrade(percentage)
+            outstr += f"{category:<10}{difficulty:<4}{grade:<4}\n"
+        else:
+            outstr += f"Category: {category}, Difficulty: {difficulty}, No attempts recorded.\n"
+    outstr += "```"
+    await interaction.response.send_message(outstr, ephemeral=(visibility.value == "private"))
+    
+    games_curs.close()
+    games_conn.close()
 
-
+async def numToGrade(percentage):
+    """Converts a percentage to a letter grade."""
+    if percentage >= 90:
+        return "A"
+    elif percentage >= 80:
+        return "B"
+    elif percentage >= 70:
+        return "C"
+    elif percentage >= 60:
+        return "D"
+    else:
+        return "F"
+  
 
 #mode: 1=in server by user, 2= out of server by user, 3=in server by raw count, 4=out of server by raw count
 def emojiQuery(guildID, mode, curs):
@@ -1027,24 +1919,102 @@ def topChat(graphType, graphXaxis, numMessages, guildID, numLines, drillDownTarg
         print(nameDict[nameid]+": "+str(sum(dataDict[nameid])))
     return nameDict,dataDict
 
-async def smrtGame(self, message,curs):
-    curTime=time.time()
-    delta=0
-    #see if the key exists in the dict
-    if message.guild.id not in self.lastSentBonusPip:
-        delta=10000000
-    else:
-        delta=curTime-self.lastSentBonusPip[message.guild.id]
+
+async def checkIgnoredChannels(channelID: str, guildID: str) -> bool:
+    channelID_str = str(channelID)
+    gameDB = "games.db"
+    games_conn = sqlite3.connect(gameDB)
+    games_curs = games_conn.cursor()
+    games_curs.execute('''SELECT IgnoredChannels FROM ServerSettings WHERE GuildID=?''', (guildID,))
+    ignoredchannels = games_curs.fetchone()
+    channelList = []
+    if ignoredchannels is not None and ignoredchannels[0] is not None:
+        channelList=json.loads(ignoredchannels[0])
+    games_conn.close()
+
+    if channelID_str in channelList:
+        return True
+    return False
+
+
+async def createTimers(GuildID):
+    gameDB = "games.db"
+    games_conn = sqlite3.connect(gameDB)
+    games_curs = games_conn.cursor()
+    # Create a table to store timers if it doesn't exist
+    games_curs.execute('''INSERT OR IGNORE INTO FeatureTimers(GuildID) VALUES (?)''', (GuildID,))
+    games_conn.commit()
+    games_conn.close()
+
+async def smrtGame(message):
+    await createTimers(message.guild.id)
+    gamesDB = "games.db"
+    games_conn = sqlite3.connect(gamesDB)
+    games_curs = games_conn.cursor()
+    #get the current time in utc
+    curTime = datetime.now()
+    delta = 0
+    #get the time from the FeatureTimers table
+    games_curs.execute('''SELECT LastBonusPipTime FROM FeatureTimers WHERE GuildID=?''', (message.guild.id,))
+    lastPipTime = games_curs.fetchone()
+    if lastPipTime:
+        LQT=datetime.strptime(lastPipTime[0], "%Y-%m-%d %H:%M:%S")
+        curTime=curTime.replace(microsecond=0)
+        #print("last bonus pip time: "+str(LQT))
+        #print("current time: "+str(curTime))
+        delta = LQT - curTime
+        #convert delta to seconds
+        delta = delta.total_seconds()
+        delta= abs(delta)
+        #print("delta: "+str(delta))
     x=.05*(delta-120)
     multiplier=sigmoid(x)
     r=random()
-    print("result: "+str(multiplier))
-    if r<.02*multiplier:
+    games_curs.execute('''SELECT PipChance FROM ServerSettings WHERE GuildID=?''', (message.guild.id,))
+    row = games_curs.fetchone()
+    if row:
+        pipChance = row[0]
+    if r < pipChance * multiplier:
         await message.add_reaction('✅')
-        self.activeGameMessaages.append(message.id)
-        self.lastSentBonusPip[message.guild.id]=curTime
+        # Update the last bonus pip time in the database
+        games_curs.execute('''UPDATE FeatureTimers SET LastBonusPipTime=?, LastBonusPipMessage=? WHERE GuildID=?''', (curTime, message.id, message.guild.id))
+        games_conn.commit()
+    games_curs.close()
+    games_conn.close()
     return
 
+async def questionSpawner(message):
+    await createTimers(message.guild.id)
+    gamesDB = "games.db"
+    games_conn = sqlite3.connect(gamesDB)
+    games_curs = games_conn.cursor()
+    games_curs.execute('''SELECT QuestionChance from ServerSettings WHERE GuildID=?''', (message.guild.id,))
+    questionChance = games_curs.fetchone()[0]
+    #get the current time in utc
+    curTime = datetime.now()
+    delta = 0
+    #get the time from the FeatureTimers table
+    games_curs.execute('''SELECT LastRandomQuestionTime FROM FeatureTimers WHERE GuildID=?''', (message.guild.id,))
+    lastQuestionTime = games_curs.fetchone()
+    if lastQuestionTime:
+        LQT=datetime.strptime(lastQuestionTime[0], "%Y-%m-%d %H:%M:%S")
+        curTime=curTime.replace(microsecond=0)
+        delta = LQT - curTime
+        #convert delta to seconds
+        delta = delta.total_seconds()
+        delta= abs(delta)
+        #print("delta: "+str(delta))
+    x=.05*(delta-120)
+    multiplier=sigmoid(x)
+    r=random()
+    if r < questionChance * multiplier:
+        await createQuestion(channel=message.channel,isForced=False)
+        # Update the last question time in the database
+        games_curs.execute('''UPDATE FeatureTimers SET LastRandomQuestionTime=? WHERE GuildID=?''', (curTime, message.guild.id))
+        games_conn.commit()
+    games_curs.close()
+    games_conn.close()
+    return
 
 
 

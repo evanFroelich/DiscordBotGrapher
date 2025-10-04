@@ -2,6 +2,7 @@
 /images
 /RankedRoleConfig
 /logs
+/Questions
 my_DB
 depricted functions
 config.ini
@@ -15,3 +16,4 @@ My_DB-wal
 TODO.txt
 games.db
 games.db-journal
+discord_ui_reference.txt
