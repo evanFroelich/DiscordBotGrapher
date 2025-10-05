@@ -1177,8 +1177,8 @@ async def gamesettingscommandset(interaction: discord.Interaction, numberofquest
             changedSettings+=f"Shame channel flag updated to {flagshamechannel}\n"
     if shamechannel is not None:
         #check to see if the id is a valid channel in this server
-        if int(shamechannel) not in [channel.id for channel in interaction.guild.text_channels]:
-            errorString+=f"Shame channel must be a valid text channel in this server.\n"
+        if int(shamechannel) not in [channel.id for channel in interaction.guild.text_channels] and int(shamechannel) not in [thread.id for thread in interaction.guild.threads]:
+            errorString+=f"Shame channel must be a valid text channel or thread in this server.\n"
         else:
             games_curs.execute("UPDATE ServerSettings SET ShameChannel = ? WHERE GuildID = ?", (shamechannel, interaction.guild.id))
             changedSettings+=f"Shame channel updated to <#{shamechannel}>\n"
