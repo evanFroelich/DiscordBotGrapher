@@ -829,7 +829,7 @@ class FlipButton(discord.ui.Button):
         games_curs.execute('''SELECT * FROM coinFlipLeaderboard WHERE UserID=?''', (interaction.user.id,))
         row = games_curs.fetchone()
         #update the content of the message the button is attached to
-        await interaction.response.edit_message(content=f"The coin landed on {'heads' if result == 1 else 'tails'}! youre streak is now {row[1]}")
+        await interaction.response.edit_message(content=f"The coin landed on {'heads' if result == 1 else 'tails'}! your streak is now {row[1]}")
         self.label = "Flip again?"
         return
     
