@@ -139,7 +139,7 @@ class MyClient(discord.Client):
         self.tree = app_commands.CommandTree(self)
 
     async def setup_hook(self):
-        await self.tree.sync()
+        #await self.tree.sync()
         print('synced')
 
     async def on_thread_create(self,thread):
@@ -1523,19 +1523,47 @@ async def gradereport(interaction: discord.Interaction, visibility: app_commands
         games_curs.close()
         games_conn.close()
         return
-    outstr = "```Your Grade Report:\n"
+    outstr = "```Your Grade Report:"
+    accumulationStr = ""
+    previousCategory = ""
+    previousDifficulty = 5
     for row in rows:
         category = row[0]
         difficulty = row[1]
         num_correct = row[2]
         num_incorrect = row[3]
         total = num_correct + num_incorrect
-        if total > 0:
+        if total>0:
+            if previousCategory != category:
+                fillSlashes=5-previousDifficulty
+                for i in range(fillSlashes):
+                    accumulationStr += f"-/"
+                outstr += accumulationStr
+                outstr = outstr[:-1]
+                accumulationStr = f"\n{category:<17}"
+                
+                fillIn=difficulty-1
+                for i in range(fillIn):
+                    accumulationStr += f"-/"
+            elif difficulty-previousDifficulty > 1:
+                diff=difficulty-previousDifficulty
+                diff=diff-1
+                for i in range(diff):
+                    accumulationStr += f"-/"
+                previousDifficulty = difficulty
+            previousCategory = category
+            previousDifficulty = difficulty
             percentage = (num_correct / total) * 100
             grade = await numToGrade(percentage)
-            outstr += f"{category:<10}{difficulty:<4}{grade:<4}\n"
+            accumulationStr += f"{grade}/"
+            #outstr += accumulationStr
+        # if total > 0:
+        #     percentage = (num_correct / total) * 100
+        #     grade = await numToGrade(percentage)
+        #     outstr += f"Grade {difficulty:<1}{category:<20}{grade:<4}\n"
         else:
             outstr += f"Category: {category}, Difficulty: {difficulty}, No attempts recorded.\n"
+    outstr += accumulationStr
     outstr += "```"
     await interaction.response.send_message(outstr, ephemeral=(visibility.value == "private"))
     
