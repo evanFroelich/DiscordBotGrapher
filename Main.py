@@ -596,7 +596,7 @@ async def test_question_message(interaction: discord.Interaction):
         LDQT = datetime.strptime(LDQT, '%Y-%m-%d %H:%M:%S')
         #curTime = datetime.now()
         if LDQT.date() == curTime.date():
-            await interaction.followup.send("You have already answered a question today. Please try again tomorrow.", ephemeral=True)
+            await interaction.followup.send("You have already answered a question today. Please try again tomorrow. daily reset is at: <t:1759622400:t>", ephemeral=True)
             games_curs.close()
             games_conn.close()
             return
