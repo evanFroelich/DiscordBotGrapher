@@ -472,7 +472,7 @@ class QuestionPickButton(discord.ui.Button):
                 games_curs.execute('''SELECT QuestionsAnsweredToday FROM GamblingUserStats WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
                 questions_answered_today = games_curs.fetchone()
                 if questions_answered_today[0]>= num_questions_per_day[0]:
-                    await interaction.response.send_message("You have reached the daily limit for questions. Please try again tomorrow.", ephemeral=True)
+                    await interaction.response.send_message("You have reached the daily limit for questions. Please try again tomorrow. the daily reset is at: <t:1759622400:t>", ephemeral=True)
                     games_curs.close()
                     games_conn.close()
                     return
