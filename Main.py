@@ -698,6 +698,11 @@ class QuestionModal(discord.ui.Modal):
                 shameChannel = interaction.guild.get_channel(shameSettings[1])
                 if shameChannel:
                     await shameChannel.send(f"Oops! <@{interaction.user.id}> didn't know the answer to: {self.question_text}")
+                else:
+                    #try to get the thread
+                    shameThread = interaction.guild.get_thread(shameSettings[1])
+                    if shameThread:
+                        await shameThread.send(f"Oops! <@{interaction.user.id}> didn't know the answer to: {self.question_text}")
 
         #await interaction.response.send_message(f"your answer: {user_answer}, correct answers: {self.question_answers}", ephemeral=True)
         games_curs.close()
