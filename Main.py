@@ -1387,7 +1387,9 @@ async def add_authorized_user(interaction: discord.Interaction, userid: str):
             authorized_users.remove(userid)
             main_curs.execute("UPDATE ServerSettings SET AuthorizedUsers = ? WHERE GuildID = ?", (json.dumps(authorized_users), interaction.guild.id))
     else:
-        main_curs.execute("INSERT INTO ServerSettings (GuildID, AuthorizedUsers) VALUES (?, ?)", (interaction.guild.id, json.dumps([userid])))
+        authorized_users=[]
+        authorized_users.append(userid)
+        main_curs.execute("UPDATE ServerSettings SET AuthorizedUsers = ? WHERE GuildID = ?", (json.dumps(authorized_users), interaction.guild.id))
     main_conn.commit()
     main_curs.close()
     main_conn.close()
@@ -1410,7 +1412,7 @@ async def isAuthorized(userID: str, guildID: str) -> bool:
     result = main_curs.fetchone()
     if result and result[0]:
         authorized_users = json.loads(result[0])
-        if userID in authorized_users:
+        if str(userID) in authorized_users:
             return True
         return False
     return False
