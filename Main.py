@@ -139,7 +139,7 @@ class MyClient(discord.Client):
         self.tree = app_commands.CommandTree(self)
 
     async def setup_hook(self):
-        #await self.tree.sync()
+        await self.tree.sync()
         print('synced')
 
     async def on_thread_create(self,thread):
@@ -624,11 +624,38 @@ class QuestionThankYouButton(discord.ui.Button):
         games_curs = games_conn.cursor()
         games_curs.execute('''UPDATE GamblingUserStats SET TipsGiven = TipsGiven + 1 WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
         games_conn.commit()
+        contentPayload=""
+        thanksView=discord.ui.View(timeout=None)
+        games_curs.execute('''SELECT Game1 FROM GamblingGamesUnlocked WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
+        unlockedGames = games_curs.fetchone()
+        if unlockedGames:
+            # User has unlocked Game1
+            games_curs.execute('''SELECT Story1 FROM StoryProgression WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
+            storyProgress = games_curs.fetchone()
+            if storyProgress:
+                if storyProgress[0] == 1:
+                    thanksView.add_item(GamblingButton(label="gamble", user_id=interaction.user.id, guild_id=interaction.guild.id, style=discord.ButtonStyle.primary))
+                if storyProgress[0] == 0:
+                    contentPayload += f"🎰 You have unlocked a new story: {storyProgress[0]}\n"
+                    thanksView.add_item(GamblingButton(label="gamble0", user_id=interaction.user.id, guild_id=interaction.guild.id, style=discord.ButtonStyle.primary))
+                    games_curs.execute('''UPDATE StoryProgression SET Story1 = 1 WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
+                    games_conn.commit()
+            else:
+                games_curs.execute('''INSERT INTO StoryProgression (GuildID, UserID) VALUES (?, ?)''', (interaction.guild.id, interaction.user.id))
+                games_conn.commit()
+           
+           
+        else:
+            games_curs.execute('''INSERT INTO GamblingGamesUnlocked (GuildID, UserID) VALUES (?, ?, ?)''', (interaction.guild.id, interaction.user.id))
+            games_conn.commit()
         games_curs.close()
+        games_conn.close()
         await award_points(1, interaction.guild.id, interaction.user.id)
         self.disabled = True
         #await interaction.edit_original_response(content="test",view=None)
-        await interaction.response.edit_message(content="Thanks for the tip!", view=None)
+        if contentPayload=="":
+            contentPayload="Thanks for the tip!"
+        await interaction.response.edit_message(content=contentPayload, view=thanksView)
         #await interaction.response.send_message("You're welcome! If you have more questions, feel free to ask!", ephemeral=True)
 
 
@@ -658,24 +685,29 @@ class QuestionModal(discord.ui.Modal):
             games_curs.execute('''INSERT INTO Scores (GuildID, UserID, Category, Difficulty, Num_Correct, Num_Incorrect) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(GuildID, UserID, Category, Difficulty) DO UPDATE SET Num_Correct = Num_Correct + 1;''', (interaction.guild.id, interaction.user.id, self.question_type, self.question_difficulty, 1, 0))
             games_curs.execute('''UPDATE GamblingUserStats SET QuestionsAnsweredTodayCorrect = QuestionsAnsweredTodayCorrect + 1 WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
             games_conn.commit()
-            gamblingPoints=self.question_difficulty*2+3
+            gamblingPoints=self.question_difficulty*3+7
             await award_points(gamblingPoints, interaction.guild.id, interaction.user.id)
-            #games_curs.execute('''UPDATE GamblingUserStats SET CurrentBalance = CurrentBalance + ? WHERE GuildID=? AND UserID=?;''', (gamblingPoints, interaction.guild.id, interaction.user.id))
             games_conn.commit()
-            #buttonList = [] 
-            #buttonList.append(QuestionThankYouButton())
-            #button= QuestionThankYouButton()
             questionAnsweredView = discord.ui.View(timeout=None)
             button= QuestionThankYouButton()
             questionAnsweredView.add_item(button)
-            #check to see if the user has met the metrics for unlocking game 1
-            games_curs.execute('''SELECT * FROM GamblingUnlockMetricsView WHERE GuildID=? and UserID=?''', (interaction.guild.id, interaction.user.id))
-            userStats = games_curs.fetchone()
-            games_curs.execute('''SELECT * FROM GamblingUnlockConditions WHERE GuildID=?''', (interaction.guild.id,))
-            unlockConditions = games_curs.fetchone()
-            if userStats and unlockConditions:
-                if userStats[2]>= unlockConditions[1] and userStats[3]>= unlockConditions[2] and userStats[4]>= unlockConditions[3]:
-                    questionAnsweredView.add_item(GamblingButton(label="🎰", user_id=interaction.user.id, guild_id=interaction.guild.id, style=discord.ButtonStyle.primary))
+            games_curs.execute('''SELECT Game1 FROM GamblingGamesUnlocked WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
+            unlockedGames = games_curs.fetchone()
+            if unlockedGames:
+                # User has unlocked Game1
+                questionAnsweredView.add_item(GamblingButton(label="🎰", user_id=interaction.user.id, guild_id=interaction.guild.id, style=discord.ButtonStyle.primary))
+            else:
+
+                #check to see if the user has met the metrics for unlocking game 1
+                games_curs.execute('''SELECT * FROM GamblingUnlockMetricsView WHERE GuildID=? and UserID=?''', (interaction.guild.id, interaction.user.id))
+                userStats = games_curs.fetchone()
+                games_curs.execute('''SELECT * FROM GamblingUnlockConditions WHERE GuildID=?''', (interaction.guild.id,))
+                unlockConditions = games_curs.fetchone()
+                if userStats and unlockConditions:
+                    if userStats[2]>= unlockConditions[1] and userStats[3]>= unlockConditions[2] and userStats[4]>= unlockConditions[3]:
+                        # questionAnsweredView.add_item(GamblingButton(label="🎰", user_id=interaction.user.id, guild_id=interaction.guild.id, style=discord.ButtonStyle.primary))
+                        games_curs.execute('''INSERT INTO GamblingGamesUnlocked (GuildID, UserID, Game1) VALUES (?, ?, 1) ON CONFLICT(GuildID, UserID) DO UPDATE SET Game1=1''', (interaction.guild.id, interaction.user.id))
+                        games_conn.commit()
             await interaction.response.send_message(f"Correct!", ephemeral=True, view=questionAnsweredView)
         else:
             games_curs.execute('''INSERT INTO Scores (GuildID, UserID, Category, Difficulty, Num_Correct, Num_Incorrect) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(GuildID, UserID, Category, Difficulty) DO UPDATE SET Num_Incorrect = Num_Incorrect + 1;''', (interaction.guild.id, interaction.user.id, self.question_type, self.question_difficulty, 0, 1))
@@ -684,13 +716,17 @@ class QuestionModal(discord.ui.Modal):
             button= QuestionThankYouButton()
             questionAnsweredView.add_item(button)
             #check to see if the user has met the metrics for unlocking game 1
-            games_curs.execute('''SELECT * FROM GamblingUnlockMetricsView WHERE GuildID=? and UserID=?''', (interaction.guild.id, interaction.user.id))
-            userStats = games_curs.fetchone()
-            games_curs.execute('''SELECT * FROM GamblingUnlockConditions WHERE GuildID=?''', (interaction.guild.id,))
-            unlockConditions = games_curs.fetchone()
-            if userStats and unlockConditions:
-                if userStats[2]>= unlockConditions[1] and userStats[3]>= unlockConditions[2] and userStats[4]>= unlockConditions[3]:
-                    questionAnsweredView.add_item(GamblingButton(label="🎰", user_id=interaction.user.id, guild_id=interaction.guild.id, style=discord.ButtonStyle.primary))
+
+            #for removal
+            # games_curs.execute('''SELECT * FROM GamblingUnlockMetricsView WHERE GuildID=? and UserID=?''', (interaction.guild.id, interaction.user.id))
+            # userStats = games_curs.fetchone()
+            # games_curs.execute('''SELECT * FROM GamblingUnlockConditions WHERE GuildID=?''', (interaction.guild.id,))
+            # unlockConditions = games_curs.fetchone()
+            # if userStats and unlockConditions:
+            #     if userStats[2]>= unlockConditions[1] and userStats[3]>= unlockConditions[2] and userStats[4]>= unlockConditions[3]:
+            #         questionAnsweredView.add_item(GamblingButton(label="🎰", user_id=interaction.user.id, guild_id=interaction.guild.id, style=discord.ButtonStyle.primary))
+
+
             await interaction.response.send_message(f"Incorrect answer. The correct answer(s) are: {self.question_answers}", ephemeral=True, view=questionAnsweredView)
             games_curs.execute('''SELECT FlagShameChannel, ShameChannel FROM ServerSettings WHERE GuildID=?''', (interaction.guild.id,))
             shameSettings = games_curs.fetchone()
@@ -714,7 +750,8 @@ async def award_points(amount, guild_id, user_id):
     games_curs = games_conn.cursor()
     games_curs.execute('''UPDATE GamblingUserStats SET CurrentBalance = CurrentBalance + ? WHERE GuildID=? AND UserID=?;''', (amount, guild_id, user_id))
     #also add the same amount to the LifetimeEarnings column
-    games_curs.execute('''UPDATE GamblingUserStats SET LifetimeEarnings = LifetimeEarnings + ? WHERE GuildID=? AND UserID=?;''', (amount, guild_id, user_id))
+    if amount > 0:
+        games_curs.execute('''UPDATE GamblingUserStats SET LifetimeEarnings = LifetimeEarnings + ? WHERE GuildID=? AND UserID=?;''', (amount, guild_id, user_id))
     games_conn.commit()
     games_curs.close()
     games_conn.close()
@@ -784,23 +821,99 @@ async def CoinFlipGame(self, interaction: discord.Interaction, bet_amount: int):
     games_conn.close()
 
 class GamblingIntroModal(discord.ui.Modal):
-    def __init__(self, user_id=None, guild_id=None):
-        super().__init__(title="Gambling Funds")
+    def __init__(self, user_id=None, guild_id=None, funds=None):
+        super().__init__(title="Lets go gambling!")
         self.user_id = user_id
         self.guild_id = guild_id
-        self.funds_input = discord.ui.TextInput(label="Enter your initial funds", placeholder="e.g. 1000", max_length=10, required=True)
+        self.funds = funds
+        self.storyMessage=discord.ui.TextDisplay(content=f"how much are you bringing with you? you have {self.funds} avaliable.")
+        self.funds_input = discord.ui.TextInput(label=f"funds brought:", max_length=10, required=True,placeholder="e.g. 1000", style=discord.TextStyle.short)
+        self.add_item(self.storyMessage)
         self.add_item(self.funds_input) #i dont think i need this
 
     async def on_submit(self, interaction: discord.Interaction):
-        funds = self.funds_input.value
-        # gamesDB = "games.db"
-        # games_conn = sqlite3.connect(gamesDB)
-        # games_curs = games_conn.cursor()
+        fundsInput = self.funds_input.value
+        view=discord.ui.View()
+        if int(fundsInput) > self.funds or int(fundsInput)<10:
+            view.add_item(GamblingButton(label="want to try that again?", user_id=self.user_id, guild_id=self.guild_id, style=discord.ButtonStyle.primary))
+            await interaction.response.send_message(f"Are you trying to cheat me?! dont try that again.", ephemeral=True, view=view)
+            return
+        
+        gamesDB = "games.db"
+        games_conn = sqlite3.connect(gamesDB)
+        games_curs = games_conn.cursor()
+        games_curs.execute('''SELECT * FROM GamblingGamesUnlocked WHERE GuildID=? AND UserID=?''', (self.guild_id, self.user_id))
+        row=games_curs.fetchone()
+        if row and row[2]==1:
+            print("user has unlocked game 1")
+            view.add_item(GamblingCoinFlipButton(user_id=self.user_id, guild_id=self.guild_id, funds=fundsInput))
+
+        await interaction.response.send_message(f"What kind of game would you like to play?", ephemeral=True, view=view)
         # games_curs.execute('''INSERT INTO GamblingFunds (GuildID, UserID, Funds) VALUES (?, ?, ?) ON CONFLICT(GuildID, UserID) DO UPDATE SET Funds = Funds + ?;''', (self.guild_id, self.user_id, funds, funds))
         # games_conn.commit()
         # await interaction.response.send_message(f"Your initial funds of {funds} have been set.", ephemeral=True)
         # games_curs.close()
         # games_conn.close()
+
+class GamblingCoinFlipButton(discord.ui.Button):
+    def __init__(self, user_id=None, guild_id=None, funds=None):
+        super().__init__(label="I would like to flip a coin", style=discord.ButtonStyle.primary)
+        self.user_id = user_id
+        self.guild_id = guild_id
+        self.funds = funds
+
+    async def callback(self, interaction: discord.Interaction):
+        print(f"funds: {self.funds}")
+        self.funds = (int(self.funds) // 10) * 10
+        view = discord.ui.View()
+        messagePayload="You want to flip a coin? you have 10 tries and wager 10% of your purse per flip."
+        wager=self.funds * 0.1
+        headsWagerButton=GamblingCoinFlipWagers(user_id=self.user_id, guild_id=self.guild_id, wager=wager, label=f"Bet Heads for: {int(wager)}",remainingFlips=10)
+        tailsWagerButton=GamblingCoinFlipWagers(user_id=self.user_id, guild_id=self.guild_id, wager=wager, label=f"Bet Tails for: {int(wager)}",remainingFlips=10)
+        view.add_item(headsWagerButton)
+        view.add_item(tailsWagerButton)
+        await interaction.response.edit_message(content=messagePayload, view=view)
+
+class GamblingCoinFlipWagers(discord.ui.Button):
+    def __init__(self, user_id=None, guild_id=None, wager=None, label=None, remainingFlips=None):
+        super().__init__(label=label, style=discord.ButtonStyle.primary)
+        self.user_id = user_id
+        self.guild_id = guild_id
+        self.wager = wager
+        self.remainingFlips = remainingFlips
+
+    async def callback(self, interaction: discord.Interaction):
+        #print(f"wager: {self.wager}")
+        messageContent=""
+        #games_db = "games.db"
+        #games_conn = sqlite3.connect(games_db)
+        #games_curs = games_conn.cursor()
+        self.remainingFlips -= 1
+        if self.label.startswith("Bet Heads"):
+            # User chose heads
+            result = 1 if random() >= 0.5 else 0
+        else:
+            # User chose tails
+            result = 0 if random() >= 0.5 else 1
+        if result == 1:
+            messageContent=f"You won the flip! Your wager of {int(self.wager)} has been added to your balance.\nYou have {self.remainingFlips} flips remaining."
+        else:
+            messageContent=f"You lost the flip! Your wager of {int(self.wager)} has been subtracted from your balance.\nYou have {self.remainingFlips} flips remaining."
+        await award_points(self.wager if result == 1 else -self.wager, self.guild_id, self.user_id)
+        #games_curs.execute('''UPDATE GamblingUserStats SET CurrentBalance = CurrentBalance + ? WHERE GuildID = ? AND UserID = ?''', (self.wager if result == 1 else -self.wager, self.guild_id, self.user_id))
+        #games_conn.commit()
+        
+        
+        if self.remainingFlips <= 0:
+            messageContent+=f"\nYou have run out of flips. Thanks for playing and I will see you again."
+            await interaction.response.edit_message(content=messageContent, view=None)
+            return
+        view = discord.ui.View()
+        headsWagerButton=GamblingCoinFlipWagers(user_id=self.user_id, guild_id=self.guild_id, wager=self.wager, label=f"Bet Heads for: {self.wager}",remainingFlips=self.remainingFlips)
+        tailsWagerButton=GamblingCoinFlipWagers(user_id=self.user_id, guild_id=self.guild_id, wager=self.wager, label=f"Bet Tails for: {self.wager}",remainingFlips=self.remainingFlips)
+        view.add_item(headsWagerButton)
+        view.add_item(tailsWagerButton)
+        await interaction.response.edit_message(content=messageContent, view=view)
 
 class GamblingButton(discord.ui.Button):
     def __init__(self, label=None, user_id=None, guild_id=None, style=discord.ButtonStyle.primary):
@@ -810,7 +923,13 @@ class GamblingButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction):
         if await ButtonLockout(interaction):
-            await interaction.response.send_modal(GamblingIntroModal(user_id=self.user_id, guild_id=self.guild_id))
+            gamesDB = "games.db"
+            games_conn = sqlite3.connect(gamesDB)
+            games_curs = games_conn.cursor()
+            games_curs.execute('''SELECT CurrentBalance FROM GamblingUserStats WHERE GuildID=? AND UserID=?''', (self.guild_id, self.user_id))
+            row= games_curs.fetchone()
+            funds = row[0] if row else 0
+            await interaction.response.send_modal(GamblingIntroModal(user_id=self.user_id, guild_id=self.guild_id, funds=funds))
             
 
 class FlipButton(discord.ui.Button):
@@ -917,6 +1036,22 @@ async def mostUsedEmojis(interaction: discord.Interaction, inorout: app_commands
     curs.close()
     conn.close()
     return
+
+@client.tree.command(name="inventory", description="Displays the user's inventory")
+async def inventory(interaction: discord.Interaction):
+    user_id = interaction.user.id
+    guild_id = interaction.guild.id
+
+    # Fetch the user's inventory from the database
+    gamesDB="games.db"
+    games_conn = sqlite3.connect(gamesDB)   
+    games_curs = games_conn.cursor()
+    games_curs.execute('''SELECT CurrentBalance FROM GamblingUserStats WHERE GuildID=? AND UserID=?''', (guild_id, user_id))
+    current_balance = games_curs.fetchone()
+    if current_balance:
+        await interaction.response.send_message(f"---WIP---\nYour current balance is: {current_balance[0]}", ephemeral=True)
+    else:
+        await interaction.response.send_message("You have no balance information.", ephemeral=True)
 
 @client.tree.command(name="server-graph", description="Replies with a graph of activity")
 @app_commands.choices(subtype=[
