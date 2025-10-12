@@ -646,7 +646,7 @@ class QuestionThankYouButton(discord.ui.Button):
            
            
         else:
-            games_curs.execute('''INSERT INTO GamblingGamesUnlocked (GuildID, UserID) VALUES (?, ?, ?)''', (interaction.guild.id, interaction.user.id))
+            games_curs.execute('''INSERT INTO GamblingGamesUnlocked (GuildID, UserID) VALUES (?, ?)''', (interaction.guild.id, interaction.user.id))
             games_conn.commit()
         games_curs.close()
         games_conn.close()
