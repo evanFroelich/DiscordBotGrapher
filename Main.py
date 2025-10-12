@@ -634,10 +634,10 @@ class QuestionThankYouButton(discord.ui.Button):
             storyProgress = games_curs.fetchone()
             if storyProgress:
                 if storyProgress[0] == 1:
-                    thanksView.add_item(GamblingButton(label="gamble", user_id=interaction.user.id, guild_id=interaction.guild.id, style=discord.ButtonStyle.primary))
+                    thanksView.add_item(GamblingButton(label="Lets Go Gambling!", user_id=interaction.user.id, guild_id=interaction.guild.id, style=discord.ButtonStyle.primary))
                 if storyProgress[0] == 0:
-                    contentPayload += f"🎰 You have unlocked a new story: {storyProgress[0]}\n"
-                    thanksView.add_item(GamblingButton(label="gamble0", user_id=interaction.user.id, guild_id=interaction.guild.id, style=discord.ButtonStyle.primary))
+                    contentPayload += f"You seem smart, friend. I’ve noticed you’ve got more coins than you need, so if you’re looking for a way to spend them and have some fun at the same time… I might just know a guy."
+                    thanksView.add_item(GamblingButton(label="Step out around back into the allyway", user_id=interaction.user.id, guild_id=interaction.guild.id, style=discord.ButtonStyle.primary))
                     games_curs.execute('''UPDATE StoryProgression SET Story1 = 1 WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
                     games_conn.commit()
             else:
@@ -694,8 +694,9 @@ class QuestionModal(discord.ui.Modal):
             games_curs.execute('''SELECT Game1 FROM GamblingGamesUnlocked WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
             unlockedGames = games_curs.fetchone()
             if unlockedGames:
+                print("pass")
                 # User has unlocked Game1
-                questionAnsweredView.add_item(GamblingButton(label="🎰", user_id=interaction.user.id, guild_id=interaction.guild.id, style=discord.ButtonStyle.primary))
+                #questionAnsweredView.add_item(GamblingButton(label="🎰", user_id=interaction.user.id, guild_id=interaction.guild.id, style=discord.ButtonStyle.primary))
             else:
 
                 #check to see if the user has met the metrics for unlocking game 1
@@ -713,8 +714,8 @@ class QuestionModal(discord.ui.Modal):
             games_curs.execute('''INSERT INTO Scores (GuildID, UserID, Category, Difficulty, Num_Correct, Num_Incorrect) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(GuildID, UserID, Category, Difficulty) DO UPDATE SET Num_Incorrect = Num_Incorrect + 1;''', (interaction.guild.id, interaction.user.id, self.question_type, self.question_difficulty, 0, 1))
             games_conn.commit()
             questionAnsweredView = discord.ui.View(timeout=None)
-            button= QuestionThankYouButton()
-            questionAnsweredView.add_item(button)
+            #button= QuestionThankYouButton()
+            #questionAnsweredView.add_item(button)
             #check to see if the user has met the metrics for unlocking game 1
 
             #for removal
@@ -727,7 +728,7 @@ class QuestionModal(discord.ui.Modal):
             #         questionAnsweredView.add_item(GamblingButton(label="🎰", user_id=interaction.user.id, guild_id=interaction.guild.id, style=discord.ButtonStyle.primary))
 
 
-            await interaction.response.send_message(f"Incorrect answer. The correct answer(s) are: {self.question_answers}", ephemeral=True, view=questionAnsweredView)
+            await interaction.response.send_message(f"Incorrect answer. The correct answer(s) are: {self.question_answers}", ephemeral=True, view=None)
             games_curs.execute('''SELECT FlagShameChannel, ShameChannel FROM ServerSettings WHERE GuildID=?''', (interaction.guild.id,))
             shameSettings = games_curs.fetchone()
             if shameSettings and shameSettings[0] == 1:
@@ -826,8 +827,8 @@ class GamblingIntroModal(discord.ui.Modal):
         self.user_id = user_id
         self.guild_id = guild_id
         self.funds = funds
-        self.storyMessage=discord.ui.TextDisplay(content=f"how much are you bringing with you? you have {self.funds} avaliable.")
-        self.funds_input = discord.ui.TextInput(label=f"funds brought:", max_length=10, required=True,placeholder="e.g. 1000", style=discord.TextStyle.short)
+        self.storyMessage=discord.ui.TextDisplay(content=f"*First things first, you need to decide how much to bring along. As much or as little as you want, as long as it's not more than the {self.funds} you have.*")
+        self.funds_input = discord.ui.TextInput(label=f"Funds brought:", max_length=10, required=True,placeholder="e.g. 1000", style=discord.TextStyle.short)
         self.add_item(self.storyMessage)
         self.add_item(self.funds_input) #i dont think i need this
 
@@ -836,7 +837,7 @@ class GamblingIntroModal(discord.ui.Modal):
         view=discord.ui.View()
         if int(fundsInput) > self.funds or int(fundsInput)<10:
             view.add_item(GamblingButton(label="want to try that again?", user_id=self.user_id, guild_id=self.guild_id, style=discord.ButtonStyle.primary))
-            await interaction.response.send_message(f"Are you trying to cheat me?! dont try that again.", ephemeral=True, view=view)
+            await interaction.response.send_message(f"*I cant bring that amount.*", ephemeral=True, view=view)
             return
         
         gamesDB = "games.db"
@@ -848,7 +849,7 @@ class GamblingIntroModal(discord.ui.Modal):
             print("user has unlocked game 1")
             view.add_item(GamblingCoinFlipButton(user_id=self.user_id, guild_id=self.guild_id, funds=fundsInput))
 
-        await interaction.response.send_message(f"What kind of game would you like to play?", ephemeral=True, view=view)
+        await interaction.response.send_message(f"The names Louie. Here's where the real fun begins. How do you want to try your luck?", ephemeral=True, view=view)
         # games_curs.execute('''INSERT INTO GamblingFunds (GuildID, UserID, Funds) VALUES (?, ?, ?) ON CONFLICT(GuildID, UserID) DO UPDATE SET Funds = Funds + ?;''', (self.guild_id, self.user_id, funds, funds))
         # games_conn.commit()
         # await interaction.response.send_message(f"Your initial funds of {funds} have been set.", ephemeral=True)
@@ -866,7 +867,7 @@ class GamblingCoinFlipButton(discord.ui.Button):
         print(f"funds: {self.funds}")
         self.funds = (int(self.funds) // 10) * 10
         view = discord.ui.View()
-        messagePayload="You want to flip a coin? you have 10 tries and wager 10% of your purse per flip."
+        messagePayload="You want to flip a coin? you have 10 tries and wager 10% of your purse per flip, good luck."
         wager=self.funds * 0.1
         headsWagerButton=GamblingCoinFlipWagers(user_id=self.user_id, guild_id=self.guild_id, wager=wager, label=f"Bet Heads for: {int(wager)}",remainingFlips=10)
         tailsWagerButton=GamblingCoinFlipWagers(user_id=self.user_id, guild_id=self.guild_id, wager=wager, label=f"Bet Tails for: {int(wager)}",remainingFlips=10)
