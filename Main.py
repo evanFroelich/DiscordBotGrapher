@@ -676,6 +676,7 @@ class QuestionModal(discord.ui.Modal):
 
     async def on_submit(self, interaction: discord.Interaction):
         user_answer = self.children[1].value
+        user_answer = user_answer.strip()
         gamesDB = "games.db"
         games_conn = sqlite3.connect(gamesDB)
         games_curs = games_conn.cursor()
