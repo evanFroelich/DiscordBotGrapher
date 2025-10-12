@@ -714,8 +714,8 @@ class QuestionModal(discord.ui.Modal):
             games_curs.execute('''INSERT INTO Scores (GuildID, UserID, Category, Difficulty, Num_Correct, Num_Incorrect) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(GuildID, UserID, Category, Difficulty) DO UPDATE SET Num_Incorrect = Num_Incorrect + 1;''', (interaction.guild.id, interaction.user.id, self.question_type, self.question_difficulty, 0, 1))
             games_conn.commit()
             questionAnsweredView = discord.ui.View(timeout=None)
-            #button= QuestionThankYouButton()
-            #questionAnsweredView.add_item(button)
+            button = QuestionThankYouButton()
+            questionAnsweredView.add_item(button)
             #check to see if the user has met the metrics for unlocking game 1
 
             #for removal
@@ -728,7 +728,7 @@ class QuestionModal(discord.ui.Modal):
             #         questionAnsweredView.add_item(GamblingButton(label="🎰", user_id=interaction.user.id, guild_id=interaction.guild.id, style=discord.ButtonStyle.primary))
 
 
-            await interaction.response.send_message(f"Incorrect answer. The correct answer(s) are: {self.question_answers}", ephemeral=True)
+            await interaction.response.send_message(f"Incorrect answer. The correct answer(s) are: {self.question_answers}", ephemeral=True, view=questionAnsweredView)
             games_curs.execute('''SELECT FlagShameChannel, ShameChannel FROM ServerSettings WHERE GuildID=?''', (interaction.guild.id,))
             shameSettings = games_curs.fetchone()
             if shameSettings and shameSettings[0] == 1:
