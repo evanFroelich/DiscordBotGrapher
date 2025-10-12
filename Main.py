@@ -728,7 +728,7 @@ class QuestionModal(discord.ui.Modal):
             #         questionAnsweredView.add_item(GamblingButton(label="🎰", user_id=interaction.user.id, guild_id=interaction.guild.id, style=discord.ButtonStyle.primary))
 
 
-            await interaction.response.send_message(f"Incorrect answer. The correct answer(s) are: {self.question_answers}", ephemeral=True, view=None)
+            await interaction.response.send_message(f"Incorrect answer. The correct answer(s) are: {self.question_answers}", ephemeral=True)
             games_curs.execute('''SELECT FlagShameChannel, ShameChannel FROM ServerSettings WHERE GuildID=?''', (interaction.guild.id,))
             shameSettings = games_curs.fetchone()
             if shameSettings and shameSettings[0] == 1:
@@ -869,19 +869,20 @@ class GamblingCoinFlipButton(discord.ui.Button):
         view = discord.ui.View()
         messagePayload="You want to flip a coin? you have 10 tries and wager 10% of your purse per flip, good luck."
         wager=self.funds * 0.1
-        headsWagerButton=GamblingCoinFlipWagers(user_id=self.user_id, guild_id=self.guild_id, wager=wager, label=f"Bet Heads for: {int(wager)}",remainingFlips=10)
-        tailsWagerButton=GamblingCoinFlipWagers(user_id=self.user_id, guild_id=self.guild_id, wager=wager, label=f"Bet Tails for: {int(wager)}",remainingFlips=10)
+        headsWagerButton=GamblingCoinFlipWagers(user_id=self.user_id, guild_id=self.guild_id, wager=wager, label=f"Bet Heads for: {int(wager)}",remainingFlips=10,streak=0)
+        tailsWagerButton=GamblingCoinFlipWagers(user_id=self.user_id, guild_id=self.guild_id, wager=wager, label=f"Bet Tails for: {int(wager)}",remainingFlips=10,streak=0)
         view.add_item(headsWagerButton)
         view.add_item(tailsWagerButton)
         await interaction.response.edit_message(content=messagePayload, view=view)
 
 class GamblingCoinFlipWagers(discord.ui.Button):
-    def __init__(self, user_id=None, guild_id=None, wager=None, label=None, remainingFlips=None):
+    def __init__(self, user_id=None, guild_id=None, wager=None, label=None, remainingFlips=None, streak=None):
         super().__init__(label=label, style=discord.ButtonStyle.primary)
         self.user_id = user_id
         self.guild_id = guild_id
         self.wager = wager
         self.remainingFlips = remainingFlips
+        self.streak = streak
 
     async def callback(self, interaction: discord.Interaction):
         #print(f"wager: {self.wager}")
@@ -898,6 +899,14 @@ class GamblingCoinFlipWagers(discord.ui.Button):
             result = 0 if random() >= 0.5 else 1
         if result == 1:
             messageContent=f"You won the flip! Your wager of {int(self.wager)} has been added to your balance.\nYou have {self.remainingFlips} flips remaining."
+            games_db = "games.db"
+            games_conn = sqlite3.connect(games_db)
+            games_curs = games_conn.cursor()
+            games_curs.execute('''UPDATE GamblingUserStats SET CoinFlipWins = CoinFlipWins + 1, CoinFlipEarnings = CoinFlipEarnings + ? WHERE GuildID = ? AND UserID = ?''', (self.wager, self.guild_id, self.user_id))
+            games_conn.commit()
+            games_curs.close()
+            games_conn.close()
+            self.streak += 1
         else:
             messageContent=f"You lost the flip! Your wager of {int(self.wager)} has been subtracted from your balance.\nYou have {self.remainingFlips} flips remaining."
         await award_points(self.wager if result == 1 else -self.wager, self.guild_id, self.user_id)
@@ -910,8 +919,8 @@ class GamblingCoinFlipWagers(discord.ui.Button):
             await interaction.response.edit_message(content=messageContent, view=None)
             return
         view = discord.ui.View()
-        headsWagerButton=GamblingCoinFlipWagers(user_id=self.user_id, guild_id=self.guild_id, wager=self.wager, label=f"Bet Heads for: {self.wager}",remainingFlips=self.remainingFlips)
-        tailsWagerButton=GamblingCoinFlipWagers(user_id=self.user_id, guild_id=self.guild_id, wager=self.wager, label=f"Bet Tails for: {self.wager}",remainingFlips=self.remainingFlips)
+        headsWagerButton=GamblingCoinFlipWagers(user_id=self.user_id, guild_id=self.guild_id, wager=self.wager, label=f"Bet Heads for: {self.wager}",remainingFlips=self.remainingFlips,streak=self.streak)
+        tailsWagerButton=GamblingCoinFlipWagers(user_id=self.user_id, guild_id=self.guild_id, wager=self.wager, label=f"Bet Tails for: {self.wager}",remainingFlips=self.remainingFlips,streak=self.streak)
         view.add_item(headsWagerButton)
         view.add_item(tailsWagerButton)
         await interaction.response.edit_message(content=messageContent, view=view)

@@ -101,6 +101,26 @@ CREATE TABLE if not exists CoinFlipLeaderboard (
 	PRIMARY KEY("UserID")
 );
 
+CREATE TABLE if not exists GamblingGamesUnlocked (
+	"GuildID"	INTEGER NOT NULL,
+	"UserID"	INTEGER NOT NULL,
+	"Game1"	INTEGER NOT NULL DEFAULT 0,
+	"Game2"	INTEGER NOT NULL DEFAULT 0,
+	"Game3"	INTEGER NOT NULL DEFAULT 0,
+	"Game4"	INTEGER NOT NULL DEFAULT 0,
+	"Game5"	INTEGER NOT NULL DEFAULT 0,
+	PRIMARY KEY("GuildID","UserID")
+);
+
+CREATE TABLE if not exists StoryProgression (
+	"GuildID"	INTEGER NOT NULL,
+	"UserID"	INTEGER NOT NULL,
+	"Story1"	INTEGER NOT NULL DEFAULT 0,
+	"Story2"	INTEGER NOT NULL DEFAULT 0,
+	"Story3"	INTEGER NOT NULL DEFAULT 0,
+	PRIMARY KEY("GuildID","UserID")
+);
+
 CREATE VIEW if not exists GamblingUnlockMetricsView AS
 SELECT
     GuildID,
