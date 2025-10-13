@@ -17,6 +17,7 @@ import re
 import asyncio
 import numpy as np
 import json
+import requests
 
 
 
@@ -628,7 +629,7 @@ class QuestionThankYouButton(discord.ui.Button):
         thanksView=discord.ui.View(timeout=None)
         games_curs.execute('''SELECT Game1 FROM GamblingGamesUnlocked WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
         unlockedGames = games_curs.fetchone()
-        if unlockedGames:
+        if unlockedGames and unlockedGames[0] == 1:
             # User has unlocked Game1
             games_curs.execute('''SELECT Story1 FROM StoryProgression WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
             storyProgress = games_curs.fetchone()
