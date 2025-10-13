@@ -729,7 +729,7 @@ class QuestionModal(discord.ui.Modal):
             #         questionAnsweredView.add_item(GamblingButton(label="🎰", user_id=interaction.user.id, guild_id=interaction.guild.id, style=discord.ButtonStyle.primary))
 
 
-            await interaction.response.send_message(f"Incorrect answer. The correct answer(s) are: {self.question_answers}", ephemeral=True, view=questionAnsweredView)
+            await interaction.response.send_message(f"Incorrect answer. \nYoure answer was: {user_answer.lower()}\nThe correct answer(s) are: {self.question_answers}", ephemeral=True, view=questionAnsweredView)
             games_curs.execute('''SELECT FlagShameChannel, ShameChannel FROM ServerSettings WHERE GuildID=?''', (interaction.guild.id,))
             shameSettings = games_curs.fetchone()
             if shameSettings and shameSettings[0] == 1:
