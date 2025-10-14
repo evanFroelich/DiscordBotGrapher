@@ -629,21 +629,22 @@ class QuestionThankYouButton(discord.ui.Button):
         thanksView=discord.ui.View(timeout=None)
         games_curs.execute('''SELECT Game1 FROM GamblingGamesUnlocked WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
         unlockedGames = games_curs.fetchone()
-        if unlockedGames and unlockedGames[0] == 1:
+        if unlockedGames:
+            if unlockedGames[0] == 1:
             # User has unlocked Game1
-            games_curs.execute('''SELECT Story1 FROM StoryProgression WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
-            storyProgress = games_curs.fetchone()
-            if storyProgress:
-                if storyProgress[0] == 1:
-                    thanksView.add_item(GamblingButton(label="Lets Go Gambling!", user_id=interaction.user.id, guild_id=interaction.guild.id, style=discord.ButtonStyle.primary))
-                if storyProgress[0] == 0:
-                    contentPayload += f"You seem smart, friend. I’ve noticed you’ve got more coins than you need, so if you’re looking for a way to spend them and have some fun at the same time… I might just know a guy."
-                    thanksView.add_item(GamblingButton(label="Step out around back into the allyway", user_id=interaction.user.id, guild_id=interaction.guild.id, style=discord.ButtonStyle.primary))
-                    games_curs.execute('''UPDATE StoryProgression SET Story1 = 1 WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
+                games_curs.execute('''SELECT Story1 FROM StoryProgression WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
+                storyProgress = games_curs.fetchone()
+                if storyProgress:
+                    if storyProgress[0] == 1:
+                        thanksView.add_item(GamblingButton(label="Lets Go Gambling!", user_id=interaction.user.id, guild_id=interaction.guild.id, style=discord.ButtonStyle.primary))
+                    if storyProgress[0] == 0:
+                        contentPayload += f"You seem smart, friend. I’ve noticed you’ve got more coins than you need, so if you’re looking for a way to spend them and have some fun at the same time… I might just know a guy."
+                        thanksView.add_item(GamblingButton(label="Step out around back into the allyway", user_id=interaction.user.id, guild_id=interaction.guild.id, style=discord.ButtonStyle.primary))
+                        games_curs.execute('''UPDATE StoryProgression SET Story1 = 1 WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
+                        games_conn.commit()
+                else:
+                    games_curs.execute('''INSERT INTO StoryProgression (GuildID, UserID) VALUES (?, ?)''', (interaction.guild.id, interaction.user.id))
                     games_conn.commit()
-            else:
-                games_curs.execute('''INSERT INTO StoryProgression (GuildID, UserID) VALUES (?, ?)''', (interaction.guild.id, interaction.user.id))
-                games_conn.commit()
            
            
         else:
