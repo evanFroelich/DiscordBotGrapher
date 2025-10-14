@@ -566,15 +566,17 @@ async def createQuestion(interaction: discord.Interaction = None, channel: disco
             games_curs.execute('''SELECT QuestionTimeout FROM ServerSettings WHERE GuildID=?''', (interaction.guild.id,))
         else:   
             games_curs.execute('''SELECT QuestionTimeout FROM ServerSettings WHERE GuildID=?''', (channel.guild.id,))
+        
         question_timeout = games_curs.fetchone()[0]
+        games_conn.commit()
+        games_curs.close()
+        games_conn.close()
         asyncio.create_task(delete_later(quizMessage, question_timeout))
         #await asyncio.sleep(question_timeout)
         #await quizMessage.delete() 
         
-        games_curs.execute('''DELETE FROM ActiveQuestions WHERE messageID=?''', (quizMessage.id,))
-        games_conn.commit()
-        games_curs.close()
-        games_conn.close()
+        #games_curs.execute('''DELETE FROM ActiveQuestions WHERE messageID=?''', (quizMessage.id,))
+        
         return
     await interaction.followup.send("you should not be seeing this error.", ephemeral=True)
 
@@ -1569,6 +1571,13 @@ async def delete_later(message,time):
     await asyncio.sleep(time)  # wait for the specified time
     try:
         await message.delete()
+        gamesDB = "games.db"
+        games_conn = sqlite3.connect(gamesDB)
+        games_curs = games_conn.cursor()
+        games_curs.execute('''DELETE FROM ActiveQuestions WHERE messageID=?''', (message.id,))
+        games_conn.commit()
+        games_curs.close()
+        games_conn.close()
     except Exception:
         pass  # message might already be gone
 
