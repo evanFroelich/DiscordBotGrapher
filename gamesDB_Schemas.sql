@@ -121,6 +121,16 @@ CREATE TABLE if not exists StoryProgression (
 	PRIMARY KEY("GuildID","UserID")
 );
 
+CREATE TABLE if not exists LLMEvaluations (
+	"ID"	INTEGER NOT NULL UNIQUE,
+	"Question"	TEXT NOT NULL,
+	"GivenAnswer"	TEXT NOT NULL,
+	"UserAnswer"	TEXT NOT NULL,
+	"LLMResponse"	TEXT NOT NULL,
+	"ClassicResponse"	TEXT NOT NULL,
+	PRIMARY KEY("ID" AUTOINCREMENT)
+);
+
 CREATE VIEW if not exists GamblingUnlockMetricsView AS
 SELECT
     GuildID,
