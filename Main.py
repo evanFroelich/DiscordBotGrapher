@@ -8,7 +8,7 @@ from discord import app_commands
 from random import random
 from datetime import datetime, timedelta
 from collections import deque
-from exceptiongroup import catch
+#from exceptiongroup import catch
 import pandas as pd
 import matplotlib.pyplot as plt
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
