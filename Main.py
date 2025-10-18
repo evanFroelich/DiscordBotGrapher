@@ -764,22 +764,23 @@ class QuestionModal(discord.ui.Modal):
             questionAnsweredView.add_item(button)
             games_curs.execute('''SELECT Game1 FROM GamblingGamesUnlocked WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
             unlockedGames = games_curs.fetchone()
-            if unlockedGames:
-                print("pass")
+            #if its empty
+            if not unlockedGames:
+                games_curs.execute('''INSERT INTO GamblingGamesUnlocked (GuildID, UserID) VALUES (?, ?)''', (interaction.guild.id, interaction.user.id))
+                games_conn.commit()
                 # User has unlocked Game1
                 #questionAnsweredView.add_item(GamblingButton(label="🎰", user_id=interaction.user.id, guild_id=interaction.guild.id, style=discord.ButtonStyle.primary))
-            else:
 
-                #check to see if the user has met the metrics for unlocking game 1
-                games_curs.execute('''SELECT * FROM GamblingUnlockMetricsView WHERE GuildID=? and UserID=?''', (interaction.guild.id, interaction.user.id))
-                userStats = games_curs.fetchone()
-                games_curs.execute('''SELECT * FROM GamblingUnlockConditions WHERE GuildID=?''', (interaction.guild.id,))
-                unlockConditions = games_curs.fetchone()
-                if userStats and unlockConditions:
-                    if userStats[2]>= unlockConditions[1] and userStats[3]>= unlockConditions[2] and userStats[4]>= unlockConditions[3]:
-                        # questionAnsweredView.add_item(GamblingButton(label="🎰", user_id=interaction.user.id, guild_id=interaction.guild.id, style=discord.ButtonStyle.primary))
-                        games_curs.execute('''INSERT INTO GamblingGamesUnlocked (GuildID, UserID, Game1) VALUES (?, ?, 1) ON CONFLICT(GuildID, UserID) DO UPDATE SET Game1=1''', (interaction.guild.id, interaction.user.id))
-                        games_conn.commit()
+            #check to see if the user has met the metrics for unlocking game 1
+            games_curs.execute('''SELECT * FROM GamblingUnlockMetricsView WHERE GuildID=? and UserID=?''', (interaction.guild.id, interaction.user.id))
+            userStats = games_curs.fetchone()
+            games_curs.execute('''SELECT * FROM GamblingUnlockConditions WHERE GuildID=?''', (interaction.guild.id,))
+            unlockConditions = games_curs.fetchone()
+            if userStats and unlockConditions:
+                if userStats[2]>= unlockConditions[1] and userStats[3]>= unlockConditions[2] and userStats[4]>= unlockConditions[3]:
+                    # questionAnsweredView.add_item(GamblingButton(label="🎰", user_id=interaction.user.id, guild_id=interaction.guild.id, style=discord.ButtonStyle.primary))
+                    games_curs.execute('''INSERT INTO GamblingGamesUnlocked (GuildID, UserID, Game1) VALUES (?, ?, 1) ON CONFLICT(GuildID, UserID) DO UPDATE SET Game1=1''', (interaction.guild.id, interaction.user.id))
+                    games_conn.commit()
             #await interaction.response.send_message(f"Correct!", ephemeral=True, view=questionAnsweredView)
             await interaction.followup.send(f"Correct! You have been awarded {gamblingPoints} gambling points.", ephemeral=True, view=questionAnsweredView)
         else:
