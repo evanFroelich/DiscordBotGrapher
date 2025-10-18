@@ -743,8 +743,8 @@ class QuestionModal(discord.ui.Modal):
         #temp=""
         #print(f"User answer: {user_answer.lower()} | Correct answers: {temp} | is true: {user_answer.lower() in self.question_answers}")
         classicResponse = user_answer.lower() in [answer.lower() for answer in self.question_answers]
-        LLMResponse = 0
-        LLMText = ""
+        LLMResponse = -1
+        LLMText = "N/A"
         if not classicResponse:
             try:
                 #classicResponse = user_answer.lower() in [answer.lower() for answer in self.question_answers]
