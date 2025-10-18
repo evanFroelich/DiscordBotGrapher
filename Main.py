@@ -838,7 +838,8 @@ class QuestionModal(discord.ui.Modal):
         else:
             classicResponse = 0
         if LLMResponse:
-            LLMResponse = 1
+            if LLMResponse!=-1:
+                LLMResponse = 1
         else:
             LLMResponse = 0
         answers_string = ", ".join(self.question_answers)
