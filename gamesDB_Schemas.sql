@@ -131,6 +131,23 @@ CREATE TABLE if not exists LLMEvaluations (
 	PRIMARY KEY("ID" AUTOINCREMENT)
 );
 
+CREATE TABLE if not exists TriviaEventLog (
+	"GuildID"	TEXT,
+	"UserID"	TEXT,
+	"TimeStamp"	TEXT NOT NULL DEFAULT (datetime('now')),
+	"DailyOrRandom"	TEXT,
+	"QuestionType"	TEXT,
+	"QuestionDifficulty"	INTEGER,
+	"QuestionText"	TEXT,
+	"QuestionAnswers"	TEXT,
+	"UserAnswer"	TEXT,
+	"ClassicDecision"	INTEGER,
+	"LLMDecision"	INTEGER,
+	"LLMText"	TEXT,
+	"CurrentQuestionsAnsweredToday"	INTEGER,
+	"CurrentQuestionsAnsweredTodayCorrect"	INTEGER
+);
+
 CREATE VIEW if not exists GamblingUnlockMetricsView AS
 SELECT
     GuildID,

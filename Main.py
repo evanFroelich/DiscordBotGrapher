@@ -492,7 +492,7 @@ class QuestionPickButton(discord.ui.Button):
                 
                 games_curs.execute('''UPDATE GamblingUserStats SET LastRandomQuestionTime = ? WHERE GuildID=? AND UserID=?''', (curTimeString, interaction.guild.id, interaction.user.id))
                 games_conn.commit() 
-            modal = QuestionModal(Question=self.question)
+            modal = QuestionModal(Question=self.question, isForced=self.isForced)
             await interaction.response.send_modal(modal)
 
 async def create_user_db_entry(guildID, userID):
@@ -714,11 +714,11 @@ Output:
 """
     result = (await askLLM(prompt)).strip().lower()
     print(f"LLM result: {result}")
-    return "abc123" in result
+    return "abc123" in result, result
 
 
 class QuestionModal(discord.ui.Modal):
-    def __init__(self, Question=None):
+    def __init__(self, Question=None, isForced=False):
         super().__init__(title="Trivia Question")
         self.question_id = Question[0]  # Question ID
         self.question_text = Question[1]  # Question text
@@ -727,6 +727,7 @@ class QuestionModal(discord.ui.Modal):
         self.question_answers = eval(self.question_answers)  # Convert string representation of list to actual list
         self.question_type = Question[3]  # Question type
         self.question_difficulty = Question[4]  # Question difficulty
+        self.isForced = isForced
         self.question_ask = discord.ui.TextInput(label="Answer Below:", placeholder="answer", max_length=100, style=discord.TextStyle.short)
         self.questionUI=discord.ui.TextDisplay(content=self.question_text)
         self.add_item(self.questionUI)
@@ -743,10 +744,11 @@ class QuestionModal(discord.ui.Modal):
         #print(f"User answer: {user_answer.lower()} | Correct answers: {temp} | is true: {user_answer.lower() in self.question_answers}")
         classicResponse = user_answer.lower() in [answer.lower() for answer in self.question_answers]
         LLMResponse = 0
+        LLMText = ""
         if not classicResponse:
             try:
                 #classicResponse = user_answer.lower() in [answer.lower() for answer in self.question_answers]
-                LLMResponse = await checkAnswer(self.question_text, self.question_answers, user_answer)
+                LLMResponse, LLMText = await checkAnswer(self.question_text, self.question_answers, user_answer)
                 games_curs.execute('''INSERT INTO LLMEvaluations (Question, GivenAnswer, UserAnswer, LLMResponse, ClassicResponse) VALUES (?, ?, ?, ?, ?)''', (self.question_text, self.question_answers[0], user_answer, LLMResponse, classicResponse))
                 games_conn.commit()
             except Exception as e:
@@ -816,6 +818,32 @@ class QuestionModal(discord.ui.Modal):
                         await shameThread.send(f"Oops! <@{interaction.user.id}> didn't know the answer to: {self.question_text}")
 
         #await interaction.response.send_message(f"your answer: {user_answer}, correct answers: {self.question_answers}", ephemeral=True)
+        games_curs.execute('''SELECT QuestionsAnsweredToday, QuestionsAnsweredTodayCorrect FROM GamblingUserStats WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
+        userStats = games_curs.fetchone()
+        if userStats:
+            # If userStats is found, we can use it
+            questions_answered_today = userStats[0]
+            questions_answered_today_correct = userStats[1]
+        else:
+            # If not found, default to 0
+            questions_answered_today = 0
+            questions_answered_today_correct = 0
+        mode=""
+        if self.isForced:
+            mode="Daily"
+        else:
+            mode="Random"
+        if classicResponse:
+            classicResponse = 1
+        else:
+            classicResponse = 0
+        if LLMResponse:
+            LLMResponse = 1
+        else:
+            LLMResponse = 0
+        answers_string = ", ".join(self.question_answers)
+        games_curs.execute('''INSERT INTO TriviaEventLog (GuildID, UserID, DailyOrRandom, QuestionType, QuestionDifficulty, QuestionText, QuestionAnswers, UserAnswer, ClassicDecision, LLMDecision, LLMText, CurrentQuestionsAnsweredToday, CurrentQuestionsAnsweredTodayCorrect) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', (interaction.guild.id, interaction.user.id, mode, self.question_type, self.question_difficulty, self.question_text, answers_string, user_answer, int(classicResponse), int(LLMResponse), LLMText, int(questions_answered_today), int(questions_answered_today_correct)))
+        games_conn.commit()
         games_curs.close()
         games_conn.close()
 
