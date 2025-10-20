@@ -431,17 +431,17 @@ async def resetDailyQuestionCorrect(guildID, userID):
         LDQT= datetime.strptime(last_daily_question_time, '%Y-%m-%d %H:%M:%S') 
         if LRQT.date() != curTime.date() and LDQT.date() != curTime.date():
             # Reset the daily question count for the user
-            games_curs.execute('''UPDATE GamblingUserStats SET QuestionsAnsweredTodayCorrect = 0 WHERE GuildID=? AND UserID=?''', (guildID, userID))
+            games_curs.execute('''UPDATE GamblingUserStats SET QuestionsAnsweredTodayCorrect = 0, QuestionsAnsweredToday = 0 WHERE GuildID=? AND UserID=?''', (guildID, userID))
     elif last_random_question_time is not None:
         LRQT=datetime.strptime(last_random_question_time, '%Y-%m-%d %H:%M:%S')
         if LRQT.date() != curTime.date():
             # Reset the daily question count for the user
-            games_curs.execute('''UPDATE GamblingUserStats SET QuestionsAnsweredTodayCorrect = 0 WHERE GuildID=? AND UserID=?''', (guildID, userID))
+            games_curs.execute('''UPDATE GamblingUserStats SET QuestionsAnsweredTodayCorrect = 0, QuestionsAnsweredToday = 0 WHERE GuildID=? AND UserID=?''', (guildID, userID))
     elif last_daily_question_time is not None:
         LDQT= datetime.strptime(last_daily_question_time, '%Y-%m-%d %H:%M:%S')
         if LDQT.date() != curTime.date():
             # Reset the daily question count for the user
-            games_curs.execute('''UPDATE GamblingUserStats SET QuestionsAnsweredTodayCorrect = 0 WHERE GuildID=? AND UserID=?''', (guildID, userID))
+            games_curs.execute('''UPDATE GamblingUserStats SET QuestionsAnsweredTodayCorrect = 0, QuestionsAnsweredToday = 0 WHERE GuildID=? AND UserID=?''', (guildID, userID))
     games_conn.commit()
     games_curs.close()
     games_conn.close()
@@ -610,7 +610,7 @@ async def test_question_message(interaction: discord.Interaction):
         LDQT = datetime.strptime(LDQT, '%Y-%m-%d %H:%M:%S')
         #curTime = datetime.now()
         if LDQT.date() == curTime.date():
-            await interaction.followup.send("You have already answered a question today. Please try again tomorrow. daily reset is at: <t:1759647600:t>", ephemeral=True)
+            await interaction.followup.send("You have already answered a Daily Question today. Please try again tomorrow. daily reset is at: <t:1759647600:t>", ephemeral=True)
             games_curs.close()
             games_conn.close()
             return
