@@ -671,7 +671,7 @@ class QuestionThankYouButton(discord.ui.Button):
         self.disabled = True
         #await interaction.edit_original_response(content="test",view=None)
         if contentPayload=="":
-            contentPayload="Thanks for the tip!"
+            contentPayload="Thanks for the tip! heres a little something for you.\n*Tipped you a coin in return*"
         await interaction.response.edit_message(content=contentPayload, view=thanksView)
         #await interaction.response.send_message("You're welcome! If you have more questions, feel free to ask!", ephemeral=True)
 
