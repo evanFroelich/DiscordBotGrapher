@@ -160,7 +160,7 @@ SELECT
     CoinFlipDoubleWins AS Game2Condition3
 FROM GamblingUserStats;
 
-CREATE VIEW if not exists QuestionCounts AS
+CREATE VIEW if not exists QuestionTypesView AS
 SELECT 
     Type,
     Difficulty,
@@ -168,10 +168,3 @@ SELECT
 FROM QuestionList
 GROUP BY Type, Difficulty
 ORDER BY Type, Difficulty;
-
-CREATE VIEW if not exists QuestionTypesView AS
-SELECT DISTINCT
-    Type,
-    Difficulty
-FROM QuestionList
-ORDER by Type,Difficulty;
