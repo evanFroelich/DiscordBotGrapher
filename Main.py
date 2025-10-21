@@ -976,20 +976,21 @@ class GamblingCoinFlipButton(discord.ui.Button):
         view = discord.ui.View()
         messagePayload="You want to flip a coin? you have 10 tries and wager 10% of your purse per flip, good luck."
         wager=self.funds * 0.1
-        headsWagerButton=GamblingCoinFlipWagers(user_id=self.user_id, guild_id=self.guild_id, wager=wager, label=f"Bet Heads for: {int(wager)}",remainingFlips=10,streak=0)
-        tailsWagerButton=GamblingCoinFlipWagers(user_id=self.user_id, guild_id=self.guild_id, wager=wager, label=f"Bet Tails for: {int(wager)}",remainingFlips=10,streak=0)
+        headsWagerButton=GamblingCoinFlipWagers(user_id=self.user_id, guild_id=self.guild_id, wager=wager, label=f"Bet Heads for: {int(wager)}",remainingFlips=10,streak=0,tripleDown=False)
+        tailsWagerButton=GamblingCoinFlipWagers(user_id=self.user_id, guild_id=self.guild_id, wager=wager, label=f"Bet Tails for: {int(wager)}",remainingFlips=10,streak=0,tripleDown=False)
         view.add_item(headsWagerButton)
         view.add_item(tailsWagerButton)
         await interaction.response.edit_message(content=messagePayload, view=view)
 
 class GamblingCoinFlipWagers(discord.ui.Button):
-    def __init__(self, user_id=None, guild_id=None, wager=None, label=None, remainingFlips=None, streak=None):
+    def __init__(self, user_id=None, guild_id=None, wager=None, label=None, remainingFlips=None, streak=None, tripleDown=None):
         super().__init__(label=label, style=discord.ButtonStyle.primary)
         self.user_id = user_id
         self.guild_id = guild_id
         self.wager = wager
         self.remainingFlips = remainingFlips
         self.streak = streak
+        self.tripleDown = tripleDown
 
     async def callback(self, interaction: discord.Interaction):
         #print(f"wager: {self.wager}")
@@ -1004,7 +1005,23 @@ class GamblingCoinFlipWagers(discord.ui.Button):
         else:
             # User chose tails
             result = 0 if random() >= 0.5 else 1
-        if result == 1:
+        if self.tripleDown:
+            if result == 1:
+                messageContent=f"Looks like you really are as lucky as you think. Take your winnings and get out of my sight."
+                await award_points(self.wager * 2, self.guild_id, self.user_id)
+                games_db = "games.db"
+                games_conn = sqlite3.connect(games_db)
+                games_curs = games_conn.cursor()
+                games_curs.execute('''UPDATE GamblingUserStats SET CoinFlipWins = CoinFlipWins + 1, CoinFlipEarnings = CoinFlipEarnings + ?, CoinFlipDoubleWins = CoinFlipDoubleWins + 1 WHERE GuildID = ? AND UserID = ?''', (self.wager, self.guild_id, self.user_id))
+                games_conn.commit()
+                games_curs.close()
+                games_conn.close()
+            else:
+                messageContent=f"So your luck ran out? Tough. Better luck next time pal."
+                await award_points(-self.wager, self.guild_id, self.user_id)
+            await interaction.response.edit_message(content=messageContent, view=None)
+            return
+        elif result == 1:
             messageContent=f"You won the flip! Your wager of {int(self.wager)} has been added to your balance.\nYou have {self.remainingFlips} flips remaining."
             games_db = "games.db"
             games_conn = sqlite3.connect(games_db)
@@ -1014,9 +1031,10 @@ class GamblingCoinFlipWagers(discord.ui.Button):
             games_curs.close()
             games_conn.close()
             self.streak += 1
+            await award_points(self.wager, self.guild_id, self.user_id)
         else:
             messageContent=f"You lost the flip! Your wager of {int(self.wager)} has been subtracted from your balance.\nYou have {self.remainingFlips} flips remaining."
-        await award_points(self.wager if result == 1 else -self.wager, self.guild_id, self.user_id)
+            await award_points(-self.wager, self.guild_id, self.user_id)
         #games_curs.execute('''UPDATE GamblingUserStats SET CurrentBalance = CurrentBalance + ? WHERE GuildID = ? AND UserID = ?''', (self.wager if result == 1 else -self.wager, self.guild_id, self.user_id))
         #games_conn.commit()
         
@@ -1025,12 +1043,29 @@ class GamblingCoinFlipWagers(discord.ui.Button):
             messageContent+=f"\nYou have run out of flips. Thanks for playing and I will see you again."
             await interaction.response.edit_message(content=messageContent, view=None)
             return
+        #start here for triple down+
         view = discord.ui.View()
-        headsWagerButton=GamblingCoinFlipWagers(user_id=self.user_id, guild_id=self.guild_id, wager=self.wager, label=f"Bet Heads for: {self.wager}",remainingFlips=self.remainingFlips,streak=self.streak)
-        tailsWagerButton=GamblingCoinFlipWagers(user_id=self.user_id, guild_id=self.guild_id, wager=self.wager, label=f"Bet Tails for: {self.wager}",remainingFlips=self.remainingFlips,streak=self.streak)
+        if self.streak>=3:
+            print("Triple down activated!")
+            messageContent=f"You got 3 in a row, huh? I bet you are feeling really lucky. How about we have some fun. If you can guess the next flip correctly, I'll triple what you have left to bet. But if you lose, you give me whats left and get the hell out of here."
+            self.wager = self.wager * self.remainingFlips
+            self.remainingFlips = 0
+            self.tripleDown = True
+        headsWagerButton=GamblingCoinFlipWagers(user_id=self.user_id, guild_id=self.guild_id, wager=self.wager, label=f"Bet Heads for: {self.wager}",remainingFlips=self.remainingFlips,streak=self.streak,tripleDown=self.tripleDown)
+        tailsWagerButton=GamblingCoinFlipWagers(user_id=self.user_id, guild_id=self.guild_id, wager=self.wager, label=f"Bet Tails for: {self.wager}",remainingFlips=self.remainingFlips,streak=self.streak,tripleDown=self.tripleDown)
         view.add_item(headsWagerButton)
         view.add_item(tailsWagerButton)
+        if self.tripleDown:
+            leaveButton=LeaveCoinFlipButton()
+            view.add_item(leaveButton)
         await interaction.response.edit_message(content=messageContent, view=view)
+
+class LeaveCoinFlipButton(discord.ui.Button):
+    def __init__(self):
+        super().__init__(label="Leave", style=discord.ButtonStyle.danger)
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.edit_message(content="You have left the Allyway in a hurry.",view=None)
 
 class GamblingButton(discord.ui.Button):
     def __init__(self, label=None, user_id=None, guild_id=None, style=discord.ButtonStyle.primary):
