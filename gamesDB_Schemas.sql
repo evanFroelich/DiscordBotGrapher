@@ -153,7 +153,7 @@ CREATE TABLE if not exists DailyGamblingTotals (
 	"Category"	TEXT NOT NULL,
 	"Funds"	INTEGER NOT NULL DEFAULT 0,
 	PRIMARY KEY("Date","Category")
-)
+);
 
 CREATE VIEW if not exists GamblingUnlockMetricsView AS
 SELECT
