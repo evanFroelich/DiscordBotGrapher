@@ -1033,6 +1033,7 @@ class GamblingCoinFlipWagers(discord.ui.Button):
             self.streak += 1
             await award_points(self.wager, self.guild_id, self.user_id)
         else:
+            self.streak = 0
             messageContent=f"You lost the flip! Your wager of {int(self.wager)} has been subtracted from your balance.\nYou have {self.remainingFlips} flips remaining."
             await award_points(-self.wager, self.guild_id, self.user_id)
         #games_curs.execute('''UPDATE GamblingUserStats SET CurrentBalance = CurrentBalance + ? WHERE GuildID = ? AND UserID = ?''', (self.wager if result == 1 else -self.wager, self.guild_id, self.user_id))
