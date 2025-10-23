@@ -150,9 +150,10 @@ CREATE TABLE if not exists TriviaEventLog (
 
 CREATE TABLE if not exists DailyGamblingTotals (
 	"Date"	TEXT NOT NULL,
+	"GuildID"	INTEGER NOT NULL,
 	"Category"	TEXT NOT NULL,
 	"Funds"	INTEGER NOT NULL DEFAULT 0,
-	PRIMARY KEY("Date","Category")
+	PRIMARY KEY("Date","Category","GuildID")
 );
 
 CREATE VIEW if not exists GamblingUnlockMetricsView AS
