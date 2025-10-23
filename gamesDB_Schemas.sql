@@ -156,6 +156,13 @@ CREATE TABLE if not exists DailyGamblingTotals (
 	PRIMARY KEY("Date","Category","GuildID")
 );
 
+CREATE TABLE if not exists NewsFeed (
+	"ID"	INTEGER NOT NULL UNIQUE,
+	"Date"	TEXT NOT NULL DEFAULT (date('now', 'localtime')),
+	"Notes"	TEXT,
+	PRIMARY KEY("ID" AUTOINCREMENT)
+);
+
 CREATE VIEW if not exists GamblingUnlockMetricsView AS
 SELECT
     GuildID,

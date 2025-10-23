@@ -141,7 +141,7 @@ class MyClient(discord.Client):
         self.tree = app_commands.CommandTree(self)
 
     async def setup_hook(self):
-        #await self.tree.sync()
+        await self.tree.sync()
         print('synced')
 
     async def on_thread_create(self,thread):
@@ -570,10 +570,24 @@ async def createQuestion(interaction: discord.Interaction = None, channel: disco
         view = discord.ui.View(timeout=None)
         for button in buttonList:
             view.add_item(button)
+        messageContent=""
+        isPrivate=False
+        games_curs.execute('''SELECT Date FROM NewsFeed ORDER BY Date DESC LIMIT 1''')
+        #if the date from the table is from today or yesterday, add to the messageContent that there is new news. date format is only year month day
+        newsDate = games_curs.fetchone()
+        if newsDate:
+            newsDate = datetime.strptime(newsDate[0], '%Y-%m-%d')
+            if newsDate.date() == datetime.now().date():
+                messageContent += "There is new news today! type /news to see it.\n\n"
+            elif newsDate.date() == (datetime.now() - timedelta(days=1)).date():
+                messageContent += "There was new news yesterday! type /news to see it.\n\n"
         if interaction is not None:
-            quizMessage=await interaction.followup.send("personal pop quiz:", ephemeral=True, view=view)
+            messageContent+="personal pop quiz:"
+            isPrivate=True
+            quizMessage=await interaction.followup.send(messageContent, ephemeral=isPrivate, view=view)
         else:
-            quizMessage=await channel.send("pop quiz:", view=view)
+            messageContent+="pop quiz:"
+            quizMessage=await channel.send(messageContent, view=view)
         #get the timeout from the server settings table
         if interaction is not None:
             games_curs.execute('''SELECT QuestionTimeout FROM ServerSettings WHERE GuildID=?''', (interaction.guild.id,))
@@ -1135,6 +1149,23 @@ async def flip_coin(interaction: discord.Interaction):
     await interaction.response.send_message(description, ephemeral=True,view=view)
     #result = "heads" if random() < 0.5 else "tails"
     #await interaction.followup.send(f"The coin landed on {result}!")
+
+@client.tree.command(name="news", description="Displays the recent news")
+async def news(interaction: discord.Interaction):
+    # Fetch news from a news API or database
+    gamesDB="games.db"
+    games_conn = sqlite3.connect(gamesDB)
+    games_curs = games_conn.cursor()
+    games_curs.execute('''SELECT Date, Notes from NewsFeed order by Date desc Limit 3''')
+    rows = games_curs.fetchall()
+    outputStr=""
+    for row in rows:
+        outputStr+=f"{row[0]}\n{row[1]}\n\n"
+    embed = discord.Embed(title="Recent News", color=discord.Color.blue())
+    embed.add_field(name="News", value=outputStr, inline=False)
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+    games_curs.close()
+    games_conn.close()
 
 @client.tree.command(name="most-used-emojis",description="Queries emoji data for this server.")
 @app_commands.choices(inorout=[
