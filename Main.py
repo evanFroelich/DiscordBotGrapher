@@ -141,7 +141,7 @@ class MyClient(discord.Client):
         self.tree = app_commands.CommandTree(self)
 
     async def setup_hook(self):
-        await self.tree.sync()
+        #await self.tree.sync()
         print('synced')
 
     async def on_thread_create(self,thread):
@@ -1234,10 +1234,13 @@ async def inventory(interaction: discord.Interaction):
     games_curs = games_conn.cursor()
     games_curs.execute('''SELECT CurrentBalance FROM GamblingUserStats WHERE GuildID=? AND UserID=?''', (guild_id, user_id))
     current_balance = games_curs.fetchone()
+    embed = discord.Embed(title=f"---WIP---\n{interaction.user.name}'s Inventory", color=discord.Color.green())
     if current_balance:
-        await interaction.response.send_message(f"---WIP---\nYour current balance is: {current_balance[0]}", ephemeral=True)
+        embed.add_field(name="Current Balance", value=current_balance[0], inline=False)
     else:
-        await interaction.response.send_message("You have no balance information.", ephemeral=True)
+        embed.add_field(name="Current Balance", value="No balance information available.", inline=False)
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
 
 @client.tree.command(name="server-graph", description="Replies with a graph of activity")
 @app_commands.choices(subtype=[
