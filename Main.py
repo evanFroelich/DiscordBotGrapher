@@ -536,8 +536,11 @@ async def createQuestion(interaction: discord.Interaction = None, channel: disco
     games_curs = games_conn.cursor()
     questionTierList = [1, 2, 3, 4, 5]
     questionPickList=[]
-    for i in range(3):
-        
+    x=3
+    if isForced:
+        x=5
+    for i in range(x):
+
         question_tier = questionTierList[int(random() * len(questionTierList))]
         questionPickList.append(question_tier)
         questionTierList.remove(question_tier)
@@ -552,20 +555,12 @@ async def createQuestion(interaction: discord.Interaction = None, channel: disco
         LIMIT 1;
         '''
     buttonList = []
-    for i in range(3):
+    for i in range(x):
         games_curs.execute(CategorySelectQuery, (questionPickList[i],))
         Question = games_curs.fetchone()
         if Question:
             #print(f"i: {i}")
             buttonList.append(QuestionPickButton(Question=Question, isForced=isForced))
-    #check to see if we have met the unlock conditions for game 1 and if no row exists for our name yet, create it
-    #games_curs.execute('''SELECT * FROM GamblingUnlockMetricsView WHERE GuildID=? and UserID=?''', (interaction.guild.id,interaction.user.id))
-    #unlock_condition = games_curs.fetchone()
-    # if not unlock_condition:
-    #     games_curs.execute('''INSERT INTO GamblingUnlockMetricsView (GuildID, UserID) VALUES (?, ?)''', (interaction.guild.id, interaction.user.id))
-    #     games_conn.commit()
-    #buttonList.append(GamblingButton(label="🎰", user_id=interaction.user.id, guild_id=interaction.guild.id, style=discord.ButtonStyle.primary))
-    #send an ephemeral message with the buttons
     if buttonList:
         view = discord.ui.View(timeout=None)
         for button in buttonList:
@@ -582,7 +577,7 @@ async def createQuestion(interaction: discord.Interaction = None, channel: disco
             elif newsDate.date() == (datetime.now() - timedelta(days=1)).date():
                 messageContent += "There was new news yesterday! type /news to see it.\n\n"
         if interaction is not None:
-            messageContent+="personal pop quiz:"
+            messageContent+="Daily pop quiz:"
             isPrivate=True
             quizMessage=await interaction.followup.send(messageContent, ephemeral=isPrivate, view=view)
         else:
