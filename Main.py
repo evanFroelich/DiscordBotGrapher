@@ -732,6 +732,9 @@ Output:
 """
     result = (await askLLM(prompt)).strip().lower()
     print(f"LLM result: {result}")
+    #if the result is longer than one word, re run the llm
+    if len(result.split()) > 1:
+        result = (await askLLM(prompt)).strip().lower()
     return "abc123" in result, result
 
 
