@@ -656,15 +656,14 @@ async def createQuestion(interaction: discord.Interaction = None, channel: disco
             view.add_item(button)
         messageContent=""
         isPrivate=False
-        games_curs.execute('''SELECT Date FROM NewsFeed ORDER BY Date DESC LIMIT 1''')
-        #if the date from the table is from today or yesterday, add to the messageContent that there is new news. date format is only year month day
-        newsDate = games_curs.fetchone()
-        if newsDate:
-            newsDate = datetime.strptime(newsDate[0], '%Y-%m-%d')
+        games_curs.execute('''SELECT Date, Headline FROM NewsFeed ORDER BY Date DESC LIMIT 1''')
+        newsFeed = games_curs.fetchone()
+        if newsFeed:
+            newsDate = datetime.strptime(newsFeed[0], '%Y-%m-%d')
             if newsDate.date() == datetime.now().date():
-                messageContent += "There is new news today! type /news to see it.\n\n"
+                messageContent += f"There is new news today! \nUse /news to read about: **{newsFeed[1]}**.\n\n"
             elif newsDate.date() == (datetime.now() - timedelta(days=1)).date():
-                messageContent += "There was new news yesterday! type /news to see it.\n\n"
+                messageContent += f"There was new news yesterday! \nUse /news to read about: **{newsFeed[1]}**.\n\n"
         if interaction is not None:
             messageContent+="Daily pop quiz:"
             isPrivate=True
@@ -1342,6 +1341,59 @@ async def inventory(interaction: discord.Interaction):
         embed.add_field(name="Current Balance", value="No balance information available.", inline=False)
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
+@client.tree.command(name="stats", description="Displays your personal stats from this server")
+async def stats(interaction: discord.Interaction):
+    user_id = interaction.user.id
+    guild_id = interaction.guild.id
+
+    # Fetch the user's stats from the database
+    gamesDB="games.db"
+    games_conn = sqlite3.connect(gamesDB)   
+    games_conn.row_factory = sqlite3.Row
+    games_curs = games_conn.cursor()
+    games_curs.execute('''SELECT * FROM UserStats WHERE GuildID=? AND UserID=?''', (guild_id, user_id))
+    user_stats = games_curs.fetchone()
+    embed = discord.Embed(title=f"---WIP---\n{interaction.user.name}'s Stats", color=discord.Color.green())
+    if user_stats:
+        embed.add_field(name="Ping Responses", value=f"Pong:{user_stats['PingPongCount']}\nSong: {user_stats['PingSongCount']}\nDong: {user_stats['PingDongCount']}\nLong: {user_stats['PingLongCount']}\nKong: {user_stats['PingKongCount']}\nGoldStar: {user_stats['PingGoldStarCount']}", inline=False)
+        #divide hits and misses to get a percent rounded to the whole number. if miss is 0 then default to 100%
+        hitRate=0
+        if user_stats['HorseMissCount'] == 0:
+            if user_stats['HorseHitCount'] == 0:
+                hitRate = "N/A"
+            else:
+                hitRate = 100
+        else:
+            hitRate = round(user_stats['HorseHitCount'] / (user_stats['HorseHitCount'] + user_stats['HorseMissCount']) * 100)
+        embed.add_field(name="Horse Stats", value=f"Times hit: {user_stats['HorseHitCount']}\tHit Rate: {hitRate}%", inline=False)
+        if user_stats['CatMissCount'] == 0:
+            if user_stats['CatHitCount'] == 0:
+                hitRate = "N/A"
+            else:
+                hitRate = 100
+        else:
+            hitRate = round(user_stats['CatHitCount'] / (user_stats['CatHitCount'] + user_stats['CatMissCount']) * 100)
+        embed.add_field(name="Cat Stats", value=f"Times hit: {user_stats['CatHitCount']}\tHit Rate: {hitRate}%", inline=False)
+        if user_stats['MarathonMissCount'] == 0:
+            if user_stats['MarathonHitCount'] == 0:
+                hitRate = "N/A"
+            else:
+                hitRate = 100
+        else:
+            hitRate = round(user_stats['MarathonHitCount'] / (user_stats['MarathonHitCount'] + user_stats['MarathonMissCount']) * 100)
+        embed.add_field(name="Marathon Stats", value=f"Times hit: {user_stats['MarathonHitCount']}\tHit Rate: {hitRate}%", inline=False)
+        if user_stats['TwitterAltMissCount'] == 0:
+            if user_stats['TwitterAltHitCount'] == 0:
+                hitRate = "N/A"
+            else:
+                hitRate = 100
+        else:
+            hitRate = round(user_stats['TwitterAltHitCount'] / (user_stats['TwitterAltHitCount'] + user_stats['TwitterAltMissCount']) * 100)
+        embed.add_field(name="Twitter Alt Stats", value=f"Times hit: {user_stats['TwitterAltHitCount']}\tHit Rate: {hitRate}%", inline=False)
+    else:
+        embed.add_field(name="Stats", value="No stats information available.", inline=False)
+
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 
 @client.tree.command(name="server-graph", description="Replies with a graph of activity")
 @app_commands.choices(subtype=[

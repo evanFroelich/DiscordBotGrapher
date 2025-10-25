@@ -159,30 +159,31 @@ CREATE TABLE if not exists DailyGamblingTotals (
 CREATE TABLE if not exists NewsFeed (
 	"ID"	INTEGER NOT NULL UNIQUE,
 	"Date"	TEXT NOT NULL DEFAULT (date('now', 'localtime')),
-	"Notes"	TEXT,
+	"Headline"	TEXT NOT NULL DEFAULT 'N/A',
+	"Notes"	TEXT NOT NULL DEFAULT 'N/A',
 	PRIMARY KEY("ID" AUTOINCREMENT)
 );
 
 CREATE TABLE if not exists UserStats (
 	"GuildID"	INTEGER NOT NULL,
 	"UserID"	INTEGER NOT NULL,
-	"PingTimestamp"	TEXT NOT NULL DEFAULT (date('now', 'localtime')),
+	"PingTimestamp"	TEXT NOT NULL DEFAULT (date('now', '-1 day', 'localtime')),
 	"PingPongCount"	INTEGER NOT NULL DEFAULT 0,
 	"PingKongCount"	INTEGER NOT NULL DEFAULT 0,
 	"PingSongCount"	INTEGER NOT NULL DEFAULT 0,
 	"PingDongCount"	INTEGER NOT NULL DEFAULT 0,
 	"PingLongCount"	INTEGER NOT NULL DEFAULT 0,
 	"PingGoldStarCount"	INTEGER NOT NULL DEFAULT 0,
-	"HorseTimestamp"	TEXT NOT NULL DEFAULT (date('now', 'localtime')),
+	"HorseTimestamp"	TEXT NOT NULL DEFAULT (date('now', '-1 day', 'localtime')),
 	"HorseHitCount"	INTEGER NOT NULL DEFAULT 0,
 	"HorseMissCount"	INTEGER NOT NULL DEFAULT 0,
-	"CatTimestamp"	TEXT NOT NULL DEFAULT (date('now', 'localtime')),
+	"CatTimestamp"	TEXT NOT NULL DEFAULT (date('now', '-1 day', 'localtime')),
 	"CatHitCount"	INTEGER NOT NULL DEFAULT 0,
 	"CatMissCount"	INTEGER NOT NULL DEFAULT 0,
-	"MarathonTimestamp"	TEXT NOT NULL DEFAULT (date('now', 'localtime')),
+	"MarathonTimestamp"	TEXT NOT NULL DEFAULT (date('now', '-1 day', 'localtime')),
 	"MarathonHitCount"	INTEGER NOT NULL DEFAULT 0,
 	"MarathonMissCount"	INTEGER NOT NULL DEFAULT 0,
-	"TwitterAltTimestamp"	TEXT NOT NULL DEFAULT (date('now', 'localtime')),
+	"TwitterAltTimestamp"	TEXT NOT NULL DEFAULT (date('now', '-1 day', 'localtime')),
 	"TwitterAltHitCount"	INTEGER NOT NULL DEFAULT 0,
 	"TwitterAltMissCount"	INTEGER NOT NULL DEFAULT 0,
 	PRIMARY KEY("GuildID","UserID")
