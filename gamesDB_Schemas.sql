@@ -163,6 +163,41 @@ CREATE TABLE if not exists NewsFeed (
 	PRIMARY KEY("ID" AUTOINCREMENT)
 );
 
+CREATE TABLE if not exists UserStats (
+	"GuildID"	INTEGER NOT NULL,
+	"UserID"	INTEGER NOT NULL,
+	"PingTimestamp"	TEXT NOT NULL DEFAULT (date('now', 'localtime')),
+	"PingPongCount"	INTEGER NOT NULL DEFAULT 0,
+	"PingKongCount"	INTEGER NOT NULL DEFAULT 0,
+	"PingSongCount"	INTEGER NOT NULL DEFAULT 0,
+	"PingDongCount"	INTEGER NOT NULL DEFAULT 0,
+	"PingLongCount"	INTEGER NOT NULL DEFAULT 0,
+	"PingGoldStarCount"	INTEGER NOT NULL DEFAULT 0,
+	"HorseTimestamp"	TEXT NOT NULL DEFAULT (date('now', 'localtime')),
+	"HorseHitCount"	INTEGER NOT NULL DEFAULT 0,
+	"HorseMissCount"	INTEGER NOT NULL DEFAULT 0,
+	"CatTimestamp"	TEXT NOT NULL DEFAULT (date('now', 'localtime')),
+	"CatHitCount"	INTEGER NOT NULL DEFAULT 0,
+	"CatMissCount"	INTEGER NOT NULL DEFAULT 0,
+	"MarathonTimestamp"	TEXT NOT NULL DEFAULT (date('now', 'localtime')),
+	"MarathonHitCount"	INTEGER NOT NULL DEFAULT 0,
+	"MarathonMissCount"	INTEGER NOT NULL DEFAULT 0,
+	"TwitterAltTimestamp"	TEXT NOT NULL DEFAULT (date('now', 'localtime')),
+	"TwitterAltHitCount"	INTEGER NOT NULL DEFAULT 0,
+	"TwitterAltMissCount"	INTEGER NOT NULL DEFAULT 0,
+	PRIMARY KEY("GuildID","UserID")
+);
+
+CREATE TABLE if not exists QuestionRetries (
+	"GuildID"	INTEGER NOT NULL,
+	"D1Retry"	INTEGER NOT NULL DEFAULT 0,
+	"D2Retry"	INTEGER NOT NULL DEFAULT 0,
+	"D3Retry"	INTEGER NOT NULL DEFAULT 1,
+	"D4Retry"	INTEGER NOT NULL DEFAULT 1,
+	"D5Retry"	INTEGER NOT NULL DEFAULT 2,
+	PRIMARY KEY("GuildID")
+);
+
 CREATE VIEW if not exists GamblingUnlockMetricsView AS
 SELECT
     GuildID,

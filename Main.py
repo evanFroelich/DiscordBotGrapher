@@ -261,7 +261,14 @@ class MyClient(discord.Client):
             if not await checkIgnoredChannels(message.channel.id, message.guild.id) and row[0]==1:
                 games_curs.execute("SELECT * FROM GoofsGaffs WHERE GuildID = ?", (message.guild.id,))
                 row = games_curs.fetchone()
-                games_conn.close()
+                games_curs.execute('''SELECT PingTimestamp, HorseTimestamp, CatTimestamp, MarathonTimestamp, TwitterAltTimestamp FROM UserStats WHERE GuildID = ? AND UserID = ?''', (message.guild.id, message.author.id))
+                userStatsTimestamps = games_curs.fetchone()
+                if not userStatsTimestamps:
+                    games_curs.execute('''INSERT INTO UserStats (GuildID, UserID) VALUES (?, ?)''', (message.guild.id, message.author.id))
+                    games_conn.commit()
+                    games_curs.execute('''SELECT PingTimestamp, HorseTimestamp, CatTimestamp, MarathonTimestamp, TwitterAltTimestamp FROM UserStats WHERE GuildID = ? AND UserID = ?''', (message.guild.id, message.author.id))
+                    userStatsTimestamps = games_curs.fetchone()
+                currentDate = datetime.now().date()
 
                 if not row:
                     return None  # no record for this guild
@@ -279,22 +286,53 @@ class MyClient(discord.Client):
 
 
                 if "girlcockx.com" in message.content and FlagTwitterAlt:
+                    UserStatTwitterTimestamp = userStatsTimestamps["TwitterAltTimestamp"]
+                    #convert it into an actual timestamp date only
+                    UserStatTwitterTimestamp = datetime.strptime(UserStatTwitterTimestamp, '%Y-%m-%d').date()
+                    statsFlag=0
+                    if currentDate != UserStatTwitterTimestamp:
+                        statsFlag=1
                     r=random()
                     #10% chance of response
                     if r<TwitterAltChance:
+                        if statsFlag==1:
+                            games_curs.execute('''UPDATE UserStats SET TwitterAltTimestamp = ?, TwitterAltHitCount = TwitterAltHitCount + 1 WHERE GuildID = ? AND UserID = ?''', (currentDate, message.guild.id, message.author.id))
                         resposneImage=discord.File("images/based_on_recent_events.png", filename="response.png")
                         await message.reply(file=resposneImage)
-                        print("hold")
+                    else:
+                        if statsFlag==1:
+                            games_curs.execute('''UPDATE UserStats SET TwitterAltTimestamp = ?, TwitterAltMissCount = TwitterAltMissCount + 1 WHERE GuildID = ? AND UserID = ?''', (currentDate, message.guild.id, message.author.id))
+                    games_conn.commit()
+                    #print("hold")
 
                 if "horse" in message.content.lower() and FlagHorse:
+                    #do the same thing as TwitterAlt
+                    UserStatHorseTimestamp = userStatsTimestamps["HorseTimestamp"]
+                    #convert it into an actual timestamp date only
+                    UserStatHorseTimestamp = datetime.strptime(UserStatHorseTimestamp, '%Y-%m-%d').date()
+                    statsFlag=0
+                    if currentDate != UserStatHorseTimestamp:
+                        statsFlag=1
                     r=random()
                     #25% chance of response
                     if r<HorseChance:
+                        if statsFlag==1:
+                            games_curs.execute('''UPDATE UserStats SET HorseTimestamp = ?, HorseHitCount = HorseHitCount + 1 WHERE GuildID = ? AND UserID = ?''', (currentDate, message.guild.id, message.author.id))
                         resposneImage=discord.File("images/horse.gif", filename="respoonse.gif")
                         await message.reply(file=resposneImage)
-                        print("hold")
+                        #print("hold")
+                    else:
+                        if statsFlag==1:
+                            games_curs.execute('''UPDATE UserStats SET HorseTimestamp = ?, HorseMissCount = HorseMissCount + 1 WHERE GuildID = ? AND UserID = ?''', (currentDate, message.guild.id, message.author.id))
+                    games_conn.commit()
 
                 if splitstr[0].lower()=='cat' and FlagCat:
+                    UserStatCatTimestamp = userStatsTimestamps["CatTimestamp"]
+                    #convert it into an actual timestamp date only
+                    UserStatCatTimestamp = datetime.strptime(UserStatCatTimestamp, '%Y-%m-%d').date()
+                    statsFlag=0
+                    if currentDate != UserStatCatTimestamp:
+                        statsFlag=1
                     time.sleep(1)  # wait a bit for reactions to register
                     newMessage= await message.channel.fetch_message(message.id)
                     reactions = newMessage.reactions
@@ -304,37 +342,75 @@ class MyClient(discord.Client):
                             if user.id == 966695034340663367:
                                 r= random()
                                 if r<CatChance:
+                                    if statsFlag==1:
+                                        games_curs.execute('''UPDATE UserStats SET CatTimestamp = ?, CatHitCount = CatHitCount + 1 WHERE GuildID = ? AND UserID = ?''', (currentDate, message.guild.id, message.author.id))
                                     time.sleep(.5)  # give it a second to make it more dramatic
                                     resposneImage=discord.File("images/cat_laugh.gif", filename="cat_laugh.gif")
                                     await message.reply(file=resposneImage)
-                                
+                                else:
+                                    if statsFlag==1:
+                                        games_curs.execute('''UPDATE UserStats SET CatTimestamp = ?, CatMissCount = CatMissCount + 1 WHERE GuildID = ? AND UserID = ?''', (currentDate, message.guild.id, message.author.id))
+                    games_conn.commit()
+
                 if (message.author.id==101755961496076288 or message.channel.id==1360302184297791801 or "marathon" in message.content.lower()) and FlagMarathon:
+                    UserStatMarathonTimestamp = userStatsTimestamps["MarathonTimestamp"]
+                    #convert it into an actual timestamp date only
+                    UserStatMarathonTimestamp = datetime.strptime(UserStatMarathonTimestamp, '%Y-%m-%d').date()
+                    statsFlag=0
+                    if currentDate != UserStatMarathonTimestamp:
+                        statsFlag=1
                     r=random()
                     if r<MarathonChance:
+                        if statsFlag==1:
+                            games_curs.execute('''UPDATE UserStats SET MarathonTimestamp = ?, MarathonHitCount = MarathonHitCount + 1 WHERE GuildID = ? AND UserID = ?''', (currentDate, message.guild.id, message.author.id))
                         resposneImage=discord.File("images/marathon.gif", filename="respoonse.gif")
                         await message.reply(file=resposneImage)
-                        print("hold")
+                        #print("hold")
+                    else:
+                        if statsFlag==1:
+                            games_curs.execute('''UPDATE UserStats SET MarathonTimestamp = ?, MarathonMissCount = MarathonMissCount + 1 WHERE GuildID = ? AND UserID = ?''', (currentDate, message.guild.id, message.author.id))
+                    games_conn.commit()
 
                 if (splitstr[0].lower()=='ping' and FlagPing):
-                    if message.author.id==100344687029665792:
+                    # if message.author.id==100344687029665792:
+                    #     await message.channel.send("pong")
+                        
+                        
+                    #else:
+                    UserStatPingTimestamp = userStatsTimestamps["PingTimestamp"]
+                    #convert it into an actual timestamp date only
+                    UserStatPingTimestamp = datetime.strptime(UserStatPingTimestamp, '%Y-%m-%d').date()
+                    statsFlag=0
+                    if currentDate != UserStatPingTimestamp:
+                        statsFlag=1
+                    rand=random()
+                    if rand<.2:
                         await message.channel.send("pong")
-                        
-                        #await message.channel.send(outSTR)
-                        
+                        if statsFlag==1:
+                            games_curs.execute('''UPDATE UserStats SET PingTimestamp = ?, PingPongCount = PingPongCount + 1 WHERE GuildID = ? AND UserID = ?''', (currentDate, message.guild.id, message.author.id))
+                    elif rand<.4:
+                        await message.channel.send("song")
+                        if statsFlag==1:
+                            games_curs.execute('''UPDATE UserStats SET PingTimestamp = ?, PingSongCount = PingSongCount + 1 WHERE GuildID = ? AND UserID = ?''', (currentDate, message.guild.id, message.author.id))
+                    elif rand<.6:
+                        await message.channel.send("dong")
+                        if statsFlag==1:
+                            games_curs.execute('''UPDATE UserStats SET PingTimestamp = ?, PingDongCount = PingDongCount + 1 WHERE GuildID = ? AND UserID = ?''', (currentDate, message.guild.id, message.author.id))
+                    elif rand<.8:
+                        await message.channel.send("long")
+                        if statsFlag==1:
+                            games_curs.execute('''UPDATE UserStats SET PingTimestamp = ?, PingLongCount = PingLongCount + 1 WHERE GuildID = ? AND UserID = ?''', (currentDate, message.guild.id, message.author.id))
+                    elif rand<.99:
+                        await message.channel.send("kong")
+                        if statsFlag==1:
+                            games_curs.execute('''UPDATE UserStats SET PingTimestamp = ?, PingKongCount = PingKongCount + 1 WHERE GuildID = ? AND UserID = ?''', (currentDate, message.guild.id, message.author.id))
                     else:
-                        rand=random()
-                        if rand<.2:
-                            await message.channel.send("pong")
-                        elif rand<.4:
-                            await message.channel.send("song")
-                        elif rand<.6:
-                            await message.channel.send("dong")
-                        elif rand<.8:
-                            await message.channel.send("long")
-                        elif rand<.99:
-                            await message.channel.send("kong")
-                        else:
-                            await message.channel.send("you found the special message. here is your gold star!")
+                        await message.channel.send("you found the special message. here is your gold star!")
+                        if statsFlag==1:
+                            games_curs.execute('''UPDATE UserStats SET PingTimestamp = ?, PingGoldStarCount = PingGoldStarCount + 1 WHERE GuildID = ? AND UserID = ?''', (currentDate, message.guild.id, message.author.id))
+                    games_conn.commit()
+            games_curs.close()
+            games_conn.close()
 
 
 
@@ -494,8 +570,21 @@ class QuestionPickButton(discord.ui.Button):
                 
                 games_curs.execute('''UPDATE GamblingUserStats SET LastRandomQuestionTime = ? WHERE GuildID=? AND UserID=?''', (curTimeString, interaction.guild.id, interaction.user.id))
                 games_conn.commit() 
-            modal = QuestionModal(Question=self.question, isForced=self.isForced)
+            games_curs.execute('''SELECT * FROM QuestionRetries where GuildID = ?''', (interaction.guild.id,))
+            row = games_curs.fetchone()
+            if not row:
+                #insert a new row
+                games_curs.execute('''INSERT INTO QuestionRetries (GuildID) VALUES (?)''', (interaction.guild.id,))
+                games_conn.commit()
+                games_curs.execute('''SELECT * FROM QuestionRetries where GuildID = ?''', (interaction.guild.id,))
+                row = games_curs.fetchone()
+            print(row)
+            print(self.question_difficulty)
+            retries=row[int(self.question_difficulty)]
+            modal = QuestionModal(Question=self.question, isForced=self.isForced, retries=retries)
             await interaction.response.send_modal(modal)
+            games_curs.close()
+            games_conn.close()
 
 async def create_user_db_entry(guildID, userID):
     gamesDB = "games.db"
@@ -734,8 +823,9 @@ Output:
 
 
 class QuestionModal(discord.ui.Modal):
-    def __init__(self, Question=None, isForced=False):
+    def __init__(self, Question=None, isForced=False, retries=0):
         super().__init__(title="Trivia Question")
+        self.question= Question  # Store the question data
         self.question_id = Question[0]  # Question ID
         self.question_text = Question[1]  # Question text
         self.question_answers = Question[2]  # Answers
@@ -744,10 +834,13 @@ class QuestionModal(discord.ui.Modal):
         self.question_type = Question[3]  # Question type
         self.question_difficulty = Question[4]  # Question difficulty
         self.isForced = isForced
-        self.question_ask = discord.ui.TextInput(label="Answer Below:", placeholder="answer", max_length=100, style=discord.TextStyle.short)
+        self.retries = retries
+        self.question_ask = discord.ui.TextInput(label=f"Answer Below:", placeholder="answer", max_length=100, style=discord.TextStyle.short)
         self.questionUI=discord.ui.TextDisplay(content=self.question_text)
+        self.retryText = discord.ui.TextDisplay(content=f"Number of retries left: {self.retries}")
         self.add_item(self.questionUI)
         self.add_item(self.question_ask)
+        self.add_item(self.retryText)
 
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(thinking=True, ephemeral=True)
@@ -767,6 +860,14 @@ class QuestionModal(discord.ui.Modal):
                 LLMResponse, LLMText = await checkAnswer(self.question_text, self.question_answers, user_answer)
                 games_curs.execute('''INSERT INTO LLMEvaluations (Question, GivenAnswer, UserAnswer, LLMResponse, ClassicResponse) VALUES (?, ?, ?, ?, ?)''', (self.question_text, self.question_answers[0], user_answer, LLMResponse, classicResponse))
                 games_conn.commit()
+                # if LLMResponse is not None:
+                #     if int(LLMResponse) == 0 and self.retries > 0:
+                #         self.retries -= 1
+                #         #resend the modal with 1 less chance
+                #         modal = QuestionModal(Question=self.question, isForced=self.isForced, retries=self.retries)
+                #         await interaction.response.send_message("You have another chance to answer the question.",ephemeral=True)
+                #         await interaction.followup.send_modal(modal)
+                #         return
             except Exception as e:
                 print(f"Error occurred: {e}")
                 logging.info(f"Error occurred in LLM: {e}")
