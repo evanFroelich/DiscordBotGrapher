@@ -1256,13 +1256,12 @@ async def news(interaction: discord.Interaction):
     gamesDB="games.db"
     games_conn = sqlite3.connect(gamesDB)
     games_curs = games_conn.cursor()
-    games_curs.execute('''SELECT Date, Notes from NewsFeed order by Date desc Limit 3''')
+    games_curs.execute('''SELECT Date, Notes, Headline from NewsFeed order by Date desc Limit 3''')
     rows = games_curs.fetchall()
     outputStr=""
-    for row in rows:
-        outputStr+=f"{row[0]}\n{row[1]}\n\n"
     embed = discord.Embed(title="Recent News", color=discord.Color.blue())
-    embed.add_field(name="News", value=outputStr, inline=False)
+    for row in rows:
+        embed.add_field(name=f"{row[0]}: {row[2]}", value=row[1], inline=False)
     await interaction.response.send_message(embed=embed, ephemeral=True)
     games_curs.close()
     games_conn.close()
