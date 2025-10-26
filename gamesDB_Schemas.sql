@@ -199,6 +199,16 @@ CREATE TABLE if not exists QuestionRetries (
 	PRIMARY KEY("GuildID")
 );
 
+CREATE TABLE if not exists CommandLog (
+	"ID"	INTEGER NOT NULL UNIQUE,
+	"GuildID"	INTEGER NOT NULL,
+	"UserID"	INTEGER NOT NULL,
+	"Timestamp"	TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+	"CommandName"	TEXT NOT NULL,
+	"CommandParameters"	TEXT,
+	PRIMARY KEY("ID" AUTOINCREMENT)
+);
+
 CREATE VIEW if not exists GamblingUnlockMetricsView AS
 SELECT
     GuildID,

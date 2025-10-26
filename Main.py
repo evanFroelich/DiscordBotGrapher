@@ -456,6 +456,13 @@ client = MyClient(intents=intents)
 
 @client.tree.command(name="ping", description="Replies with Pong!")
 async def ping(interaction: discord.Interaction):
+    gamesDB="games.db"
+    games_conn = sqlite3.connect(gamesDB)
+    games_curs = games_conn.cursor()
+    games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName) VALUES (?, ?, ?)''', (interaction.guild.id, interaction.user.id, "ping"))
+    games_conn.commit()
+    games_curs.close()
+    games_conn.close()
     rand=random()
     payload=""
     if rand<.2:
@@ -699,6 +706,8 @@ async def test_question_message(interaction: discord.Interaction):
     gamesDB = "games.db"
     games_conn = sqlite3.connect(gamesDB)
     games_curs = games_conn.cursor()
+    games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName) VALUES (?, ?, ?)''', (interaction.guild.id, interaction.user.id, "daily-trivia"))
+    games_conn.commit()
     games_curs.execute('''SELECT LastDailyQuestionTime FROM GamblingUserStats WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
     last_daily_question_time = games_curs.fetchone()
     print(f"last_daily_question_time: {last_daily_question_time}")
@@ -1232,6 +1241,8 @@ async def flip_coin(interaction: discord.Interaction):
     games_db = "games.db"
     games_conn = sqlite3.connect(games_db)
     games_curs = games_conn.cursor()
+    games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName) VALUES (?, ?, ?)''', (interaction.guild.id, interaction.user.id, "flip"))
+    games_conn.commit()
     #check if the users row exists
     games_curs.execute('''SELECT * FROM coinFlipLeaderboard WHERE UserID=?''', (interaction.user.id,))
     row = games_curs.fetchone()
@@ -1256,9 +1267,10 @@ async def news(interaction: discord.Interaction):
     gamesDB="games.db"
     games_conn = sqlite3.connect(gamesDB)
     games_curs = games_conn.cursor()
+    games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName) VALUES (?, ?, ?)''', (interaction.guild.id, interaction.user.id, "news"))
+    games_conn.commit()
     games_curs.execute('''SELECT Date, Notes, Headline from NewsFeed order by Date desc Limit 3''')
     rows = games_curs.fetchall()
-    outputStr=""
     embed = discord.Embed(title="Recent News", color=discord.Color.blue())
     for row in rows:
         embed.add_field(name=f"{row[0]}: {row[2]}", value=row[1], inline=False)
@@ -1279,6 +1291,13 @@ async def mostUsedEmojis(interaction: discord.Interaction, inorout: app_commands
     DB_NAME = "My_DB"
     conn = sqlite3.connect(DB_NAME)
     curs = conn.cursor()
+    gamesDB="games.db"
+    games_conn = sqlite3.connect(gamesDB)
+    games_curs = games_conn.cursor()
+    games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName, CommandParameters) VALUES (?, ?, ?, ?)''', (interaction.guild.id, interaction.user.id, "MostUsedEmojis", f"inOrOut: {inorout.value}, subtype: {subtype.value}"))
+    games_conn.commit()
+    games_curs.close()
+    games_conn.close()
 
     output=""
     if inorout.value == 'in':
@@ -1331,6 +1350,8 @@ async def inventory(interaction: discord.Interaction):
     gamesDB="games.db"
     games_conn = sqlite3.connect(gamesDB)   
     games_curs = games_conn.cursor()
+    games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName) VALUES (?, ?, ?)''', (interaction.guild.id, interaction.user.id, "inventory"))
+    games_conn.commit()
     games_curs.execute('''SELECT CurrentBalance FROM GamblingUserStats WHERE GuildID=? AND UserID=?''', (guild_id, user_id))
     current_balance = games_curs.fetchone()
     embed = discord.Embed(title=f"---WIP---\n{interaction.user.name}'s Inventory", color=discord.Color.green())
@@ -1350,6 +1371,8 @@ async def stats(interaction: discord.Interaction):
     games_conn = sqlite3.connect(gamesDB)   
     games_conn.row_factory = sqlite3.Row
     games_curs = games_conn.cursor()
+    games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName) VALUES (?, ?, ?)''', (interaction.guild.id, interaction.user.id, "stats"))
+    games_conn.commit()
     games_curs.execute('''SELECT * FROM UserStats WHERE GuildID=? AND UserID=?''', (guild_id, user_id))
     user_stats = games_curs.fetchone()
     embed = discord.Embed(title=f"---WIP---\n{interaction.user.name}'s Stats", color=discord.Color.green())
@@ -1414,6 +1437,13 @@ async def stats(interaction: discord.Interaction):
 @app_commands.describe(numberoflines="number of lines to display <default: 15>")
 
 async def servergraph(interaction: discord.Interaction, subtype: app_commands.Choice[str], xaxislabel: app_commands.Choice[str], logging: app_commands.Choice[str], numberofmessages: int = 1000, drilldowntarget: str = '', numberoflines: int = 15):
+    gamesDB="games.db"
+    games_conn = sqlite3.connect(gamesDB)
+    games_curs = games_conn.cursor()
+    games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName, CommandParameters) VALUES (?, ?, ?, ?)''', (interaction.guild.id, interaction.user.id, "server-graph", f"'subtype': {subtype.value}, 'xaxislabel': {xaxislabel.value}, 'logging': {logging.value}, 'numberofmessages': {numberofmessages}, 'drilldowntarget': {drilldowntarget}, 'numberoflines': {numberoflines}"))
+    games_conn.commit()
+    games_curs.close()
+    games_conn.close()
     if not await isAuthorized(interaction.user.id, str(interaction.guild.id)):
         await interaction.response.send_message("You are not authorized to use this command.")
         return
@@ -1617,6 +1647,8 @@ class PatchNotesModal(discord.ui.Modal):
 @app_commands.describe(ignoredchannels="Channel ID for the ignored channels to add or remove")
 @app_commands.describe(flaggoofsgaffs="Flag to enable chat response goofs and gaffs. 1 is on 0 is off")
 async def gamesettingscommandset(interaction: discord.Interaction, numberofquestionsperday: int = None, questiontimeout: int = None, pipchance: float = None, questionchance: float = None, flagshamechannel: int = None, shamechannel: str = None, flagignoredchannels: int = None, ignoredchannels: str = None, flaggoofsgaffs: int = None):
+    games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName, CommandParameters) VALUES (?, ?, ?, ?)''', (interaction.guild.id, interaction.user.id, "game-settings-set", f"'numberofquestionsperday': {numberofquestionsperday}, 'questiontimeout': {questiontimeout}, 'pipchance': {pipchance}, 'questionchance': {questionchance}, 'flagshamechannel': {flagshamechannel}, 'shamechannel': {shamechannel}, 'flagignoredchannels': {flagignoredchannels}, 'ignoredchannels': {ignoredchannels}, 'flaggoofsgaffs': {flaggoofsgaffs}"))
+    games_conn.commit()
     if not await isAuthorized(str(interaction.user.id), str(interaction.guild.id)):
         await interaction.response.send_message("You are not authorized to use this command. ask an administrator to authorize you using the /addAuthorizedUser command.",ephemeral=True)
         return
@@ -1725,6 +1757,8 @@ async def gamesettingscommandset(interaction: discord.Interaction, numberofquest
 @app_commands.describe(flagtwitteralt="1 is on 0 is off.")
 @app_commands.describe(twitteraltchance="0-1 decimal")
 async def goofs_settings_command_set(interaction: discord.Interaction, flaghorse: int = None, horsechance: float = None, flagcat: int = None, catchance: float = None, flagping: int = None, flagmarathon: int = None, marathonchance: float = None, flagtwitteralt: int = None, twitteraltchance: float = None):
+    games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName, CommandParameters) VALUES (?, ?, ?, ?)''', (interaction.guild.id, interaction.user.id, "goofs-settings-set", f"'flaghorse': {flaghorse}, 'horsechance': {horsechance}, 'flagcat': {flagcat}, 'catchance': {catchance}, 'flagping': {flagping}, 'flagmarathon': {flagmarathon}, 'marathonchance': {marathonchance}, 'flagtwitteralt': {flagtwitteralt}, 'twitteraltchance': {twitteraltchance}"))
+    games_conn.commit()
     if not await isAuthorized(str(interaction.user.id), str(interaction.guild.id)):
         await interaction.response.send_message("You are not authorized to use this command.")
         return
@@ -1807,6 +1841,8 @@ async def goofs_settings_command_get(interaction: discord.Interaction):
     games_db = "games.db"
     games_conn = sqlite3.connect(games_db)
     games_curs = games_conn.cursor()
+    games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName) VALUES (?, ?, ?)''', (interaction.guild.id, interaction.user.id, "goofs-settings-get"))
+    games_conn.commit()
     games_curs.execute("SELECT * FROM GoofsGaffs WHERE GuildID = ?", (interaction.guild.id,))
     rows = games_curs.fetchall()
     if not rows:
@@ -1826,6 +1862,8 @@ async def serversettingscommandget(interaction: discord.Interaction):
     games_db = "games.db"
     games_conn = sqlite3.connect(games_db)
     games_curs = games_conn.cursor()
+    games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName) VALUES (?, ?, ?)''', (interaction.guild.id, interaction.user.id, "game-settings-get"))
+    games_conn.commit()
     games_curs.execute("SELECT * FROM ServerSettings WHERE GuildID = ?", (interaction.guild.id,))
     rows = games_curs.fetchall()
     if not rows:
@@ -1840,6 +1878,13 @@ async def serversettingscommandget(interaction: discord.Interaction):
 
 @client.tree.command(name="add-authorized-user", description="User ID")
 async def add_authorized_user(interaction: discord.Interaction, userid: str):
+    gamesDB="games.db"
+    games_conn = sqlite3.connect(gamesDB)
+    games_curs = games_conn.cursor()
+    games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName, CommandParameters) VALUES (?, ?, ?, ?)''', (interaction.guild.id, interaction.user.id, "add-authorized-user", f"User: {userid}"))
+    games_conn.commit()
+    games_curs.close()
+    games_conn.close()
     if not await isAuthorized(interaction.user.id, str(interaction.guild.id)):
         await interaction.response.send_message("You are not authorized to use this command.")
         return
@@ -1920,6 +1965,8 @@ async def leaderboard(interaction: discord.Interaction, subtype: app_commands.Ch
     games_conn = sqlite3.connect(gamesDB)
     main_curs = main_conn.cursor()
     games_curs = games_conn.cursor()
+    games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName, CommandParameters) VALUES (?, ?, ?, ?)''', (interaction.guild.id, interaction.user.id, "leaderboard", f"subtype: {subtype.value}"))
+    games_conn.commit()
     if subtype.value == "pip":
         """Displays the game points leaderboard."""
         await interaction.response.defer(thinking=True)
@@ -1998,6 +2045,8 @@ async def gradereport(interaction: discord.Interaction, visibility: app_commands
     gamesDB = "games.db"
     games_conn = sqlite3.connect(gamesDB)
     games_curs = games_conn.cursor()
+    games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName, CommandParameters) VALUES (?, ?, ?, ?)''', (interaction.guild.id, interaction.user.id, "grade-report", f"visibility: {visibility.value}"))
+    games_conn.commit()
     await create_user_db_entry(interaction.guild.id, interaction.user.id)
     games_curs.execute('''select Category, Difficulty, Num_Correct, Num_Incorrect from Scores where GuildID = ? and UserID = ? order by category, difficulty''', (interaction.guild.id, interaction.user.id))
     rows = games_curs.fetchall()
