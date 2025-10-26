@@ -141,7 +141,7 @@ class MyClient(discord.Client):
         self.tree = app_commands.CommandTree(self)
 
     async def setup_hook(self):
-        #await self.tree.sync()
+        await self.tree.sync()
         print('synced')
 
     async def on_thread_create(self,thread):
@@ -1294,7 +1294,7 @@ async def mostUsedEmojis(interaction: discord.Interaction, inorout: app_commands
     gamesDB="games.db"
     games_conn = sqlite3.connect(gamesDB)
     games_curs = games_conn.cursor()
-    games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName, CommandParameters) VALUES (?, ?, ?, ?)''', (interaction.guild.id, interaction.user.id, "MostUsedEmojis", f"inOrOut: {inorout.value}, subtype: {subtype.value}"))
+    games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName, CommandParameters) VALUES (?, ?, ?, ?)''', (interaction.guild.id, interaction.user.id, "most-used-emojis", f"inOrOut: {inorout.value}, subtype: {subtype.value}"))
     games_conn.commit()
     games_curs.close()
     games_conn.close()
@@ -1362,7 +1362,11 @@ async def inventory(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
 @client.tree.command(name="stats", description="Displays your personal stats from this server")
-async def stats(interaction: discord.Interaction):
+@app_commands.choices(visibility=[
+    app_commands.Choice(name="Private", value="private"),
+    app_commands.Choice(name="Public", value="public")
+])
+async def stats(interaction: discord.Interaction, visibility: app_commands.Choice[str]):
     user_id = interaction.user.id
     guild_id = interaction.guild.id
 
@@ -1371,7 +1375,7 @@ async def stats(interaction: discord.Interaction):
     games_conn = sqlite3.connect(gamesDB)   
     games_conn.row_factory = sqlite3.Row
     games_curs = games_conn.cursor()
-    games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName) VALUES (?, ?, ?)''', (interaction.guild.id, interaction.user.id, "stats"))
+    games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName, CommandParameters) VALUES (?, ?, ?, ?)''', (interaction.guild.id, interaction.user.id, "stats", f"visibility: {visibility.value}"))
     games_conn.commit()
     games_curs.execute('''SELECT * FROM UserStats WHERE GuildID=? AND UserID=?''', (guild_id, user_id))
     user_stats = games_curs.fetchone()
@@ -1427,8 +1431,8 @@ async def stats(interaction: discord.Interaction):
 
     else:
         embed.add_field(name="Stats", value="No stats information available.", inline=False)
-
-    await interaction.response.send_message(embed=embed, ephemeral=True)
+    visibility = "Public" if visibility.value == "public" else "Private"
+    await interaction.response.send_message(embed=embed, ephemeral=visibility == "Private")
 
 @client.tree.command(name="server-graph", description="Replies with a graph of activity")
 @app_commands.choices(subtype=[
