@@ -141,7 +141,7 @@ class MyClient(discord.Client):
         self.tree = app_commands.CommandTree(self)
 
     async def setup_hook(self):
-        await self.tree.sync()
+        #await self.tree.sync()
         print('synced')
 
     async def on_thread_create(self,thread):
@@ -1375,6 +1375,10 @@ async def stats(interaction: discord.Interaction):
     games_conn.commit()
     games_curs.execute('''SELECT * FROM UserStats WHERE GuildID=? AND UserID=?''', (guild_id, user_id))
     user_stats = games_curs.fetchone()
+    games_curs.execute('''SELECT * FROM UserStatsGeneralView WHERE GuildID=? AND UserID=?''', (guild_id, user_id))
+    general_stats = games_curs.fetchone()
+    games_curs.execute('''SELECT CommandName, CommandCount FROM UserStatsCommandView WHERE GuildID=? AND UserID=? Order by CommandCount desc''', (guild_id, user_id))
+    command_stats = games_curs.fetchall()
     embed = discord.Embed(title=f"---WIP---\n{interaction.user.name}'s Stats", color=discord.Color.green())
     if user_stats:
         embed.add_field(name="Ping Responses", value=f"Pong:{user_stats['PingPongCount']}\nSong: {user_stats['PingSongCount']}\nDong: {user_stats['PingDongCount']}\nLong: {user_stats['PingLongCount']}\nKong: {user_stats['PingKongCount']}\nGoldStar: {user_stats['PingGoldStarCount']}", inline=False)
@@ -1412,6 +1416,15 @@ async def stats(interaction: discord.Interaction):
         else:
             hitRate = round(user_stats['TwitterAltHitCount'] / (user_stats['TwitterAltHitCount'] + user_stats['TwitterAltMissCount']) * 100)
         embed.add_field(name="Twitter Alt Stats", value=f"Times hit: {user_stats['TwitterAltHitCount']}\tHit Rate: {hitRate}%", inline=False)
+        if general_stats:
+            embed.add_field(name="Trivia stats", value=f"Questions Answered: {general_stats['TriviaCount']}\nLifetime Earnings: {general_stats['LifetimeEarnings']}\nCurrent Balance: {general_stats['CurrentBalance']}\nTips Given: {general_stats['TipsGiven']}", inline=False)
+            embed.add_field(name="Coin Flip Stats", value=f"Times Flipped: {general_stats['TimesFlipped']}\nCurrent Streak: {general_stats['CurrentStreak']}\nLast Flipped: {general_stats['LastFlip']}", inline=False)
+            commandStr=""
+            #go through the results of command_stats and add them all into the string
+            for command in command_stats:
+                commandStr += f"{command['CommandName']}: {command['CommandCount']}\n"
+            embed.add_field(name=f"Total Commands Used: {general_stats['TotalCommands']}",value=f"{commandStr}", inline=False)
+
     else:
         embed.add_field(name="Stats", value="No stats information available.", inline=False)
 

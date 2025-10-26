@@ -229,3 +229,54 @@ SELECT
 FROM QuestionList
 GROUP BY Type, Difficulty
 ORDER BY Type, Difficulty;
+
+CREATE VIEW if not exists UserStatsGeneralView AS WITH
+Trivia AS (
+    SELECT GuildID, UserID, COUNT(*) AS TriviaCount
+    FROM Scores
+    GROUP BY GuildID, UserID
+),
+Gambling AS (
+    SELECT GuildID, UserID, LifetimeEarnings, CurrentBalance, TipsGiven,
+           CoinFlipWins, CoinFlipEarnings, CoinFlipDoubleWins
+    FROM GamblingUserStats
+),
+CoinFlips AS (
+    SELECT UserID, CurrentStreak, LastFlip, TimesFlipped
+    FROM CoinFlipLeaderboard
+    GROUP BY UserID
+),
+Commands AS (
+    SELECT GuildID, UserID, COUNT(*) AS TotalCommands
+    FROM CommandLog
+    GROUP BY GuildID, UserID
+)
+SELECT
+    t.GuildID,
+    t.UserID,
+    t.TriviaCount,
+    g.LifetimeEarnings,
+    g.CurrentBalance,
+    g.TipsGiven,
+    g.CoinFlipWins,
+    g.CoinFlipEarnings,
+    g.CoinFlipDoubleWins,
+    c.CurrentStreak,
+    c.LastFlip,
+    c.TimesFlipped,
+    cmd.TotalCommands
+FROM Trivia t
+LEFT JOIN Gambling g
+    ON t.GuildID = g.GuildID AND t.UserID = g.UserID
+LEFT JOIN CoinFlips c
+    ON t.UserID = c.UserID
+LEFT JOIN Commands cmd
+    ON t.GuildID = cmd.GuildID AND t.UserID = cmd.UserID;
+
+CREATE VIEW if not exists UserStatsCommandView AS SELECT
+    GuildID,
+    UserID,
+    CommandName,
+    COUNT(*) AS CommandCount
+FROM CommandLog
+GROUP BY GuildID, UserID, CommandName;
