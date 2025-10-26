@@ -236,6 +236,7 @@ Trivia AS (
         SUM(Num_Incorrect) AS TotalIncorrect,
         SUM(Num_Correct + Num_Incorrect) AS TriviaCount
     FROM Scores
+	WHERE Category != 'bonus'
     GROUP BY GuildID, UserID
 ),
 Gambling AS (
