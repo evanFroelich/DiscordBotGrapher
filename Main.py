@@ -671,6 +671,8 @@ async def createQuestion(interaction: discord.Interaction = None, channel: disco
                 messageContent += f"There is new news today! \nUse /news to read about: **{newsFeed[1]}**.\n\n"
             elif newsDate.date() == (datetime.now() - timedelta(days=1)).date():
                 messageContent += f"There was new news yesterday! \nUse /news to read about: **{newsFeed[1]}**.\n\n"
+            elif newsDate.date() == (datetime.now() - timedelta(days=2)).date():
+                messageContent += f"There was new news a few days ago! \nUse /news to read about: **{newsFeed[1]}**.\n\n"
         if interaction is not None:
             messageContent+="Daily pop quiz:"
             isPrivate=True
