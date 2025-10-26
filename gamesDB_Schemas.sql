@@ -32,13 +32,6 @@ CREATE TABLE if not exists FeatureTimers (
 	PRIMARY KEY("GuildID")
 );
 
-CREATE TABLE if not exists GamblingFunds (
-	"GuildID"	INTEGER,
-	"UserID"	INTEGER,
-	"Funds"	INTEGER,
-	PRIMARY KEY("GuildID","UserID")
-);
-
 CREATE TABLE if not exists GamblingUserStats (
 	"GuildID"	INTEGER NOT NULL,
 	"UserID"	INTEGER NOT NULL,

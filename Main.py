@@ -2173,7 +2173,7 @@ def emojiQuery(guildID, mode, curs):
             LastUsedTime
         FROM RankedEmojis
         WHERE Rank = 1
-        ORDER BY EmojiCount DESC, LastUsedTime DESC;
+        ORDER BY EmojiCount DESC, LastUsedTime DESC LIMIT 50;
         """
     elif mode == 2:
         query = """
@@ -2212,7 +2212,7 @@ def emojiQuery(guildID, mode, curs):
             LastUsedTime
         FROM RankedEmojis
         WHERE Rank = 1
-        ORDER BY EmojiCount DESC, LastUsedTime DESC;
+        ORDER BY EmojiCount DESC, LastUsedTime DESC LIMIT 50;
         """
     elif mode == 3:
         query="""
@@ -2224,7 +2224,7 @@ def emojiQuery(guildID, mode, curs):
         FROM InServerEmoji
         WHERE GuildID = ?
         GROUP BY EmojiName, EmojiID
-        ORDER BY EmojiUsageCount DESC;
+        ORDER BY EmojiUsageCount DESC LIMIT 50;
         """
     elif mode == 4:
         query="""
@@ -2236,7 +2236,7 @@ def emojiQuery(guildID, mode, curs):
         FROM OutOfServerEmoji
         WHERE GuildID = ?
         GROUP BY EmojiName, EmojiID
-        ORDER BY EmojiUsageCount DESC;
+        ORDER BY EmojiUsageCount DESC LIMIT 50;
         """
 
     sqlResponse=curs.execute(query, (guildID,))
