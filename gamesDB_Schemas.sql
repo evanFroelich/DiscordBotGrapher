@@ -232,7 +232,9 @@ ORDER BY Type, Difficulty;
 
 CREATE VIEW if not exists UserStatsGeneralView AS WITH
 Trivia AS (
-    SELECT GuildID, UserID, COUNT(*) AS TriviaCount
+    SELECT GuildID, UserID, SUM(Num_Correct) AS TotalCorrect,
+        SUM(Num_Incorrect) AS TotalIncorrect,
+        SUM(Num_Correct + Num_Incorrect) AS TriviaCount
     FROM Scores
     GROUP BY GuildID, UserID
 ),
@@ -272,11 +274,3 @@ LEFT JOIN CoinFlips c
     ON t.UserID = c.UserID
 LEFT JOIN Commands cmd
     ON t.GuildID = cmd.GuildID AND t.UserID = cmd.UserID;
-
-CREATE VIEW if not exists UserStatsCommandView AS SELECT
-    GuildID,
-    UserID,
-    CommandName,
-    COUNT(*) AS CommandCount
-FROM CommandLog
-GROUP BY GuildID, UserID, CommandName;
