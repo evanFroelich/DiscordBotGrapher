@@ -831,6 +831,12 @@ Output:
         result = (await askLLM(prompt)).strip().lower()
     return "abc123" in result, result
 
+class QuestionRetryButton(discord.ui.Button):
+    def __init__(self, label: str, style: discord.ButtonStyle = discord.ButtonStyle.primary,):
+        super().__init__(label=label, style=style)
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.send_message("You clicked the retry button!", ephemeral=True)
 
 class QuestionModal(discord.ui.Modal):
     def __init__(self, Question=None, isForced=False, retries=0, guildID=None, userID=None, messageID=None):
@@ -856,7 +862,7 @@ class QuestionModal(discord.ui.Modal):
         #self.add_item(self.retryText)
         games_conn = sqlite3.connect("games.db")
         games_curs = games_conn.cursor()
-        games_curs.execute('''INSERT into ActiveTrivia (GuildID, UserID, MessageID, QuestionID, QuestionType, QuestionDifficulty, QuestionText) VALUES (?, ?, ?, ?, ?, ?, ?)''', (self.guildID, self.userID, self.messageID, self.question_id, self.question_type, self.question_difficulty, self.question_text))
+        games_curs.execute('''INSERT or ignore into ActiveTrivia (GuildID, UserID, MessageID, QuestionID, QuestionType, QuestionDifficulty, QuestionText) VALUES (?, ?, ?, ?, ?, ?, ?)''', (self.guildID, self.userID, self.messageID, self.question_id, self.question_type, self.question_difficulty, self.question_text))
         games_conn.commit()
         games_curs.close()
         games_conn.close()
@@ -880,17 +886,17 @@ class QuestionModal(discord.ui.Modal):
                 LLMResponse, LLMText = await checkAnswer(self.question_text, self.question_answers, user_answer)
                 games_curs.execute('''INSERT INTO LLMEvaluations (Question, GivenAnswer, UserAnswer, LLMResponse, ClassicResponse) VALUES (?, ?, ?, ?, ?)''', (self.question_text, self.question_answers[0], user_answer, LLMResponse, classicResponse))
                 games_conn.commit()
-                if LLMResponse is not None:
-                    if int(LLMResponse) == 0 and self.retries > 0:
-                        self.retries -= 1
-                        tempQuestionModal = QuestionModal(Question=self.question, isForced=self.isForced, retries=self.retries,guildID=self.guildID,userID=self.userID,messageID=self.messageID)
-                        view = discord.ui.View(timeout=None)
-                        view.add_item(tempQuestionModal)
-                        #resend the modal with 1 less chance
-                       # modal = QuestionModal(Question=self.question, isForced=self.isForced, retries=self.retries)
-                        await interaction.response.send_message(f"You have {self.retries} chance(s) to retry the question.",ephemeral=True,view=view)
-                        #await interaction.followup.send_modal(modal)
-                        return
+                # if LLMResponse is not None:
+                #     if int(LLMResponse) == 0 and self.retries > 0:
+                #         self.retries -= 1
+                #         tempQuestionModal = QuestionModal(Question=self.question, isForced=self.isForced, retries=self.retries,guildID=self.guildID,userID=self.userID,messageID=self.messageID)
+                #         view = discord.ui.View(timeout=None)
+                #         view.add_item(tempQuestionModal)
+                #         #resend the modal with 1 less chance
+                #        # modal = QuestionModal(Question=self.question, isForced=self.isForced, retries=self.retries)
+                #         await interaction.response.send_message(f"You have {self.retries} chance(s) to retry the question.",ephemeral=True,view=view)
+                #         #await interaction.followup.send_modal(modal)
+                #         return
             except Exception as e:
                 print(f"Error occurred: {e}")
                 logging.info(f"Error occurred in LLM: {e}")
