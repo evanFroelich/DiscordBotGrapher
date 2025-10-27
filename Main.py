@@ -880,14 +880,17 @@ class QuestionModal(discord.ui.Modal):
                 LLMResponse, LLMText = await checkAnswer(self.question_text, self.question_answers, user_answer)
                 games_curs.execute('''INSERT INTO LLMEvaluations (Question, GivenAnswer, UserAnswer, LLMResponse, ClassicResponse) VALUES (?, ?, ?, ?, ?)''', (self.question_text, self.question_answers[0], user_answer, LLMResponse, classicResponse))
                 games_conn.commit()
-                # if LLMResponse is not None:
-                #     if int(LLMResponse) == 0 and self.retries > 0:
-                #         self.retries -= 1
-                #         #resend the modal with 1 less chance
-                #         modal = QuestionModal(Question=self.question, isForced=self.isForced, retries=self.retries)
-                #         await interaction.response.send_message("You have another chance to answer the question.",ephemeral=True)
-                #         await interaction.followup.send_modal(modal)
-                #         return
+                if LLMResponse is not None:
+                    if int(LLMResponse) == 0 and self.retries > 0:
+                        self.retries -= 1
+                        tempQuestionModal = QuestionModal(Question=self.question, isForced=self.isForced, retries=self.retries,guildID=self.guildID,userID=self.userID,messageID=self.messageID)
+                        view = discord.ui.View(timeout=None)
+                        view.add_item(tempQuestionModal)
+                        #resend the modal with 1 less chance
+                       # modal = QuestionModal(Question=self.question, isForced=self.isForced, retries=self.retries)
+                        await interaction.response.send_message(f"You have {self.retries} chance(s) to retry the question.",ephemeral=True,view=view)
+                        #await interaction.followup.send_modal(modal)
+                        return
             except Exception as e:
                 print(f"Error occurred: {e}")
                 logging.info(f"Error occurred in LLM: {e}")
@@ -941,12 +944,15 @@ class QuestionModal(discord.ui.Modal):
             questionAnsweredView.add_item(button)
             games_curs.execute('''SELECT LastDailyQuestionTime FROM GamblingUserStats WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
             lastDailyQuestionTime = games_curs.fetchone()
-            if lastDailyQuestionTime:
+            #change this to match what was done above for getting the question right
+            if lastDailyQuestionTime[0] is not None:
                 lastDailyQuestionTime = datetime.strptime(lastDailyQuestionTime[0], '%Y-%m-%d %H:%M:%S')
-            if lastDailyQuestionTime and lastDailyQuestionTime.date() != datetime.now().date():
-                await interaction.followup.send(f"Incorrect answer. \nYour answer was: {user_answer}\nThe correct answer(s) are: {', '.join(self.question_answers)}\n\nYou still have a daily trivia question available! /daily-trivia", ephemeral=True, view=questionAnsweredView)
+                if lastDailyQuestionTime and lastDailyQuestionTime.date() != datetime.now().date():
+                    await interaction.followup.send(f"Incorrect answer. \nYour answer was: {user_answer}\nThe correct answer(s) are: {', '.join(self.question_answers)}\n\nYou still have a daily trivia question available! /daily-trivia", ephemeral=True, view=questionAnsweredView)
+                else:
+                    await interaction.followup.send(f"Incorrect answer. \nYour answer was: {user_answer}\nThe correct answer(s) are: {', '.join(self.question_answers)}", ephemeral=True, view=questionAnsweredView)
             else:
-                await interaction.followup.send(f"Incorrect answer. \nYour answer was: {user_answer}\nThe correct answer(s) are: {', '.join(self.question_answers)}", ephemeral=True, view=questionAnsweredView)
+                await interaction.followup.send(f"Incorrect answer. \nYour answer was: {user_answer}\nThe correct answer(s) are: {', '.join(self.question_answers)}\n\nYou still have a daily trivia question available! /daily-trivia", ephemeral=True, view=questionAnsweredView)
             games_curs.execute('''SELECT FlagShameChannel, ShameChannel FROM ServerSettings WHERE GuildID=?''', (interaction.guild.id,))
             shameSettings = games_curs.fetchone()
             if shameSettings and shameSettings[0] == 1:
