@@ -81,6 +81,22 @@ def sigmoid(x):
     return 1 / (1 + np.exp(-x))
 
 
+@tasks.loop(minutes=5)
+async def cleanup_abandoned_trivia_loop():
+    games_conn = sqlite3.connect("games.db")
+    games_curs = games_conn.cursor()
+    # Perform cleanup operations on abandoned trivia sessions
+    games_curs.execute('''SELECT * FROM ActiveTrivia WHERE Timestamp < ?''', (datetime.now() - timedelta(minutes=5),))
+    abandoned_sessions = games_curs.fetchall()
+    games_conn.commit()
+    games_curs.close()
+    games_conn.close()
+    for session in abandoned_sessions:
+        guildID, userID, messageID, questionID, questionType, questionDifficulty, questionText = session[0], session[1], session[2], session[3], session[4], session[5], session[6]
+        await abandoned_trivia_cleanup(guildID, userID, messageID, questionID, questionType, questionDifficulty, questionText)
+    return
+    
+
 class MyClient(discord.Client):
     ignoreList=[]
     async def on_ready(self):
@@ -130,8 +146,10 @@ class MyClient(discord.Client):
         game_conn.close()
         #assignRoles.start()
         #await assignRoles()
-        sched=AsyncIOScheduler()
-        sched.add_job(assignRoles,'interval',seconds=900)
+        #sched=AsyncIOScheduler()
+        #sched.add_job(assignRoles,'interval',seconds=900)
+        if not cleanup_abandoned_trivia_loop.is_running():
+            cleanup_abandoned_trivia_loop.start()
         #sched.start()
 
         await client.tree.sync()
@@ -832,11 +850,45 @@ Output:
     return "abc123" in result, result
 
 class QuestionRetryButton(discord.ui.Button):
-    def __init__(self, label: str, style: discord.ButtonStyle = discord.ButtonStyle.primary,):
+    def __init__(self, question, qList, label: str, style: discord.ButtonStyle = discord.ButtonStyle.primary):
         super().__init__(label=label, style=style)
+        self.question = question
+        self.qList = qList
+        self.uses=1
 
     async def callback(self, interaction: discord.Interaction):
-        await interaction.response.send_message("You clicked the retry button!", ephemeral=True)
+        if self.uses>0:
+            self.uses-=1
+            Qmodal=QuestionModal(Question=self.question, isForced=self.qList[0], retries=self.qList[1], guildID=self.qList[2], userID=self.qList[3], messageID=self.qList[4])
+            #self.disabled = True
+            #await interaction.message.edit(view=self.view)
+            await interaction.response.send_modal(Qmodal)
+        return
+
+async def abandoned_trivia_cleanup(guildID: int, userID: int, messageID: int, questionID: int, questionType: str, questionDifficulty: str, questionText: str):
+    games_conn=sqlite3.connect('games.db')
+    games_curs = games_conn.cursor()
+    games_curs.execute('''INSERT INTO Scores (GuildID, UserID, Category, Difficulty, Num_Correct, Num_Incorrect) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(GuildID, UserID, Category, Difficulty) DO UPDATE SET Num_Incorrect = Num_Incorrect + 1;''', (guildID, userID, questionType, questionDifficulty, 0, 1))
+    games_curs.execute('''UPDATE QuestionList SET GlobalIncorrect = GlobalIncorrect + 1 WHERE ID=?''', (questionID,))
+    games_conn.commit()
+    games_curs.execute('''SELECT FlagShameChannel, ShameChannel FROM ServerSettings WHERE GuildID=?''', (guildID,))
+    shameSettings = games_curs.fetchone()
+    if shameSettings and shameSettings[0] == 1:
+        #get the shame channel from the guildID instead
+        guild=client.get_guild(guildID)
+        shameChannel = guild.get_channel(shameSettings[1])
+        if shameChannel:
+            await shameChannel.send(f"Oops! <@{userID}> didn't give an answer to: {questionText}",allowed_mentions=discord.AllowedMentions.none())
+        else:
+            #try to get the thread
+            shameThread = guild.get_thread(shameSettings[1])
+            if shameThread:
+                await shameThread.send(f"Oops! <@{userID}> didn't give an answer to: {questionText}",allowed_mentions=discord.AllowedMentions.none())
+    games_curs.execute('''DELETE FROM ActiveTrivia WHERE GuildID=? AND UserID=? AND MessageID=?''', (guildID, userID, messageID))
+    games_conn.commit()
+    games_curs.close()
+    games_conn.close()
+
 
 class QuestionModal(discord.ui.Modal):
     def __init__(self, Question=None, isForced=False, retries=0, guildID=None, userID=None, messageID=None):
@@ -859,7 +911,7 @@ class QuestionModal(discord.ui.Modal):
         self.retryText = discord.ui.TextDisplay(content=f"Number of retries left: {self.retries}")
         self.add_item(self.questionUI)
         self.add_item(self.question_ask)
-        #self.add_item(self.retryText)
+        self.add_item(self.retryText)
         games_conn = sqlite3.connect("games.db")
         games_curs = games_conn.cursor()
         games_curs.execute('''INSERT or ignore into ActiveTrivia (GuildID, UserID, MessageID, QuestionID, QuestionType, QuestionDifficulty, QuestionText) VALUES (?, ?, ?, ?, ?, ?, ?)''', (self.guildID, self.userID, self.messageID, self.question_id, self.question_type, self.question_difficulty, self.question_text))
@@ -886,17 +938,15 @@ class QuestionModal(discord.ui.Modal):
                 LLMResponse, LLMText = await checkAnswer(self.question_text, self.question_answers, user_answer)
                 games_curs.execute('''INSERT INTO LLMEvaluations (Question, GivenAnswer, UserAnswer, LLMResponse, ClassicResponse) VALUES (?, ?, ?, ?, ?)''', (self.question_text, self.question_answers[0], user_answer, LLMResponse, classicResponse))
                 games_conn.commit()
-                # if LLMResponse is not None:
-                #     if int(LLMResponse) == 0 and self.retries > 0:
-                #         self.retries -= 1
-                #         tempQuestionModal = QuestionModal(Question=self.question, isForced=self.isForced, retries=self.retries,guildID=self.guildID,userID=self.userID,messageID=self.messageID)
-                #         view = discord.ui.View(timeout=None)
-                #         view.add_item(tempQuestionModal)
-                #         #resend the modal with 1 less chance
-                #        # modal = QuestionModal(Question=self.question, isForced=self.isForced, retries=self.retries)
-                #         await interaction.response.send_message(f"You have {self.retries} chance(s) to retry the question.",ephemeral=True,view=view)
-                #         #await interaction.followup.send_modal(modal)
-                #         return
+                if LLMResponse is not None:
+                    if int(LLMResponse) == 0 and self.retries > 0:
+                        self.retries -= 1
+                        qlist=[self.isForced,self.retries,self.guildID,self.userID,self.messageID]
+                        view = discord.ui.View(timeout=None)
+                        retryButton=QuestionRetryButton(question=self.question, qList=qlist, label="Retry Question?")
+                        view.add_item(retryButton)
+                        await interaction.followup.send(f"Incorrect answer. You have {self.retries+1} chance(s) to retry the question. If you abandon the question, it will count as incorrect.",ephemeral=True,view=view)
+                        return
             except Exception as e:
                 print(f"Error occurred: {e}")
                 logging.info(f"Error occurred in LLM: {e}")
@@ -954,24 +1004,23 @@ class QuestionModal(discord.ui.Modal):
             if lastDailyQuestionTime[0] is not None:
                 lastDailyQuestionTime = datetime.strptime(lastDailyQuestionTime[0], '%Y-%m-%d %H:%M:%S')
                 if lastDailyQuestionTime and lastDailyQuestionTime.date() != datetime.now().date():
-                    await interaction.followup.send(f"Incorrect answer. \nYour answer was: {user_answer}\nThe correct answer(s) are: {', '.join(self.question_answers)}\n\nYou still have a daily trivia question available! /daily-trivia", ephemeral=True, view=questionAnsweredView)
+                    await interaction.followup.send(f"Incorrect answer. \nYour answer was: {user_answer}\nThe correct answer(s) are: {', '.join(self.question_answers)}\n\nYou still have a daily trivia question available! /daily-trivia", ephemeral=True, view=questionAnsweredView,allowed_mentions=discord.AllowedMentions.none())
                 else:
-                    await interaction.followup.send(f"Incorrect answer. \nYour answer was: {user_answer}\nThe correct answer(s) are: {', '.join(self.question_answers)}", ephemeral=True, view=questionAnsweredView)
+                    await interaction.followup.send(f"Incorrect answer. \nYour answer was: {user_answer}\nThe correct answer(s) are: {', '.join(self.question_answers)}", ephemeral=True, view=questionAnsweredView,allowed_mentions=discord.AllowedMentions.none())
             else:
-                await interaction.followup.send(f"Incorrect answer. \nYour answer was: {user_answer}\nThe correct answer(s) are: {', '.join(self.question_answers)}\n\nYou still have a daily trivia question available! /daily-trivia", ephemeral=True, view=questionAnsweredView)
+                await interaction.followup.send(f"Incorrect answer. \nYour answer was: {user_answer}\nThe correct answer(s) are: {', '.join(self.question_answers)}\n\nYou still have a daily trivia question available! /daily-trivia", ephemeral=True, view=questionAnsweredView,allowed_mentions=discord.AllowedMentions.none())
             games_curs.execute('''SELECT FlagShameChannel, ShameChannel FROM ServerSettings WHERE GuildID=?''', (interaction.guild.id,))
             shameSettings = games_curs.fetchone()
             if shameSettings and shameSettings[0] == 1:
                 shameChannel = interaction.guild.get_channel(shameSettings[1])
                 if shameChannel:
-                    await shameChannel.send(f"Oops! <@{interaction.user.id}> didn't know the answer to: {self.question_text}")
+                    await shameChannel.send(f"Oops! <@{interaction.user.id}> didn't know the answer to: {self.question_text}",allowed_mentions=discord.AllowedMentions.none())
                 else:
                     #try to get the thread
                     shameThread = interaction.guild.get_thread(shameSettings[1])
                     if shameThread:
-                        await shameThread.send(f"Oops! <@{interaction.user.id}> didn't know the answer to: {self.question_text}")
+                        await shameThread.send(f"Oops! <@{interaction.user.id}> didn't know the answer to: {self.question_text}",allowed_mentions=discord.AllowedMentions.none())
 
-        #await interaction.response.send_message(f"your answer: {user_answer}, correct answers: {self.question_answers}", ephemeral=True)
         games_curs.execute('''SELECT QuestionsAnsweredToday, QuestionsAnsweredTodayCorrect FROM GamblingUserStats WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
         userStats = games_curs.fetchone()
         if userStats:
