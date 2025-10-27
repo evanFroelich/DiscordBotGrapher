@@ -924,12 +924,14 @@ class QuestionModal(discord.ui.Modal):
             games_curs.execute('''SELECT LastDailyQuestionTime FROM GamblingUserStats WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
             lastDailyQuestionTime = games_curs.fetchone()
             #turn it into a timestamp from the string it currently is
-            if lastDailyQuestionTime:
+            if lastDailyQuestionTime[0] is not None:
                 lastDailyQuestionTime = datetime.strptime(lastDailyQuestionTime[0], '%Y-%m-%d %H:%M:%S')
-            if lastDailyQuestionTime and lastDailyQuestionTime.date() != datetime.now().date():
-                await interaction.followup.send(f"Correct! You have been awarded {gamblingPoints} gambling points.\n\nYou still have a daily trivia question available! /daily-trivia", ephemeral=True, view=questionAnsweredView)
+                if lastDailyQuestionTime and lastDailyQuestionTime.date() != datetime.now().date():
+                    await interaction.followup.send(f"Correct! You have been awarded {gamblingPoints} gambling points.\n\nYou still have a daily trivia question available! /daily-trivia", ephemeral=True, view=questionAnsweredView)
+                else:
+                    await interaction.followup.send(f"Correct! You have been awarded {gamblingPoints} gambling points.", ephemeral=True, view=questionAnsweredView)
             else:
-                await interaction.followup.send(f"Correct! You have been awarded {gamblingPoints} gambling points.", ephemeral=True, view=questionAnsweredView)
+               await interaction.followup.send(f"Correct! You have been awarded {gamblingPoints} gambling points.\n\nYou still have a daily trivia question available! /daily-trivia", ephemeral=True, view=questionAnsweredView)
         else:
             games_curs.execute('''INSERT INTO Scores (GuildID, UserID, Category, Difficulty, Num_Correct, Num_Incorrect) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(GuildID, UserID, Category, Difficulty) DO UPDATE SET Num_Incorrect = Num_Incorrect + 1;''', (interaction.guild.id, interaction.user.id, self.question_type, self.question_difficulty, 0, 1))
             games_curs.execute('''UPDATE QuestionList SET GlobalIncorrect = GlobalIncorrect + 1 WHERE ID=?''', (self.question_id,))
