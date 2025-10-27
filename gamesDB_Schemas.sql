@@ -202,6 +202,18 @@ CREATE TABLE if not exists CommandLog (
 	PRIMARY KEY("ID" AUTOINCREMENT)
 );
 
+CREATE TABLE  if not exists ActiveTrivia (
+	"GuildID"	INTEGER NOT NULL,
+	"UserID"	INTEGER NOT NULL,
+	"MessageID"	INTEGER NOT NULL,
+	"QuestionID"	INTEGER NOT NULL,
+	"QuestionType"	TEXT NOT NULL,
+	"QuestionDifficulty"	INTEGER NOT NULL,
+	"QuestionText"	TEXT NOT NULL,
+	"Timestamp"	TEXT DEFAULT (datetime('now', 'localtime')),
+	PRIMARY KEY("GuildID","UserID","MessageID")
+);
+
 CREATE VIEW if not exists GamblingUnlockMetricsView AS
 SELECT
     GuildID,

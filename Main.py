@@ -141,7 +141,7 @@ class MyClient(discord.Client):
         self.tree = app_commands.CommandTree(self)
 
     async def setup_hook(self):
-        await self.tree.sync()
+        #await self.tree.sync()
         print('synced')
 
     async def on_thread_create(self,thread):
@@ -588,7 +588,7 @@ class QuestionPickButton(discord.ui.Button):
             print(row)
             print(self.question_difficulty)
             retries=row[int(self.question_difficulty)]
-            modal = QuestionModal(Question=self.question, isForced=self.isForced, retries=retries)
+            modal = QuestionModal(Question=self.question, isForced=self.isForced, retries=retries, userID=interaction.user.id, guildID=interaction.guild.id, messageID=interaction.message.id)
             await interaction.response.send_modal(modal)
             games_curs.close()
             games_conn.close()
@@ -833,7 +833,7 @@ Output:
 
 
 class QuestionModal(discord.ui.Modal):
-    def __init__(self, Question=None, isForced=False, retries=0):
+    def __init__(self, Question=None, isForced=False, retries=0, guildID=None, userID=None, messageID=None):
         super().__init__(title="Trivia Question")
         self.question= Question  # Store the question data
         self.question_id = Question[0]  # Question ID
@@ -845,12 +845,22 @@ class QuestionModal(discord.ui.Modal):
         self.question_difficulty = Question[4]  # Question difficulty
         self.isForced = isForced
         self.retries = retries
+        self.guildID = guildID
+        self.userID = userID
+        self.messageID = messageID
         self.question_ask = discord.ui.TextInput(label=f"Answer Below:", placeholder="answer", max_length=100, style=discord.TextStyle.short)
         self.questionUI=discord.ui.TextDisplay(content=self.question_text)
         self.retryText = discord.ui.TextDisplay(content=f"Number of retries left: {self.retries}")
         self.add_item(self.questionUI)
         self.add_item(self.question_ask)
-        self.add_item(self.retryText)
+        #self.add_item(self.retryText)
+        games_conn = sqlite3.connect("games.db")
+        games_curs = games_conn.cursor()
+        games_curs.execute('''INSERT into ActiveTrivia (GuildID, UserID, MessageID, QuestionID, QuestionType, QuestionDifficulty, QuestionText) VALUES (?, ?, ?, ?, ?, ?, ?)''', (self.guildID, self.userID, self.messageID, self.question_id, self.question_type, self.question_difficulty, self.question_text))
+        games_conn.commit()
+        games_curs.close()
+        games_conn.close()
+
 
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(thinking=True, ephemeral=True)
@@ -898,8 +908,6 @@ class QuestionModal(discord.ui.Modal):
             if not unlockedGames:
                 games_curs.execute('''INSERT INTO GamblingGamesUnlocked (GuildID, UserID) VALUES (?, ?)''', (interaction.guild.id, interaction.user.id))
                 games_conn.commit()
-                # User has unlocked Game1
-                #questionAnsweredView.add_item(GamblingButton(label="🎰", user_id=interaction.user.id, guild_id=interaction.guild.id, style=discord.ButtonStyle.primary))
 
             #check to see if the user has met the metrics for unlocking game 1
             games_curs.execute('''SELECT * FROM GamblingUnlockMetricsView WHERE GuildID=? and UserID=?''', (interaction.guild.id, interaction.user.id))
@@ -929,7 +937,6 @@ class QuestionModal(discord.ui.Modal):
             questionAnsweredView = discord.ui.View(timeout=None)
             button = QuestionThankYouButton()
             questionAnsweredView.add_item(button)
-            #check for the same thing as above for daily trivia
             games_curs.execute('''SELECT LastDailyQuestionTime FROM GamblingUserStats WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
             lastDailyQuestionTime = games_curs.fetchone()
             if lastDailyQuestionTime:
@@ -977,6 +984,7 @@ class QuestionModal(discord.ui.Modal):
             LLMResponse = 0
         answers_string = ", ".join(self.question_answers)
         games_curs.execute('''INSERT INTO TriviaEventLog (GuildID, UserID, DailyOrRandom, QuestionType, QuestionDifficulty, QuestionText, QuestionAnswers, UserAnswer, ClassicDecision, LLMDecision, LLMText, CurrentQuestionsAnsweredToday, CurrentQuestionsAnsweredTodayCorrect) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', (interaction.guild.id, interaction.user.id, mode, self.question_type, self.question_difficulty, self.question_text, answers_string, user_answer, int(classicResponse), int(LLMResponse), LLMText, int(questions_answered_today), int(questions_answered_today_correct)))
+        games_curs.execute('''DELETE FROM ActiveTrivia WHERE MessageID=? and UserID=? and GuildID=?''', (self.messageID, interaction.user.id, self.guildID))
         games_conn.commit()
         games_curs.close()
         games_conn.close()
@@ -990,42 +998,6 @@ async def award_points(amount, guild_id, user_id):
     if amount > 0:
         games_curs.execute('''UPDATE GamblingUserStats SET LifetimeEarnings = LifetimeEarnings + ? WHERE GuildID=? AND UserID=?;''', (amount, guild_id, user_id))
     games_conn.commit()
-    games_curs.close()
-    games_conn.close()
-
-#@client.tree.command(name="testquestion", description="Test question command")
-#@app_commands.describe(question_tier="difficulty of random question <default: 1>")
-async def test_question(interaction: discord.Interaction, question_tier: int = 1):
-    await create_user_db_entry(interaction.guild.id, interaction.user.id)
-    
-    gamesDB = "games.db"
-    games_conn = sqlite3.connect(gamesDB)
-    games_curs = games_conn.cursor()
-    CategorySelectQuery='''
-    SELECT ID, Question, Answers, Type, Difficulty
-        FROM QuestionList
-        WHERE Difficulty = ?
-        ORDER BY RANDOM()
-        LIMIT 1;
-        '''
-    games_curs.execute(CategorySelectQuery, (question_tier,))
-    Question = games_curs.fetchone()
-    if not Question:
-        await interaction.response.send_message("No questions found for the specified difficulty.")
-        games_curs.close()
-        games_conn.close()
-        return
-    question_id=Question[0]
-    question_text= Question[1] 
-    answers = Question[2]
-    #answers is a json string, so we need to parse it
-    answers = answers.replace("'", '"')
-    answers = eval(answers)  # Convert string representation of list to actual list
-    #await interaction.response.send_message(f"Question: {question_text}\nAnswers: {answers}")
-
-    modal = QuestionModal(Question=question_text, Answers=answers, QuestionID=question_id)
-    await interaction.response.send_modal(modal)
-    
     games_curs.close()
     games_conn.close()
 
