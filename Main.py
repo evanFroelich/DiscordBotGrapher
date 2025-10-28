@@ -1705,8 +1705,13 @@ class PatchNotesModal(discord.ui.Modal):
 @app_commands.describe(ignoredchannels="Channel ID for the ignored channels to add or remove")
 @app_commands.describe(flaggoofsgaffs="Flag to enable chat response goofs and gaffs. 1 is on 0 is off")
 async def gamesettingscommandset(interaction: discord.Interaction, numberofquestionsperday: int = None, questiontimeout: int = None, pipchance: float = None, questionchance: float = None, flagshamechannel: int = None, shamechannel: str = None, flagignoredchannels: int = None, ignoredchannels: str = None, flaggoofsgaffs: int = None):
+    games_db = "games.db"
+    games_conn = sqlite3.connect(games_db)
+    games_curs = games_conn.cursor()
     games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName, CommandParameters) VALUES (?, ?, ?, ?)''', (interaction.guild.id, interaction.user.id, "game-settings-set", f"'numberofquestionsperday': {numberofquestionsperday}, 'questiontimeout': {questiontimeout}, 'pipchance': {pipchance}, 'questionchance': {questionchance}, 'flagshamechannel': {flagshamechannel}, 'shamechannel': {shamechannel}, 'flagignoredchannels': {flagignoredchannels}, 'ignoredchannels': {ignoredchannels}, 'flaggoofsgaffs': {flaggoofsgaffs}"))
     games_conn.commit()
+    games_curs.close()
+    games_conn.close()
     if not await isAuthorized(str(interaction.user.id), str(interaction.guild.id)):
         await interaction.response.send_message("You are not authorized to use this command. ask an administrator to authorize you using the /addAuthorizedUser command.",ephemeral=True)
         return
@@ -1815,8 +1820,13 @@ async def gamesettingscommandset(interaction: discord.Interaction, numberofquest
 @app_commands.describe(flagtwitteralt="1 is on 0 is off.")
 @app_commands.describe(twitteraltchance="0-1 decimal")
 async def goofs_settings_command_set(interaction: discord.Interaction, flaghorse: int = None, horsechance: float = None, flagcat: int = None, catchance: float = None, flagping: int = None, flagmarathon: int = None, marathonchance: float = None, flagtwitteralt: int = None, twitteraltchance: float = None):
+    games_db="games.db"
+    games_conn=sqlite3.connect(games_db)
+    games_curs=games_conn.cursor()
     games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName, CommandParameters) VALUES (?, ?, ?, ?)''', (interaction.guild.id, interaction.user.id, "goofs-settings-set", f"'flaghorse': {flaghorse}, 'horsechance': {horsechance}, 'flagcat': {flagcat}, 'catchance': {catchance}, 'flagping': {flagping}, 'flagmarathon': {flagmarathon}, 'marathonchance': {marathonchance}, 'flagtwitteralt': {flagtwitteralt}, 'twitteraltchance': {twitteraltchance}"))
     games_conn.commit()
+    games_curs.close()
+    games_conn.close()
     if not await isAuthorized(str(interaction.user.id), str(interaction.guild.id)):
         await interaction.response.send_message("You are not authorized to use this command.")
         return
