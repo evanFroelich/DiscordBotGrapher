@@ -16,7 +16,9 @@ def upload_csv_to_db():
             counter += 1
             if counter % 10 == 0:
                 print(f"Processed {counter} rows...")
-
+            # Pass over the row if the first or second column is blank
+            if not row["Subject"] or not row["Grade"]:
+                continue
             # Build answers list (skip blanks, uppercase for consistency)
             answers = [row["Answer"], row["Alt1"], row["Alt2"], row["Alt3"], row["Alt4"], row["Alt5"]]
             answers = [a.strip().upper() for a in answers if a and a.strip()]
