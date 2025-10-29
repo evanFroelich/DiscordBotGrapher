@@ -1329,9 +1329,6 @@ async def news(interaction: discord.Interaction):
     app_commands.Choice(name="users", value="user")
 ])
 async def mostUsedEmojis(interaction: discord.Interaction, inorout: app_commands.Choice[str], subtype: app_commands.Choice[str]):
-    DB_NAME = "My_DB"
-    conn = sqlite3.connect(DB_NAME)
-    curs = conn.cursor()
     gamesDB="games.db"
     games_conn = sqlite3.connect(gamesDB)
     games_curs = games_conn.cursor()
@@ -1339,6 +1336,12 @@ async def mostUsedEmojis(interaction: discord.Interaction, inorout: app_commands
     games_conn.commit()
     games_curs.close()
     games_conn.close()
+    if not await isAuthorized(interaction.user.id, str(interaction.guild.id)):
+        await interaction.response.send_message("You are not authorized to use this command.")
+        return
+    DB_NAME = "My_DB"
+    conn = sqlite3.connect(DB_NAME)
+    curs = conn.cursor()
 
     output=""
     if inorout.value == 'in':
