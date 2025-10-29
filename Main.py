@@ -370,7 +370,7 @@ class MyClient(discord.Client):
                                         games_curs.execute('''UPDATE UserStats SET CatTimestamp = ?, CatMissCount = CatMissCount + 1 WHERE GuildID = ? AND UserID = ?''', (currentDate, message.guild.id, message.author.id))
                     games_conn.commit()
 
-                if (message.author.id==101755961496076288 or message.channel.id==1360302184297791801 or "marathon" in message.content.lower()) and FlagMarathon:
+                if "marathon" in message.content.lower() and FlagMarathon:
                     UserStatMarathonTimestamp = userStatsTimestamps["MarathonTimestamp"]
                     #convert it into an actual timestamp date only
                     UserStatMarathonTimestamp = datetime.strptime(UserStatMarathonTimestamp, '%Y-%m-%d').date()
