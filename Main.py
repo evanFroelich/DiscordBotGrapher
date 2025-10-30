@@ -1,12 +1,13 @@
 import discord
 import sqlite3
 import os
-import time
+#import time
 from discord.ext import tasks, commands
 from discord.utils import get
 from discord import app_commands
-from random import random
-from datetime import datetime, timedelta
+#from random import random
+import random
+from datetime import datetime, timedelta, time
 from collections import deque
 #from exceptiongroup import catch
 import pandas as pd
@@ -19,6 +20,7 @@ import asyncio
 import numpy as np
 import json
 import requests
+import zoneinfo
 
 
 
@@ -80,6 +82,48 @@ async def assignRoles():
 def sigmoid(x):
     return 1 / (1 + np.exp(-x))
 
+@tasks.loop(time=time(hour=23, minute=55, second=0, tzinfo=zoneinfo.ZoneInfo("America/Los_Angeles")))
+async def daily_question_leaderboard():
+    games_conn=sqlite3.connect("games.db")
+    games_curs=games_conn.cursor()
+    games_curs.execute('''SELECT GuildID, FlagShameChannel, ShameChannel from ServerSettings''')
+    guilds=games_curs.fetchall()
+    for guildID in guilds:
+        if guildID[1]==1 and guildID[2]:
+            games_curs.execute('''SELECT UserID, QuestionsAnsweredTodayCorrect FROM GamblingUserStats WHERE GuildID = ? and (date(LastDailyQuestionTime) = date('now', 'localtime') OR date(LastRandomQuestionTime) = date('now', 'localtime')) order by QuestionsAnsweredTodayCorrect desc''', (guildID[0],))
+            leaderboardResults = games_curs.fetchall()
+            todaysDate = datetime.now().date()
+            embed=discord.Embed(title=f"Daily Question Leaderboard for {todaysDate}", description="", color=0x00ff00)
+            if leaderboardResults:
+                # Process leaderboard results
+                for userID, questionsAnswered in leaderboardResults:
+                    embed.description += f"<@{userID}>: {questionsAnswered} correct answers today.\n"
+            #get the channel from the ShameChannel channelID
+            channel = client.get_channel(guildID[2])
+            await channel.send(embed=embed)
+
+@tasks.loop(time=time(hour=0, minute=1, second=0, tzinfo=zoneinfo.ZoneInfo("America/Los_Angeles")))
+async def package_daily_gambling():
+    print("Packaging daily gambling totals for auction house...")
+    games_conn=sqlite3.connect("games.db")
+    games_curs=games_conn.cursor()
+    today = datetime.now().date()
+    games_curs.execute('''SELECT Category, sum(Funds) from DailyGamblingTotals where Date=date('now', '-1 day', 'localtime') group by Category''')
+    yesterday_totals = games_curs.fetchall()
+    
+    for row in yesterday_totals:
+        random_multiplier = random.random()
+        random_multiplier=(random_multiplier*.2)+.4
+        random_multiplier = round(random_multiplier, 2)
+        category = row[0]
+        yesterday_total = row[1]
+        amount_auctioned = yesterday_total * random_multiplier
+        amount_auctioned = round(amount_auctioned)
+        games_curs.execute('''INSERT INTO AuctionHousePrize (Date, Zone, TotalAmount, PercentAuctioned, AmountAuctioned) VALUES (?, ?, ?, ?, ?)''', (today, category, yesterday_total, random_multiplier, amount_auctioned))
+    games_conn.commit()
+    games_curs.close()
+    games_conn.close()
+    return
 
 @tasks.loop(minutes=5)
 async def cleanup_abandoned_trivia_loop():
@@ -102,7 +146,7 @@ class MyClient(discord.Client):
     async def on_ready(self):
         #8 f=open(
         print('Logged on as {0}!'.format(self.user))
-        #print(random())
+        #print(random.random())
         channel=client.get_channel(150421071676309504)
         await channel.send("rebooted")
         channel=client.get_channel(1337282148054470808)
@@ -150,6 +194,10 @@ class MyClient(discord.Client):
         #sched.add_job(assignRoles,'interval',seconds=900)
         if not cleanup_abandoned_trivia_loop.is_running():
             cleanup_abandoned_trivia_loop.start()
+        if not package_daily_gambling.is_running():
+            package_daily_gambling.start()
+        if not daily_question_leaderboard.is_running():
+            daily_question_leaderboard.start()
         #sched.start()
 
         await client.tree.sync()
@@ -177,7 +225,7 @@ class MyClient(discord.Client):
         conn.close()
         games_conn = sqlite3.connect("games.db")
         games_curs = games_conn.cursor()    
-        games_curs.execute('''insert into GamblingUnlockConditions (GuildID) values (?)''', (guild.id,))
+        games_curs.execute('''INSERT INTO GamblingUnlockConditions (GuildID) values (?)''', (guild.id,))
         games_curs.execute('''INSERT INTO ServerSettings (GuildID) VALUES (?)''', (guild.id,))
         games_curs.execute('''INSERT OR IGNORE INTO FeatureTimers (GuildID) VALUES (?);''',(guild.id,))
         games_curs.execute('''INSERT OR IGNORE INTO GoofsGaffs (GuildID) VALUES (?);''',(guild.id,))
@@ -310,7 +358,7 @@ class MyClient(discord.Client):
                     statsFlag=0
                     if currentDate != UserStatTwitterTimestamp:
                         statsFlag=1
-                    r=random()
+                    r=random.random.random()
                     #10% chance of response
                     if r<TwitterAltChance:
                         if statsFlag==1:
@@ -331,7 +379,7 @@ class MyClient(discord.Client):
                     statsFlag=0
                     if currentDate != UserStatHorseTimestamp:
                         statsFlag=1
-                    r=random()
+                    r=random.random()
                     #25% chance of response
                     if r<HorseChance:
                         if statsFlag==1:
@@ -358,7 +406,7 @@ class MyClient(discord.Client):
                         userList=[user async for user in reaction.users()]
                         for user in userList:
                             if user.id == 966695034340663367:
-                                r= random()
+                                r= random.random()
                                 if r<CatChance:
                                     if statsFlag==1:
                                         games_curs.execute('''UPDATE UserStats SET CatTimestamp = ?, CatHitCount = CatHitCount + 1 WHERE GuildID = ? AND UserID = ?''', (currentDate, message.guild.id, message.author.id))
@@ -377,7 +425,7 @@ class MyClient(discord.Client):
                     statsFlag=0
                     if currentDate != UserStatMarathonTimestamp:
                         statsFlag=1
-                    r=random()
+                    r=random.random()
                     if r<MarathonChance:
                         if statsFlag==1:
                             games_curs.execute('''UPDATE UserStats SET MarathonTimestamp = ?, MarathonHitCount = MarathonHitCount + 1 WHERE GuildID = ? AND UserID = ?''', (currentDate, message.guild.id, message.author.id))
@@ -401,7 +449,7 @@ class MyClient(discord.Client):
                     statsFlag=0
                     if currentDate != UserStatPingTimestamp:
                         statsFlag=1
-                    rand=random()
+                    rand=random.random()
                     if rand<.2:
                         await message.channel.send("pong")
                         if statsFlag==1:
@@ -481,7 +529,7 @@ async def ping(interaction: discord.Interaction):
     games_conn.commit()
     games_curs.close()
     games_conn.close()
-    rand=random()
+    rand=random.random()
     payload=""
     if rand<.2:
         payload="pong"
@@ -638,7 +686,7 @@ async def create_guild_db_entry(guildID):
     gamesDB = "games.db"
     games_conn = sqlite3.connect(gamesDB)
     games_curs = games_conn.cursor()
-    games_curs.execute('''insert into GamblingUnlockConditions (GuildID, Game1Condition1, Game1Condition2, Game1Condition3, Game2Condition1, Game2Condition2, Game2Condition3) values (?, ?, ?, ?, ?, ?, ?)''', (guildID, 500, 15, 3, 2000, 500, 3))
+    games_curs.execute('''INSERT INTO GamblingUnlockConditions (GuildID, Game1Condition1, Game1Condition2, Game1Condition3, Game2Condition1, Game2Condition2, Game2Condition3) values (?, ?, ?, ?, ?, ?, ?)''', (guildID, 500, 15, 3, 2000, 500, 3))
     games_curs.execute('''INSERT INTO ServerSettings (GuildID) VALUES (?)''', (guildID,))
     games_conn.commit()
     games_curs.close()
@@ -655,7 +703,7 @@ async def createQuestion(interaction: discord.Interaction = None, channel: disco
         x=5
     for i in range(x):
 
-        question_tier = questionTierList[int(random() * len(questionTierList))]
+        question_tier = questionTierList[int(random.random() * len(questionTierList))]
         questionPickList.append(question_tier)
         questionTierList.remove(question_tier)
         #print(f"i: {i}")
@@ -665,7 +713,7 @@ async def createQuestion(interaction: discord.Interaction = None, channel: disco
     SELECT ID, Question, Answers, Type, Difficulty
         FROM QuestionList
         WHERE Difficulty = ?
-        ORDER BY RANDOM()
+        ORDER BY random()
         LIMIT 1;
         '''
     buttonList = []
@@ -1080,7 +1128,7 @@ async def CoinFlipGame(self, interaction: discord.Interaction, bet_amount: int):
     games_curs.execute('''UPDATE GamblingUserStats SET CurrentBalance=CurrentBalance-? WHERE GuildID=? AND UserID=?''', (bet_amount, self.guild_id, self.user_id))
     
     # Simulate a win or loss
-    if random() < 0.5:  # 50% chance of winning
+    if random.random() < 0.5:  # 50% chance of winning
         winnings = bet_amount * 2
         await award_points(winnings, self.guild_id, self.user_id)
         #games_curs.execute('''UPDATE GamblingUserStats SET CurrentBalance=CurrentBalance+? WHERE GuildID=? AND UserID=?''', (winnings, self.guild_id, self.user_id))
@@ -1165,10 +1213,10 @@ class GamblingCoinFlipWagers(discord.ui.Button):
         self.remainingFlips -= 1
         if self.label.startswith("Bet Heads"):
             # User chose heads
-            result = 1 if random() >= 0.5 else 0
+            result = 1 if random.random() >= 0.5 else 0
         else:
             # User chose tails
-            result = 0 if random() >= 0.5 else 1
+            result = 0 if random.random() >= 0.5 else 1
         if self.tripleDown:
             if result == 1:
                 messageContent=f"Looks like you really are as lucky as you think. Take your winnings and get out of my sight."
@@ -1258,7 +1306,7 @@ class FlipButton(discord.ui.Button):
         self.guild_id = guild_id
 
     async def callback(self, interaction: discord.Interaction):
-        result = 1 if random() < 0.5 else 0
+        result = 1 if random.random() < 0.5 else 0
         #update the table with +1 if heads, set to 0 if tails
         games_db = "games.db"
         games_conn = sqlite3.connect(games_db)
@@ -1299,7 +1347,7 @@ async def flip_coin(interaction: discord.Interaction):
     view = discord.ui.View(timeout=None)
     view.add_item(flipButton)
     await interaction.response.send_message(description, ephemeral=True,view=view)
-    #result = "heads" if random() < 0.5 else "tails"
+    #result = "heads" if random.random() < 0.5 else "tails"
     #await interaction.followup.send(f"The coin landed on {result}!")
 
 @client.tree.command(name="news", description="Displays the recent news")
@@ -1696,6 +1744,40 @@ class PatchNotesModal(discord.ui.Modal):
         await interaction.response.send_message(f"Patch notes channel ID set to: <#{channelID}>")
         conn.commit()
         conn.close()
+
+@client.tree.command(name="auction-house", description="PVP gambling")
+async def auction_house(interaction: discord.Interaction):
+    games_conn=sqlite3.connect("games.db")
+    games_conn.row_factory = sqlite3.Row
+    games_curs=games_conn.cursor()
+    games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName) VALUES (?, ?, ?)''', (interaction.guild.id, interaction.user.id, "auction-house"))
+    games_curs.execute('''SELECT Zone, PercentAuctioned, CurrentPrice, CurrentBidder FROM AuctionHousePrize where Date = ?''', (datetime.now().date(),))
+    auction_data = games_curs.fetchall()
+    games_conn.commit()
+    games_curs.close()
+    games_conn.close()
+    embed = discord.Embed(title="Auction House", description="Bid on winners!", color=0x228a65)
+    totalRows=0
+    if auction_data:
+        for item in auction_data:
+            totalRows+=1
+            if totalRows == 1:
+                aucName = f"[{int(item['PercentAuctioned']*100)}% of yesterdays total from {item['Zone']}]"
+                aucValue = f":right_arrow: Current top bid: {item['CurrentPrice']} by {item['CurrentBidder']}"
+            else:
+                aucName = f"{int(item['PercentAuctioned']*100)}% of yesterdays total from {item['Zone']}"
+                aucValue = f"Current top bid: {item['CurrentPrice']} by {item['CurrentBidder']}"
+            embed.add_field(name=aucName, value=aucValue, inline=False)
+            #embed.add_field(name="Current Price", value=item["CurrentPrice"], inline=False)
+            #embed.add_field(name="Percent of yesterdays total", value=item["PercentAuctioned"], inline=False)
+    await interaction.response.send_message(embed=embed)
+
+class SwitchButton(discord.ui.Button):
+    def __init__(self, label=None, style=discord.ButtonStyle.primary):
+        super().__init__(label=label, style=style)
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.send_message("Switch button clicked!")
 
 @client.tree.command(name="game-settings-set", description="Manage game settings")
 @app_commands.describe(numberofquestionsperday="Number of random questions a user can answer per day")
@@ -2607,7 +2689,7 @@ async def smrtGame(message):
         #print("delta: "+str(delta))
     x=.05*(delta-120)
     multiplier=sigmoid(x)
-    r=random()
+    r=random.random()
     games_curs.execute('''SELECT PipChance FROM ServerSettings WHERE GuildID=?''', (message.guild.id,))
     row = games_curs.fetchone()
     if row:
@@ -2644,7 +2726,7 @@ async def questionSpawner(message):
         #print("delta: "+str(delta))
     x=.05*(delta-120)
     multiplier=sigmoid(x)
-    r=random()
+    r=random.random()
     if r < questionChance * multiplier:
         await createQuestion(channel=message.channel,isForced=False)
         # Update the last question time in the database
