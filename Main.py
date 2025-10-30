@@ -201,7 +201,7 @@ class MyClient(discord.Client):
         if not daily_question_leaderboard.is_running():
             daily_question_leaderboard.start()
         #sched.start()
-
+        await checkAnswer(question="test",userAnswer="test",correctAnswer="test")
         await client.tree.sync()
         
     def __init__(self, *, intents, **options):
