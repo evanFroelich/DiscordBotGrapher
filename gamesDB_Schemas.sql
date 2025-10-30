@@ -214,6 +214,23 @@ CREATE TABLE  if not exists ActiveTrivia (
 	PRIMARY KEY("GuildID","UserID","MessageID")
 );
 
+CREATE TABLE if not exists AuctionHousePrize (
+	"Date"	TEXT,
+	"Zone"	TEXT,
+	"TotalAmount"	INTEGER,
+	"PercentAuctioned"	REAL,
+	"AmountAuctioned"	INTEGER,
+	"CurrentPrice"	INTEGER NOT NULL DEFAULT 0,
+	"CurrentBidderGuildID"	INTEGER NOT NULL DEFAULT 122123044582981632,
+	"CurrentBidderUserID"	INTEGER NOT NULL DEFAULT 100344687029665792,
+	"FinalBidderGuildID"	INTEGER,
+	"FinalBidderUserID"	INTEGER,
+	"HasBeenClaimed"	INTEGER NOT NULL DEFAULT 0,
+	"HasBeenCleared"	INTEGER NOT NULL DEFAULT 0,
+	"HasRollOver"	INTEGER NOT NULL DEFAULT 0,
+	PRIMARY KEY("Date","Zone")
+);
+
 CREATE VIEW if not exists GamblingUnlockMetricsView AS
 SELECT
     GuildID,
