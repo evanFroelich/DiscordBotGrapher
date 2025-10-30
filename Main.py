@@ -94,13 +94,15 @@ async def daily_question_leaderboard():
             leaderboardResults = games_curs.fetchall()
             todaysDate = datetime.now().date()
             embed=discord.Embed(title=f"Daily Question Leaderboard for {todaysDate}", description="", color=0x00ff00)
+            printstr=f"**Daily Question Leaderboard for {todaysDate}**\n\n"
             if leaderboardResults:
                 # Process leaderboard results
                 for userID, questionsAnswered in leaderboardResults:
                     embed.description += f"<@{userID}>: {questionsAnswered} correct answers today.\n"
+                    printstr += f"<@{userID}>: {questionsAnswered} correct answers today.\n"
             #get the channel from the ShameChannel channelID
             channel = client.get_channel(guildID[2])
-            await channel.send(embed=embed)
+            await channel.send(content=printstr)
 
 @tasks.loop(time=time(hour=0, minute=1, second=0, tzinfo=zoneinfo.ZoneInfo("America/Los_Angeles")))
 async def package_daily_gambling():
