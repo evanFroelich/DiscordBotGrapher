@@ -242,7 +242,7 @@ class MyClient(discord.Client):
         self.tree = app_commands.CommandTree(self)
 
     async def setup_hook(self):
-        #await self.tree.sync()
+        await self.tree.sync()
         print('synced')
 
     async def on_thread_create(self,thread):
