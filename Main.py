@@ -1786,6 +1786,13 @@ async def auction_house(interaction: discord.Interaction):
     games_conn.row_factory = sqlite3.Row
     games_curs=games_conn.cursor()
     games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName) VALUES (?, ?, ?)''', (interaction.guild.id, interaction.user.id, "auction-house"))
+    games_curs.execute('''SELECT Game1 from GamblingGamesUnlocked where GuildID = ? AND UserID = ?''', (interaction.guild.id, interaction.user.id))
+    row = games_curs.fetchone()
+    if row is None or row['Game1'] == 0:
+        await interaction.response.send_message("You have not unlocked the Auction House game yet. Play more to unlock it!", ephemeral=True)
+        games_curs.close()
+        games_conn.close()
+        return
     games_curs.execute('''SELECT Zone, PercentAuctioned, CurrentPrice, CurrentBidderUserID, CurrentBidderGuildID FROM AuctionHousePrize where Date = ?''', (datetime.now().date(),))
     auction_data = games_curs.fetchall()
     games_conn.commit()
@@ -1810,6 +1817,10 @@ async def auction_house(interaction: discord.Interaction):
             embed.add_field(name=aucName, value=aucValue, inline=False)
             #embed.add_field(name="Current Price", value=item["CurrentPrice"], inline=False)
             #embed.add_field(name="Percent of yesterdays total", value=item["PercentAuctioned"], inline=False)
+    else:
+        embed.add_field(name="No auction data available for today.", value="Please check back tomorrow.", inline=False)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+        return
     view=discord.ui.View(timeout=None)
     bidButton=OpenBidButton(label="Place a Bid")
     refreshButton=RefreshAuctionButton(label="🔄")
