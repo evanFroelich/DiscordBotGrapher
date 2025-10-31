@@ -842,7 +842,7 @@ async def test_question_message(interaction: discord.Interaction):
 
 class QuestionThankYouButton(discord.ui.Button):
     def __init__(self):
-        super().__init__(label="Tip your Quizmaster", style=discord.ButtonStyle.primary)  # No timeout
+        super().__init__(label="Tip your Quizmaster", style=discord.ButtonStyle.success)  # No timeout
 
     async def callback(self, interaction: discord.Interaction):
         gamesDB = "games.db"
@@ -1900,7 +1900,7 @@ class BidModal(discord.ui.Modal):
         if currentPrice and int(bid_amount) > currentPrice['CurrentPrice']:
             games_curs.execute('''UPDATE AuctionHousePrize SET CurrentPrice = ?, CurrentBidderUserID = ?, CurrentBidderGuildID = ? WHERE Date = ?''', (int(bid_amount), interaction.user.id, interaction.guild.id, datetime.now().date()))
             games_conn.commit()
-            await interaction.response.send_message(f"You placed a bid of {bid_amount}!")
+            await interaction.response.send_message(f"You placed a bid of {bid_amount}!",ephemeral=True)
         else:
             await interaction.response.send_message(f"Your bid must be higher than the current price of {currentPrice['CurrentPrice']}.", ephemeral=True)
         games_curs.close()
