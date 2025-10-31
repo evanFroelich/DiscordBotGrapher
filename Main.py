@@ -1914,6 +1914,15 @@ class SwitchAuctionButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
        return
 
+#@client.tree.command(name="wiki", description="A wiki for understanding the bot's features")
+async def wiki(interaction: discord.Interaction):
+    embed = discord.Embed(title="Bot Wiki", description="A wiki for understanding the bot's features.", color=0x228a65)
+    embed.add_field(name="Getting Started", value="Learn how to set up and use the bot.", inline=False)
+    embed.add_field(name="Commands", value="Detailed descriptions of all available commands.", inline=False)
+    embed.add_field(name="Features", value="Overview of the bot's features and functionalities.", inline=False)
+    embed.add_field(name="FAQ", value="Frequently Asked Questions about the bot.", inline=False)
+    embed.set_footer(text="For more information, visit our documentation website.")
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 
 @client.tree.command(name="game-settings-set", description="Manage game settings")
 @app_commands.describe(numberofquestionsperday="Number of random questions a user can answer per day")
@@ -2247,7 +2256,11 @@ async def delete_later(message,time):
     app_commands.Choice(name="bonus-points", value="pip"),
     app_commands.Choice(name="coin-flip", value="flip")
 ])
-async def leaderboard(interaction: discord.Interaction, subtype: app_commands.Choice[str]):
+@app_commands.choices(visibility=[
+    app_commands.Choice(name="public", value="public"),
+    app_commands.Choice(name="private", value="private")
+])
+async def leaderboard(interaction: discord.Interaction, subtype: app_commands.Choice[str], visibility: app_commands.Choice[str]):
     mainDB = "MY_DB"
     gamesDB = "games.db"
     main_conn = sqlite3.connect(mainDB)
@@ -2256,9 +2269,12 @@ async def leaderboard(interaction: discord.Interaction, subtype: app_commands.Ch
     games_curs = games_conn.cursor()
     games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName, CommandParameters) VALUES (?, ?, ?, ?)''', (interaction.guild.id, interaction.user.id, "leaderboard", f"subtype: {subtype.value}"))
     games_conn.commit()
+    privMsg=True if visibility.value=="private" else False
+    await interaction.response.defer(thinking=True,ephemeral=privMsg)
+    #print(f"visibility: {visibility.value} privMsg: {privMsg}")
     if subtype.value == "pip":
         """Displays the game points leaderboard."""
-        await interaction.response.defer(thinking=True)
+        
         #await asyncio.sleep(10)  # Simulate processing time
         guild_id = str(interaction.guild.id)
         
@@ -2276,9 +2292,8 @@ async def leaderboard(interaction: discord.Interaction, subtype: app_commands.Ch
                 outstr += f"User ID {row[0]}: {row[1]} points\n"
         if outstr == "":
             outstr = "no points yet"
-        await interaction.followup.send(outstr)
+        await interaction.followup.send(outstr,ephemeral=privMsg)
     if subtype.value == "flip":
-        await interaction.response.defer(thinking=True)
         games_curs.execute('''SELECT UserID, CurrentStreak FROM CoinFlipLeaderboard ORDER BY CurrentStreak DESC, LastFlip DESC''')
         rows= games_curs.fetchall()
         leaderboard=[]
@@ -2298,9 +2313,9 @@ async def leaderboard(interaction: discord.Interaction, subtype: app_commands.Ch
                 leaderboard.append(f"{user.display_name}: {CurrentStreak}")
         #check if leaderboard is empty
         if not leaderboard:
-            await interaction.followup.send("No users found in the coin flip leaderboard.")
+            await interaction.followup.send("No users found in the coin flip leaderboard.", ephemeral=privMsg)
         else:
-            msg=await interaction.followup.send("\n".join(leaderboard))
+            msg=await interaction.followup.send("\n".join(leaderboard),ephemeral=privMsg)
             asyncio.create_task(delete_later(message=msg,time=60))
 
     main_curs.close()
