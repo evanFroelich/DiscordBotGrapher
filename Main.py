@@ -1899,9 +1899,12 @@ class BidModal(discord.ui.Modal):
         if currentPrice and int(bid_amount) > currentPrice['CurrentPrice']:
             games_curs.execute('''UPDATE AuctionHousePrize SET CurrentPrice = ?, CurrentBidderUserID = ?, CurrentBidderGuildID = ? WHERE Date = ?''', (int(bid_amount), interaction.user.id, interaction.guild.id, datetime.now().date()))
             games_conn.commit()
+            await interaction.response.send_message(f"You placed a bid of {bid_amount}!")
+        else:
+            await interaction.response.send_message(f"Your bid must be higher than the current price of {currentPrice['CurrentPrice']}.", ephemeral=True)
         games_curs.close()
         games_conn.close()
-        await interaction.response.send_message(f"You placed a bid of {bid_amount}!")
+        
 
 class SwitchAuctionButton(discord.ui.Button):
     def __init__(self, label=None, style=discord.ButtonStyle.primary):
