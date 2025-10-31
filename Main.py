@@ -295,7 +295,7 @@ class MyClient(discord.Client):
             if message.author.id==510016054391734273:
                 splitstr=message.content.split()
                 if "RUINED" in splitstr:
-                    time.sleep(5)
+                    await asyncio.sleep(5)
                     await message.channel.send("https://tenor.com/view/death-stranding-2-sisyphus-on-the-beach-hideo-kojima-mountain-climb-gif-9060768058445058879")
             return
         
@@ -434,7 +434,8 @@ class MyClient(discord.Client):
                     statsFlag=0
                     if currentDate != UserStatCatTimestamp:
                         statsFlag=1
-                    time.sleep(1)  # wait a bit for reactions to register
+                    await asyncio.sleep(1)  # wait a bit for reactions to register
+
                     newMessage= await message.channel.fetch_message(message.id)
                     reactions = newMessage.reactions
                     for reaction in reactions:
@@ -445,7 +446,7 @@ class MyClient(discord.Client):
                                 if r<CatChance:
                                     if statsFlag==1:
                                         games_curs.execute('''UPDATE UserStats SET CatTimestamp = ?, CatHitCount = CatHitCount + 1 WHERE GuildID = ? AND UserID = ?''', (currentDate, message.guild.id, message.author.id))
-                                    time.sleep(.5)  # give it a second to make it more dramatic
+                                    await asyncio.sleep(.5)  # give it a second to make it more dramatic
                                     resposneImage=discord.File("images/cat_laugh.gif", filename="cat_laugh.gif")
                                     await message.reply(file=resposneImage)
                                 else:
@@ -2258,7 +2259,7 @@ async def leaderboard(interaction: discord.Interaction, subtype: app_commands.Ch
     if subtype.value == "pip":
         """Displays the game points leaderboard."""
         await interaction.response.defer(thinking=True)
-        #time.sleep(10)  # Simulate processing time
+        #await asyncio.sleep(10)  # Simulate processing time
         guild_id = str(interaction.guild.id)
         
         games_curs.execute('''SELECT UserID, SUM(Num_Correct) AS TotalPoints
