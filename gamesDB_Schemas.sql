@@ -45,6 +45,8 @@ CREATE TABLE if not exists GamblingUserStats (
 	"QuestionsAnsweredToday"	INTEGER NOT NULL DEFAULT 0,
 	"QuestionsAnsweredTodayCorrect"	INTEGER NOT NULL DEFAULT 0,
 	"LastRandomQuestionTime"	TEXT,
+	"AuctionHouseWinnings"	INTEGER NOT NULL DEFAULT 0,
+	"AuctionHouseLosses"	INTEGER NOT NULL DEFAULT 0,
 	PRIMARY KEY("GuildID","UserID")
 );
 

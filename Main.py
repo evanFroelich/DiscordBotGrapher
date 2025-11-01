@@ -127,6 +127,10 @@ async def package_daily_gambling():
                 #new_balance = new_balance + int(row['AmountAuctioned'])
         
                 #games_curs.execute('''UPDATE GamblingUserStats SET CurrentBalance=? WHERE GuildID=? AND UserID=?''', (new_balance, row['CurrentBidderGuildID'], row['CurrentBidderUserID']))
+                if int(row['AmountAuctioned'])-int(row['CurrentPrice'])>0:
+                    games_curs.execute('''Update GamblingUserStats SET AuctionHouseWinnings = AuctionHouseWinnings + ? WHERE GuildID=? AND UserID=?''', (int(row['AmountAuctioned'])-int(row['CurrentPrice']), row['CurrentBidderGuildID'], row['CurrentBidderUserID']))
+                else:
+                    games_curs.execute('''Update GamblingUserStats SET AuctionHouseLosses = AuctionHouseLosses + ? WHERE GuildID=? AND UserID=?''', (int(row['CurrentPrice'])-int(row['AmountAuctioned']), row['CurrentBidderGuildID'], row['CurrentBidderUserID']))
                 games_conn.commit()
                 await award_points(-row['CurrentPrice'], row['CurrentBidderGuildID'], row['CurrentBidderUserID'])
                 await award_points(int(row['AmountAuctioned']), row['CurrentBidderGuildID'], row['CurrentBidderUserID'])
@@ -261,8 +265,11 @@ class MyClient(discord.Client):
         games_conn = sqlite3.connect("games.db")
         games_curs = games_conn.cursor()    
         games_curs.execute('''INSERT INTO GamblingUnlockConditions (GuildID) values (?)''', (guild.id,))
+        games_conn.commit()
         games_curs.execute('''INSERT INTO ServerSettings (GuildID) VALUES (?)''', (guild.id,))
+        games_conn.commit()
         games_curs.execute('''INSERT OR IGNORE INTO FeatureTimers (GuildID) VALUES (?);''',(guild.id,))
+        games_conn.commit()
         games_curs.execute('''INSERT OR IGNORE INTO GoofsGaffs (GuildID) VALUES (?);''',(guild.id,))
         games_conn.commit()
         games_curs.close()
@@ -2261,11 +2268,8 @@ async def delete_later(message,time):
     app_commands.Choice(name="private", value="private")
 ])
 async def leaderboard(interaction: discord.Interaction, subtype: app_commands.Choice[str], visibility: app_commands.Choice[str]):
-    mainDB = "MY_DB"
     gamesDB = "games.db"
-    main_conn = sqlite3.connect(mainDB)
     games_conn = sqlite3.connect(gamesDB)
-    main_curs = main_conn.cursor()
     games_curs = games_conn.cursor()
     games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName, CommandParameters) VALUES (?, ?, ?, ?)''', (interaction.guild.id, interaction.user.id, "leaderboard", f"subtype: {subtype.value}"))
     games_conn.commit()
@@ -2273,11 +2277,7 @@ async def leaderboard(interaction: discord.Interaction, subtype: app_commands.Ch
     await interaction.response.defer(thinking=True,ephemeral=privMsg)
     #print(f"visibility: {visibility.value} privMsg: {privMsg}")
     if subtype.value == "pip":
-        """Displays the game points leaderboard."""
-        
-        #await asyncio.sleep(10)  # Simulate processing time
         guild_id = str(interaction.guild.id)
-        
         games_curs.execute('''SELECT UserID, SUM(Num_Correct) AS TotalPoints
         FROM Scores WHERE GuildID = ?
         GROUP BY UserID
@@ -2317,9 +2317,6 @@ async def leaderboard(interaction: discord.Interaction, subtype: app_commands.Ch
         else:
             msg=await interaction.followup.send("\n".join(leaderboard),ephemeral=privMsg)
             asyncio.create_task(delete_later(message=msg,time=60))
-
-    main_curs.close()
-    main_conn.close()
     games_curs.close()
     games_conn.close()
 
