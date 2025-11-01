@@ -246,7 +246,7 @@ class MyClient(discord.Client):
         self.tree = app_commands.CommandTree(self)
 
     async def setup_hook(self):
-        await self.tree.sync()
+        #await self.tree.sync()
         print('synced')
 
     async def on_thread_create(self,thread):
@@ -1840,8 +1840,12 @@ async def auction_house(interaction: discord.Interaction):
     view=discord.ui.View(timeout=None)
     bidButton=OpenBidButton(label="Place a Bid")
     refreshButton=RefreshAuctionButton(label="🔄")
+    plus5Button=SimpleBidButton(label="+5", bid_amount=5)
+    plus1Button=SimpleBidButton(label="+1", bid_amount=1)
     view.add_item(bidButton)
     view.add_item(refreshButton)
+    view.add_item(plus5Button)
+    view.add_item(plus1Button)
     await interaction.response.send_message(embed=embed, ephemeral=True, view=view)
 
 class RefreshAuctionButton(discord.ui.Button):
@@ -1879,6 +1883,8 @@ class RefreshAuctionButton(discord.ui.Button):
         view = discord.ui.View(timeout=None)
         view.add_item(OpenBidButton(label="Place a Bid"))
         view.add_item(RefreshAuctionButton(label="🔄"))
+        view.add_item(SimpleBidButton(label="+5", bid_amount=5))
+        view.add_item(SimpleBidButton(label="+1", bid_amount=1))
         await interaction.response.edit_message(embed=embed, view=view)
         #await interaction.followup.send("✅ Auction info refreshed!", ephemeral=True)  # optional confirmation
 
@@ -1900,6 +1906,10 @@ class BidModal(discord.ui.Modal):
         self.add_item(discord.ui.TextInput(label=f"Enter bid. Current bal: {currentBalance['CurrentBalance']}", placeholder="Enter your bid amount"))
     async def on_submit(self, interaction: discord.Interaction):
         bid_amount = self.children[0].value
+        await placeBid(interaction, bid_amount)
+        
+
+async def placeBid(interaction: discord.Interaction, bid_amount: int, is_simple_bid: bool = False):
         games_conn=sqlite3.connect("games.db")
         games_conn.row_factory = sqlite3.Row
         games_curs=games_conn.cursor()
@@ -1912,6 +1922,8 @@ class BidModal(discord.ui.Modal):
             return
         games_curs.execute('''SELECT CurrentPrice FROM AuctionHousePrize where Date = ?''', (datetime.now().date(),))
         currentPrice= games_curs.fetchone()
+        if is_simple_bid:
+            bid_amount = currentPrice['CurrentPrice'] + bid_amount
         if currentPrice and int(bid_amount) > currentPrice['CurrentPrice']:
             games_curs.execute('''UPDATE AuctionHousePrize SET CurrentPrice = ?, CurrentBidderUserID = ?, CurrentBidderGuildID = ? WHERE Date = ?''', (int(bid_amount), interaction.user.id, interaction.guild.id, datetime.now().date()))
             games_conn.commit()
@@ -1920,6 +1932,15 @@ class BidModal(discord.ui.Modal):
             await interaction.response.send_message(f"Your bid must be higher than the current price of {currentPrice['CurrentPrice']}.", ephemeral=True)
         games_curs.close()
         games_conn.close()
+
+
+class SimpleBidButton(discord.ui.Button):
+    def __init__(self, label=None, style=discord.ButtonStyle.primary, bid_amount=0):
+        super().__init__(label=label, style=style)
+        self.bid_amount = bid_amount
+
+    async def callback(self, interaction: discord.Interaction):
+        await placeBid(interaction, self.bid_amount, is_simple_bid=True)
         
 
 class SwitchAuctionButton(discord.ui.Button):
