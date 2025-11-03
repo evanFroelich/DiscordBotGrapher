@@ -152,7 +152,7 @@ async def package_daily_gambling():
     
     for row in yesterday_totals:
         random_multiplier = random.random()
-        random_multiplier=(random_multiplier*.2)+.4
+        random_multiplier=(random_multiplier*.1)+.05
         random_multiplier = round(random_multiplier, 2)
         category = row[0]
         yesterday_total = row[1]
@@ -654,6 +654,7 @@ class QuestionPickButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
          await create_user_db_entry(interaction.guild.id, interaction.user.id)
          if await ButtonLockout(interaction):
+            #await interaction.response.defer(ephemeral=True)
             gamesDB = "games.db"
             games_conn = sqlite3.connect(gamesDB)
             games_curs = games_conn.cursor()
@@ -852,6 +853,7 @@ class QuestionThankYouButton(discord.ui.Button):
         super().__init__(label="Tip your Quizmaster", style=discord.ButtonStyle.success)  # No timeout
 
     async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(thinking=False, ephemeral=True)
         gamesDB = "games.db"
         games_conn = sqlite3.connect(gamesDB)
         games_curs = games_conn.cursor()
@@ -889,7 +891,8 @@ class QuestionThankYouButton(discord.ui.Button):
         #await interaction.edit_original_response(content="test",view=None)
         if contentPayload=="":
             contentPayload="Thanks for the tip! heres a little something for you.\n*You recieve a coin in return*"
-        await interaction.response.edit_message(content=contentPayload, view=thanksView)
+        #await interaction.response.edit_message(content=contentPayload, view=thanksView)
+        await interaction.followup.edit_message(message_id=interaction.message.id, content=contentPayload, view=thanksView)
         #await interaction.response.send_message("You're welcome! If you have more questions, feel free to ask!", ephemeral=True)
 
 
@@ -1200,7 +1203,7 @@ class GamblingIntroModal(discord.ui.Modal):
         view=discord.ui.View()
         if int(fundsInput) > self.funds or int(fundsInput)<10:
             view.add_item(GamblingButton(label="want to try that again?", user_id=self.user_id, guild_id=self.guild_id, style=discord.ButtonStyle.primary))
-            await interaction.response.send_message(f"*I cant bring that amount.*", ephemeral=True, view=view)
+            await interaction.response.send_message(f"*I cant bring that amount.*\n(cannot bring more than you have or less than 10)", ephemeral=True, view=view)
             return
         
         gamesDB = "games.db"
@@ -1249,6 +1252,7 @@ class GamblingCoinFlipWagers(discord.ui.Button):
         self.tripleDown = tripleDown
 
     async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(thinking=False, ephemeral=True)
         #print(f"wager: {self.wager}")
         messageContent=""
         #games_db = "games.db"
@@ -1276,7 +1280,8 @@ class GamblingCoinFlipWagers(discord.ui.Button):
             else:
                 messageContent=f"So your luck ran out? Tough. Better luck next time pal."
                 await award_points(-self.wager, self.guild_id, self.user_id)
-            await interaction.response.edit_message(content=messageContent, view=None)
+            #await interaction.response.edit_message(content=messageContent, view=None)
+            await interaction.followup.edit_message(message_id=interaction.message.id, content=messageContent, view=None)
             return
         elif result == 1:
             messageContent=f"You won the flip! Your wager of {int(self.wager)} has been added to your balance.\nYou have {self.remainingFlips} flips remaining."
@@ -1300,7 +1305,8 @@ class GamblingCoinFlipWagers(discord.ui.Button):
         
         if self.remainingFlips <= 0:
             messageContent+=f"\nYou have run out of flips. Thanks for playing and I will see you again."
-            await interaction.response.edit_message(content=messageContent, view=None)
+            #await interaction.response.edit_message(content=messageContent, view=None)
+            await interaction.followup.edit_message(message_id=interaction.message.id, content=messageContent, view=None)
             return
         #start here for triple down+
         view = discord.ui.View()
@@ -1317,7 +1323,7 @@ class GamblingCoinFlipWagers(discord.ui.Button):
         if self.tripleDown:
             leaveButton=LeaveCoinFlipButton()
             view.add_item(leaveButton)
-        await interaction.response.edit_message(content=messageContent, view=view)
+        await interaction.followup.edit_message(message_id=interaction.message.id, content=messageContent, view=view)
 
 class LeaveCoinFlipButton(discord.ui.Button):
     def __init__(self):
