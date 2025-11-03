@@ -233,6 +233,14 @@ CREATE TABLE if not exists AuctionHousePrize (
 	PRIMARY KEY("Date","Zone")
 );
 
+CREATE TABLE if not exists Wiki (
+	"CommandName"	TEXT NOT NULL,
+	"CommandGroup"	TEXT,
+	"CommandDescription"	TEXT,
+	"ListOrder"	INTEGER NOT NULL DEFAULT 0,
+	PRIMARY KEY("CommandName")
+);
+
 CREATE VIEW if not exists GamblingUnlockMetricsView AS
 SELECT
     GuildID,

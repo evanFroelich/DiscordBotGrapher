@@ -246,7 +246,7 @@ class MyClient(discord.Client):
         self.tree = app_commands.CommandTree(self)
 
     async def setup_hook(self):
-        #await self.tree.sync()
+        await self.tree.sync()
         print('synced')
 
     async def on_thread_create(self,thread):
@@ -1957,15 +1957,51 @@ class SwitchAuctionButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
        return
 
-#@client.tree.command(name="wiki", description="A wiki for understanding the bot's features")
+@client.tree.command(name="wiki", description="A wiki for understanding the bot's features")
 async def wiki(interaction: discord.Interaction):
     embed = discord.Embed(title="Bot Wiki", description="A wiki for understanding the bot's features.", color=0x228a65)
-    embed.add_field(name="Getting Started", value="Learn how to set up and use the bot.", inline=False)
-    embed.add_field(name="Commands", value="Detailed descriptions of all available commands.", inline=False)
-    embed.add_field(name="Features", value="Overview of the bot's features and functionalities.", inline=False)
-    embed.add_field(name="FAQ", value="Frequently Asked Questions about the bot.", inline=False)
-    embed.set_footer(text="For more information, visit our documentation website.")
-    await interaction.response.send_message(embed=embed, ephemeral=True)
+    # embed.add_field(name="Getting Started", value="Learn how to set up and use the bot.", inline=False)
+    # embed.add_field(name="Commands", value="Detailed descriptions of all available commands.", inline=False)
+    # embed.add_field(name="Features", value="Overview of the bot's features and functionalities.", inline=False)
+    # embed.add_field(name="FAQ", value="Frequently Asked Questions about the bot.", inline=False)
+    # embed.set_footer(text="For more information, visit our documentation website.")
+    pages = await get_wiki_page()
+    for page in pages:
+        embed.add_field(name=page['CommandName'], value=page['CommandDescription'], inline=False)
+    view = discord.ui.View(timeout=None)
+    view.add_item(WikiChangeButton(label="General", group="General"))
+    view.add_item(WikiChangeButton(label="Data", group="Data"))
+    view.add_item(WikiChangeButton(label="Trivia", group="Trivia"))
+    view.add_item(WikiChangeButton(label="Other", group="Other"))
+    await interaction.response.send_message(embed=embed, ephemeral=True, view=view)
+
+class WikiChangeButton(discord.ui.Button):
+    def __init__(self, label=None, style=discord.ButtonStyle.primary, group="General"):
+        super().__init__(label=label, style=style)
+        self.group = group
+
+    async def callback(self, interaction: discord.Interaction):
+        pages = await get_wiki_page(self.group)
+        embed = discord.Embed(title=f"Wiki - {self.group}", color=0x228a65)
+        for page in pages:
+            embed.add_field(name=page['CommandName'], value=page['CommandDescription'], inline=False)
+        view = discord.ui.View(timeout=None)
+        view.add_item(WikiChangeButton(label="General", group="General"))
+        view.add_item(WikiChangeButton(label="Data", group="Data"))
+        view.add_item(WikiChangeButton(label="Trivia", group="Trivia"))
+        view.add_item(WikiChangeButton(label="Other", group="Other"))
+        await interaction.response.edit_message(embed=embed, view=view)
+        return
+    
+async def get_wiki_page(group: str= "General"):
+    games_conn=sqlite3.connect("games.db")
+    games_conn.row_factory = sqlite3.Row
+    games_curs = games_conn.cursor()
+    games_curs.execute("select CommandName, CommandDescription from Wiki where CommandGroup=? order by ListOrder asc", (group,))
+    pages = games_curs.fetchall()
+    games_curs.close()
+    games_conn.close()
+    return pages
 
 @client.tree.command(name="game-settings-set", description="Manage game settings")
 @app_commands.describe(numberofquestionsperday="Number of random questions a user can answer per day")
@@ -2938,7 +2974,7 @@ os.chdir(script_dir)
 log_file_path = 'log_file.log'
 logging.basicConfig(filename=log_file_path, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logging.info('Script started')
-logging.info('root dir changed')
+#logging.info('root dir changed')
 FOToken=open('Token/Token',"r")
 logging.info('Post token')
 token=FOToken.readline()
