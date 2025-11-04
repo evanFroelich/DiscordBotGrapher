@@ -2355,9 +2355,9 @@ async def leaderboard(interaction: discord.Interaction, subtype: app_commands.Ch
         for row in rows:
             user=interaction.guild.get_member(int(row[0]))
             if user:
-                outstr += f"{user.display_name}: {row[1]} points\n"
+                outstr += f"{user.display_name}: {row[1]} hits\n"
             else:
-                outstr += f"User ID {row[0]}: {row[1]} points\n"
+                outstr += f"User ID {row[0]}: {row[1]} hits\n"
         if outstr == "":
             outstr = "no points yet"
         embed.description=outstr
