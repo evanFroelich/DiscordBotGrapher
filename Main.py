@@ -84,7 +84,7 @@ def sigmoid(x):
 
 @tasks.loop(time=time(hour=23, minute=55, second=0, tzinfo=zoneinfo.ZoneInfo("America/Los_Angeles")))
 async def daily_question_leaderboard():
-    games_conn=sqlite3.connect("games.db")
+    games_conn=sqlite3.connect("games.db",timeout=10)
     games_curs=games_conn.cursor()
     games_curs.execute('''SELECT GuildID, FlagShameChannel, ShameChannel from ServerSettings''')
     guilds=games_curs.fetchall()
@@ -107,7 +107,7 @@ async def daily_question_leaderboard():
 @tasks.loop(time=time(hour=0, minute=2, second=0, tzinfo=zoneinfo.ZoneInfo("America/Los_Angeles")))
 async def package_daily_gambling():
     print("Packaging daily gambling totals for auction house...")
-    games_conn=sqlite3.connect("games.db")
+    games_conn=sqlite3.connect("games.db",timeout=10)
     games_conn.row_factory = sqlite3.Row
     games_curs=games_conn.cursor()
     today = datetime.now().date()
@@ -1377,8 +1377,7 @@ class FlipButton(discord.ui.Button):
 @client.tree.command(name="flip",description="Flip a coin")
 async def flip_coin(interaction: discord.Interaction):
     #check if the user has a row with this guild in the coinFlipLeaderboard table
-    games_db = "games.db"
-    games_conn = sqlite3.connect(games_db)
+    games_conn=sqlite3.connect("games.db",timeout=10)
     games_curs = games_conn.cursor()
     games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName) VALUES (?, ?, ?)''', (interaction.guild.id, interaction.user.id, "flip"))
     games_conn.commit()
@@ -1805,7 +1804,7 @@ class PatchNotesModal(discord.ui.Modal):
 
 @client.tree.command(name="auction-house", description="PVP gambling")
 async def auction_house(interaction: discord.Interaction):
-    games_conn=sqlite3.connect("games.db")
+    games_conn=sqlite3.connect("games.db",timeout=10)
     games_conn.row_factory = sqlite3.Row
     games_curs=games_conn.cursor()
     games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName) VALUES (?, ?, ?)''', (interaction.guild.id, interaction.user.id, "auction-house"))
@@ -1905,7 +1904,7 @@ class OpenBidButton(discord.ui.Button):
 class BidModal(discord.ui.Modal):
     def __init__(self, interaction: discord.Interaction):
         super().__init__(title="Place Your Bid")
-        games_conn=sqlite3.connect("games.db")
+        games_conn=sqlite3.connect("games.db",timeout=10)
         games_conn.row_factory = sqlite3.Row
         games_curs=games_conn.cursor()
         games_curs.execute('''SELECT CurrentBalance FROM GamblingUserStats WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
@@ -1917,7 +1916,7 @@ class BidModal(discord.ui.Modal):
         
 
 async def placeBid(interaction: discord.Interaction, bid_amount: int, is_simple_bid: bool = False):
-        games_conn=sqlite3.connect("games.db")
+        games_conn=sqlite3.connect("games.db",timeout=10)
         games_conn.row_factory = sqlite3.Row
         games_curs=games_conn.cursor()
         games_curs.execute('''SELECT CurrentBalance FROM GamblingUserStats WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
@@ -1960,11 +1959,6 @@ class SwitchAuctionButton(discord.ui.Button):
 @client.tree.command(name="wiki", description="A wiki for understanding the bot's features")
 async def wiki(interaction: discord.Interaction):
     embed = discord.Embed(title="Bot Wiki", description="A wiki for understanding the bot's features.", color=0x228a65)
-    # embed.add_field(name="Getting Started", value="Learn how to set up and use the bot.", inline=False)
-    # embed.add_field(name="Commands", value="Detailed descriptions of all available commands.", inline=False)
-    # embed.add_field(name="Features", value="Overview of the bot's features and functionalities.", inline=False)
-    # embed.add_field(name="FAQ", value="Frequently Asked Questions about the bot.", inline=False)
-    # embed.set_footer(text="For more information, visit our documentation website.")
     pages = await get_wiki_page()
     for page in pages:
         embed.add_field(name=page['CommandName'], value=page['CommandDescription'], inline=False)
@@ -1994,7 +1988,7 @@ class WikiChangeButton(discord.ui.Button):
         return
     
 async def get_wiki_page(group: str= "General"):
-    games_conn=sqlite3.connect("games.db")
+    games_conn=sqlite3.connect("games.db",timeout=10)
     games_conn.row_factory = sqlite3.Row
     games_curs = games_conn.cursor()
     games_curs.execute("select CommandName, CommandDescription from Wiki where CommandGroup=? order by ListOrder asc", (group,))
@@ -2014,8 +2008,7 @@ async def get_wiki_page(group: str= "General"):
 @app_commands.describe(ignoredchannels="Channel ID for the ignored channels to add or remove")
 @app_commands.describe(flaggoofsgaffs="Flag to enable chat response goofs and gaffs. 1 is on 0 is off")
 async def gamesettingscommandset(interaction: discord.Interaction, numberofquestionsperday: int = None, questiontimeout: int = None, pipchance: float = None, questionchance: float = None, flagshamechannel: int = None, shamechannel: str = None, flagignoredchannels: int = None, ignoredchannels: str = None, flaggoofsgaffs: int = None):
-    games_db = "games.db"
-    games_conn = sqlite3.connect(games_db)
+    games_conn=sqlite3.connect("games.db",timeout=10)
     games_curs = games_conn.cursor()
     games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName, CommandParameters) VALUES (?, ?, ?, ?)''', (interaction.guild.id, interaction.user.id, "game-settings-set", f"'numberofquestionsperday': {numberofquestionsperday}, 'questiontimeout': {questiontimeout}, 'pipchance': {pipchance}, 'questionchance': {questionchance}, 'flagshamechannel': {flagshamechannel}, 'shamechannel': {shamechannel}, 'flagignoredchannels': {flagignoredchannels}, 'ignoredchannels': {ignoredchannels}, 'flaggoofsgaffs': {flaggoofsgaffs}"))
     games_conn.commit()
@@ -2025,8 +2018,7 @@ async def gamesettingscommandset(interaction: discord.Interaction, numberofquest
         await interaction.response.send_message("You are not authorized to use this command. ask an administrator to authorize you using the /addAuthorizedUser command.",ephemeral=True)
         return
     #go through each parameter and if it is not none, update the database with its new value
-    games_db = "games.db"
-    games_conn = sqlite3.connect(games_db)
+    games_conn=sqlite3.connect("games.db",timeout=10)
     games_curs = games_conn.cursor()
     changedSettings=""
     errorString=""
@@ -2129,8 +2121,7 @@ async def gamesettingscommandset(interaction: discord.Interaction, numberofquest
 @app_commands.describe(flagtwitteralt="1 is on 0 is off.")
 @app_commands.describe(twitteraltchance="0-1 decimal")
 async def goofs_settings_command_set(interaction: discord.Interaction, flaghorse: int = None, horsechance: float = None, flagcat: int = None, catchance: float = None, flagping: int = None, flagmarathon: int = None, marathonchance: float = None, flagtwitteralt: int = None, twitteraltchance: float = None):
-    games_db="games.db"
-    games_conn=sqlite3.connect(games_db)
+    games_conn=sqlite3.connect("games.db",timeout=10)
     games_curs=games_conn.cursor()
     games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName, CommandParameters) VALUES (?, ?, ?, ?)''', (interaction.guild.id, interaction.user.id, "goofs-settings-set", f"'flaghorse': {flaghorse}, 'horsechance': {horsechance}, 'flagcat': {flagcat}, 'catchance': {catchance}, 'flagping': {flagping}, 'flagmarathon': {flagmarathon}, 'marathonchance': {marathonchance}, 'flagtwitteralt': {flagtwitteralt}, 'twitteraltchance': {twitteraltchance}"))
     games_conn.commit()
@@ -2140,8 +2131,7 @@ async def goofs_settings_command_set(interaction: discord.Interaction, flaghorse
         await interaction.response.send_message("You are not authorized to use this command.")
         return
 
-    games_db="games.db"
-    games_conn=sqlite3.connect(games_db)
+    games_conn=sqlite3.connect("games.db",timeout=10)
     games_curs=games_conn.cursor()
     changedSettings=""
     errorString=""
@@ -2215,8 +2205,7 @@ async def goofs_settings_command_set(interaction: discord.Interaction, flaghorse
 @client.tree.command(name="goofs-settings-get",description="Get goofs and gaffs settings")
 async def goofs_settings_command_get(interaction: discord.Interaction):
     # Get and display the goofs and gaffs setting for the given server
-    games_db = "games.db"
-    games_conn = sqlite3.connect(games_db)
+    games_conn=sqlite3.connect("games.db",timeout=10)
     games_curs = games_conn.cursor()
     games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName) VALUES (?, ?, ?)''', (interaction.guild.id, interaction.user.id, "goofs-settings-get"))
     games_conn.commit()
@@ -2236,8 +2225,7 @@ async def goofs_settings_command_get(interaction: discord.Interaction):
 @client.tree.command(name="game-settings-get", description="Get server settings")
 async def serversettingscommandget(interaction: discord.Interaction):
     #get and display all values in the serversettings table for the given server
-    games_db = "games.db"
-    games_conn = sqlite3.connect(games_db)
+    games_conn=sqlite3.connect("games.db",timeout=10)
     games_curs = games_conn.cursor()
     games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName) VALUES (?, ?, ?)''', (interaction.guild.id, interaction.user.id, "game-settings-get"))
     games_conn.commit()
