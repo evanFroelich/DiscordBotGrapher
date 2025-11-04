@@ -1958,6 +1958,13 @@ class SwitchAuctionButton(discord.ui.Button):
 
 @client.tree.command(name="wiki", description="A wiki for understanding the bot's features")
 async def wiki(interaction: discord.Interaction):
+    #log it to the command log
+    games_conn=sqlite3.connect("games.db",timeout=10)
+    games_curs = games_conn.cursor()
+    games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName) VALUES (?, ?, ?)''', (interaction.guild.id, interaction.user.id, "wiki"))
+    games_conn.commit()
+    games_curs.close()
+    games_conn.close()
     embed = discord.Embed(title="Bot Wiki", description="A wiki for understanding the bot's features.", color=0x228a65)
     pages = await get_wiki_page()
     for page in pages:
