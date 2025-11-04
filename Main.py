@@ -2328,7 +2328,8 @@ async def delete_later(message,time):
 @client.tree.command(name="leaderboard", description="new game points leaderboard")
 @app_commands.choices(subtype=[
     app_commands.Choice(name="bonus-points", value="pip"),
-    app_commands.Choice(name="coin-flip", value="flip")
+    app_commands.Choice(name="coin-flip", value="flip"),
+    app_commands.Choice(name="balance", value="balance")
 ])
 @app_commands.choices(visibility=[
     app_commands.Choice(name="public", value="public"),
@@ -2384,11 +2385,24 @@ async def leaderboard(interaction: discord.Interaction, subtype: app_commands.Ch
         else:
             msg=await interaction.followup.send("\n".join(leaderboard),ephemeral=privMsg)
             asyncio.create_task(delete_later(message=msg,time=60))
+    if subtype.value == "balance":
+        #get the current balances for the server
+        games_curs.execute('''SELECT UserID, CurrentBalance FROM GamblingUserStats WHERE GuildID = ? ORDER BY CurrentBalance DESC''', (interaction.guild.id,))
+        rows= games_curs.fetchall()
+        outstr=""
+        for row in rows:
+            user=interaction.guild.get_member(int(row[0]))
+            if user:
+                outstr += f"{user.display_name}: {row[1]} points\n"
+            else:
+                outstr += f"User ID {row[0]}: {row[1]} points\n"
+        await interaction.followup.send(outstr, ephemeral=privMsg)
     games_curs.close()
     games_conn.close()
 
 
     
+
 
 
 
