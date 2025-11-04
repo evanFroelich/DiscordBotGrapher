@@ -246,7 +246,7 @@ class MyClient(discord.Client):
         self.tree = app_commands.CommandTree(self)
 
     async def setup_hook(self):
-        await self.tree.sync()
+        #await self.tree.sync()
         print('synced')
 
     async def on_thread_create(self,thread):
@@ -2343,6 +2343,7 @@ async def leaderboard(interaction: discord.Interaction, subtype: app_commands.Ch
     games_conn.commit()
     privMsg=True if visibility.value=="private" else False
     await interaction.response.defer(thinking=True,ephemeral=privMsg)
+    embed=embed=discord.Embed(title="Leaderboard", color=0x228a65)
     #print(f"visibility: {visibility.value} privMsg: {privMsg}")
     if subtype.value == "pip":
         guild_id = str(interaction.guild.id)
@@ -2352,6 +2353,7 @@ async def leaderboard(interaction: discord.Interaction, subtype: app_commands.Ch
         ORDER BY TotalPoints DESC''', (guild_id,))
         rows= games_curs.fetchall()
         outstr=""
+        embed.title="Bonus Points Leaderboard"
         for row in rows:
             user=interaction.guild.get_member(int(row[0]))
             if user:
@@ -2360,43 +2362,44 @@ async def leaderboard(interaction: discord.Interaction, subtype: app_commands.Ch
                 outstr += f"User ID {row[0]}: {row[1]} points\n"
         if outstr == "":
             outstr = "no points yet"
-        await interaction.followup.send(outstr,ephemeral=privMsg)
+        embed.description=outstr
+        await interaction.followup.send(embed=embed, ephemeral=privMsg)
     if subtype.value == "flip":
         games_curs.execute('''SELECT UserID, CurrentStreak FROM CoinFlipLeaderboard ORDER BY CurrentStreak DESC, LastFlip DESC''')
         rows= games_curs.fetchall()
-        leaderboard=[]
+        embed=discord.Embed(color=0x228a65)
+        outstr=""
         quitQ=0
         participation=0
-        leaderboard.append(f"---Coin Flip Leaderboard---")
+        embed.title="---Coin Flip Leaderboard---"
         for UserID, CurrentStreak in rows:
             #--TODO: see if i can pre capture the user ids so i only have to go out to discord once instead of every loop
             user=interaction.guild.get_member(int(UserID))
             if user:
                 if participation == 0 and CurrentStreak==1:
-                    leaderboard.append(f"---Participation Trophy---")
+                    outstr+=f"---Participation Trophy---\n"
                     participation=1
                 if quitQ==0 and CurrentStreak == 0:
-                    leaderboard.append(f"---Quitters---")
+                    outstr+=f"---Quitters---\n"
                     quitQ=1
-                leaderboard.append(f"{user.display_name}: {CurrentStreak}")
-        #check if leaderboard is empty
-        if not leaderboard:
-            await interaction.followup.send("No users found in the coin flip leaderboard.", ephemeral=privMsg)
-        else:
-            msg=await interaction.followup.send("\n".join(leaderboard),ephemeral=privMsg)
-            asyncio.create_task(delete_later(message=msg,time=60))
+                outstr += f"{user.display_name}: {CurrentStreak}\n"
+        embed.description=outstr
+        msg=await interaction.followup.send(embed=embed,ephemeral=privMsg)
+        asyncio.create_task(delete_later(message=msg,time=60))
     if subtype.value == "balance":
         #get the current balances for the server
         games_curs.execute('''SELECT UserID, CurrentBalance FROM GamblingUserStats WHERE GuildID = ? ORDER BY CurrentBalance DESC''', (interaction.guild.id,))
         rows= games_curs.fetchall()
         outstr=""
+        embed=discord.Embed(title="Gambling Balance Leaderboard", color=0x228a65)
         for row in rows:
             user=interaction.guild.get_member(int(row[0]))
             if user:
                 outstr += f"{user.display_name}: {row[1]} points\n"
             else:
                 outstr += f"User ID {row[0]}: {row[1]} points\n"
-        await interaction.followup.send(outstr, ephemeral=privMsg)
+        embed.description=outstr
+        await interaction.followup.send(embed=embed, ephemeral=privMsg)
     games_curs.close()
     games_conn.close()
 
