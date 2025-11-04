@@ -2882,7 +2882,7 @@ async def createTimers(GuildID):
     games_conn.close()
 
 async def smrtGame(message):
-    await createTimers(message.guild.id)
+    #await createTimers(message.guild.id)
     gamesDB = "games.db"
     games_conn = sqlite3.connect(gamesDB)
     games_curs = games_conn.cursor()
