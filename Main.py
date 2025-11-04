@@ -1151,10 +1151,8 @@ async def award_points(amount, guild_id, user_id):
     gamesDB = "games.db"
     games_conn = sqlite3.connect(gamesDB)
     games_curs = games_conn.cursor()
-    games_curs.execute('''UPDATE GamblingUserStats SET CurrentBalance = CurrentBalance + ? WHERE GuildID=? AND UserID=?;''', (amount, guild_id, user_id))
-    #also add the same amount to the LifetimeEarnings column
-    if amount > 0:
-        games_curs.execute('''UPDATE GamblingUserStats SET LifetimeEarnings = LifetimeEarnings + ? WHERE GuildID=? AND UserID=?;''', (amount, guild_id, user_id))
+    #change line to insert and on conflict update
+    games_curs.execute('''INSERT INTO GamblingUserStats (GuildID, UserID, CurrentBalance, LifetimeEarnings) VALUES (?, ?, ?, ?) ON CONFLICT (GuildID, UserID) DO UPDATE SET CurrentBalance = CurrentBalance + ?, LifetimeEarnings = LifetimeEarnings + ?;''', (guild_id, user_id, amount, amount, amount, amount))
     games_conn.commit()
     games_curs.close()
     games_conn.close()
