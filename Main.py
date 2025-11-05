@@ -20,6 +20,7 @@ import asyncio
 import numpy as np
 import json
 import requests
+import aiohttp
 import zoneinfo
 
 
@@ -700,6 +701,8 @@ class QuestionPickButton(discord.ui.Button):
             retries=row[int(self.question_difficulty)]
             modal = QuestionModal(Question=self.question, isForced=self.isForced, retries=retries, userID=interaction.user.id, guildID=interaction.guild.id, messageID=interaction.message.id)
             await interaction.response.send_modal(modal)
+            #fix the references
+            #games_curs.execute('''INSERT or ignore into ActiveTrivia (GuildID, UserID, MessageID, QuestionID, QuestionType, QuestionDifficulty, QuestionText) VALUES (?, ?, ?, ?, ?, ?, ?)''', (interaction.guild.id, self.userID, self.messageID, self.question_id, self.question_type, self.question_difficulty, self.question_text))
             games_curs.close()
             games_conn.close()
 
@@ -897,21 +900,18 @@ class QuestionThankYouButton(discord.ui.Button):
 
 
 async def askLLM(question):
-    response = requests.post(
-        "http://localhost:11434/api/generate",
-        json={"model": "phi3", "prompt": question}
-    )
-    full_response = ""
-    for line in response.iter_lines():
-        if line:
-            data = json.loads(line)
+    async with aiohttp.ClientSession() as session:
+        async with session.post(
+            "http://localhost:11434/api/generate",
+            json={"model": "phi3", "prompt": question, "stream": False}
+        ) as response:
+            if response.status != 200:
+                print(f"Error: Received status code {response.status}")
+                return None
+            full_response = ""
+            data = await response.json()
             if "response" in data:
                 full_response += data["response"]
-            elif "error" in data:
-                print(f"Error occurred: {data['error']}")
-                return None
-            elif "done" in data:
-                break  # Ollama sends this when finished
 
     return full_response.strip() if full_response else None
 
@@ -1028,23 +1028,23 @@ class QuestionModal(discord.ui.Modal):
         LLMResponse = -1
         LLMText = "N/A"
         if not classicResponse:
-            try:
+            #try:
                 #classicResponse = user_answer.lower() in [answer.lower() for answer in self.question_answers]
-                LLMResponse, LLMText = await checkAnswer(self.question_text, self.question_answers, user_answer)
-                games_curs.execute('''INSERT INTO LLMEvaluations (Question, GivenAnswer, UserAnswer, LLMResponse, ClassicResponse) VALUES (?, ?, ?, ?, ?)''', (self.question_text, self.question_answers[0], user_answer, LLMResponse, classicResponse))
-                games_conn.commit()
-                if LLMResponse is not None:
-                    if int(LLMResponse) == 0 and self.retries > 0:
-                        self.retries -= 1
-                        qlist=[self.isForced,self.retries,self.guildID,self.userID,self.messageID]
-                        view = discord.ui.View(timeout=None)
-                        retryButton=QuestionRetryButton(question=self.question, qList=qlist, label="Retry Question?")
-                        view.add_item(retryButton)
-                        await interaction.followup.send(f"Incorrect answer. You have {self.retries+1} chance(s) to retry the question. If you abandon the question, it will count as incorrect.",ephemeral=True,view=view)
-                        return
-            except Exception as e:
-                print(f"Error occurred: {e}")
-                logging.info(f"Error occurred in LLM: {e}")
+            LLMResponse, LLMText = await checkAnswer(self.question_text, self.question_answers, user_answer)
+            games_curs.execute('''INSERT INTO LLMEvaluations (Question, GivenAnswer, UserAnswer, LLMResponse, ClassicResponse) VALUES (?, ?, ?, ?, ?)''', (self.question_text, self.question_answers[0], user_answer, LLMResponse, classicResponse))
+            games_conn.commit()
+            if LLMResponse is not None:
+                if int(LLMResponse) == 0 and self.retries > 0:
+                    self.retries -= 1
+                    qlist=[self.isForced,self.retries,self.guildID,self.userID,self.messageID]
+                    view = discord.ui.View(timeout=None)
+                    retryButton=QuestionRetryButton(question=self.question, qList=qlist, label="Retry Question?")
+                    view.add_item(retryButton)
+                    await interaction.followup.send(f"Incorrect answer. You have {self.retries+1} chance(s) to retry the question. If you abandon the question, it will count as incorrect.",ephemeral=True,view=view)
+                    return
+            #except Exception as e:
+                #print(f"Error occurred: {e}")
+                #logging.info(f"Error occurred in LLM: {e}")
         if classicResponse or int(LLMResponse)==1:
             games_curs.execute('''INSERT INTO Scores (GuildID, UserID, Category, Difficulty, Num_Correct, Num_Incorrect) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(GuildID, UserID, Category, Difficulty) DO UPDATE SET Num_Correct = Num_Correct + 1;''', (interaction.guild.id, interaction.user.id, self.question_type, self.question_difficulty, 1, 0))
             games_curs.execute('''UPDATE GamblingUserStats SET QuestionsAnsweredTodayCorrect = QuestionsAnsweredTodayCorrect + 1 WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
