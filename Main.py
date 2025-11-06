@@ -1418,9 +1418,41 @@ async def news(interaction: discord.Interaction):
     embed = discord.Embed(title="Recent News", color=discord.Color.blue())
     for row in rows:
         embed.add_field(name=f"{row[0]}: {row[2]}", value=row[1], inline=False)
-    await interaction.response.send_message(embed=embed, ephemeral=True)
+    view = discord.ui.View()
+    next_button = NewsPageButton(label="Next", page_number=2)
+    view.add_item(next_button)
+    await interaction.response.send_message(embed=embed, ephemeral=True, view=view)
     games_curs.close()
     games_conn.close()
+
+class NewsPageButton(discord.ui.Button):
+    def __init__(self, label=None, page_number=1):
+        super().__init__(label=label, style=discord.ButtonStyle.primary)
+        self.page_number = page_number
+
+    async def callback(self, interaction: discord.Interaction):
+        gamesDB="games.db"
+        games_conn = sqlite3.connect(gamesDB)
+        games_curs = games_conn.cursor()
+        offset = (self.page_number - 1) * 3
+        games_curs.execute('''SELECT Date, Notes, Headline from NewsFeed order by Date desc Limit 3 OFFSET ?''', (offset,))
+        rows = games_curs.fetchall()
+        embed = discord.Embed(title="Recent News", color=discord.Color.blue())
+        for row in rows:
+            embed.add_field(name=f"{row[0]}: {row[2]}", value=row[1], inline=False)
+        view = discord.ui.View()
+        if self.page_number > 1:
+            prev_button = NewsPageButton(label="Previous", page_number=self.page_number - 1)
+            view.add_item(prev_button)
+        # Check if there are more news items for the next page
+        games_curs.execute('''SELECT COUNT(*) FROM NewsFeed''')
+        total_news = games_curs.fetchone()[0]
+        if offset + 3 < total_news:
+            next_button = NewsPageButton(label="Next", page_number=self.page_number + 1)
+            view.add_item(next_button)
+        await interaction.response.edit_message(embed=embed, view=view)
+        games_curs.close()
+        games_conn.close()
 
 @client.tree.command(name="most-used-emojis",description="Queries emoji data for this server.")
 @app_commands.choices(inorout=[
