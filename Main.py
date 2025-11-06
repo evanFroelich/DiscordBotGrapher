@@ -909,11 +909,16 @@ async def askLLM(question):
                 print(f"Error: Received status code {response.status}")
                 return None
             full_response = ""
+            time=0
             data = await response.json()
             if "response" in data:
                 full_response += data["response"]
+            if "total_duration" in data:
+                time = data["total_duration"]
+                #convert to seconds. currently in nanoseconds
+                time /= 1000000000
 
-    return full_response.strip() if full_response else None
+    return full_response.strip() if full_response else None, time
 
 async def checkAnswer(question, correctAnswer, userAnswer):
     prompt = f"""
@@ -937,12 +942,15 @@ User answer (text only): "{userAnswer}"
 
 Output:
 """
-    result = (await askLLM(prompt)).strip().lower()
+    #result, timeTaken = (await askLLM(prompt)).strip().lower()
+    result, timeTaken = await askLLM(prompt)
+    result = result.strip().lower()
     print(f"LLM result: {result}")
+    print(f"LLM response time: {timeTaken} seconds")
     #if the result is longer than one word, re run the llm
     if len(result.split()) > 1:
         result = (await askLLM(prompt)).strip().lower()
-    return "abc123" in result, result
+    return "abc123" in result, result, timeTaken
 
 class QuestionRetryButton(discord.ui.Button):
     def __init__(self, question, qList, label: str, style: discord.ButtonStyle = discord.ButtonStyle.primary):
@@ -1028,23 +1036,23 @@ class QuestionModal(discord.ui.Modal):
         LLMResponse = -1
         LLMText = "N/A"
         if not classicResponse:
-            #try:
+            try:
                 #classicResponse = user_answer.lower() in [answer.lower() for answer in self.question_answers]
-            LLMResponse, LLMText = await checkAnswer(self.question_text, self.question_answers, user_answer)
-            games_curs.execute('''INSERT INTO LLMEvaluations (Question, GivenAnswer, UserAnswer, LLMResponse, ClassicResponse) VALUES (?, ?, ?, ?, ?)''', (self.question_text, self.question_answers[0], user_answer, LLMResponse, classicResponse))
-            games_conn.commit()
-            if LLMResponse is not None:
-                if int(LLMResponse) == 0 and self.retries > 0:
-                    self.retries -= 1
-                    qlist=[self.isForced,self.retries,self.guildID,self.userID,self.messageID]
-                    view = discord.ui.View(timeout=None)
-                    retryButton=QuestionRetryButton(question=self.question, qList=qlist, label="Retry Question?")
-                    view.add_item(retryButton)
-                    await interaction.followup.send(f"Incorrect answer. You have {self.retries+1} chance(s) to retry the question. If you abandon the question, it will count as incorrect.",ephemeral=True,view=view)
-                    return
-            #except Exception as e:
-                #print(f"Error occurred: {e}")
-                #logging.info(f"Error occurred in LLM: {e}")
+                LLMResponse, LLMText, timeTaken = await checkAnswer(self.question_text, self.question_answers, user_answer)
+                games_curs.execute('''INSERT INTO LLMEvaluations (Question, GivenAnswer, UserAnswer, LLMResponse, ClassicResponse, LLMText, LLMTime) VALUES (?, ?, ?, ?, ?, ?, ?)''', (self.question_text, self.question_answers[0], user_answer, LLMResponse, classicResponse, LLMText, timeTaken))
+                games_conn.commit()
+                if LLMResponse is not None:
+                    if int(LLMResponse) == 0 and self.retries > 0:
+                        self.retries -= 1
+                        qlist=[self.isForced,self.retries,self.guildID,self.userID,self.messageID]
+                        view = discord.ui.View(timeout=None)
+                        retryButton=QuestionRetryButton(question=self.question, qList=qlist, label="Retry Question?")
+                        view.add_item(retryButton)
+                        await interaction.followup.send(f"Incorrect answer. You have {self.retries+1} chance(s) to retry the question. If you abandon the question, it will count as incorrect.",ephemeral=True,view=view)
+                        return
+            except Exception as e:
+                print(f"Error occurred: {e}")
+                logging.info(f"Error occurred in LLM: {e}")
         if classicResponse or int(LLMResponse)==1:
             games_curs.execute('''INSERT INTO Scores (GuildID, UserID, Category, Difficulty, Num_Correct, Num_Incorrect) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(GuildID, UserID, Category, Difficulty) DO UPDATE SET Num_Correct = Num_Correct + 1;''', (interaction.guild.id, interaction.user.id, self.question_type, self.question_difficulty, 1, 0))
             games_curs.execute('''UPDATE GamblingUserStats SET QuestionsAnsweredTodayCorrect = QuestionsAnsweredTodayCorrect + 1 WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
