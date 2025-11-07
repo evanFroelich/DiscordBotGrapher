@@ -1012,14 +1012,14 @@ class QuestionStealButton(discord.ui.Button):
         if await ButtonLockout(interaction):
             self.disabled = True
             await interaction.message.edit(view=self.view)
-            modal = QuestionModal(Question=self.question, isForced=True, retries=0, userID=interaction.user.id, guildID=interaction.guild.id, messageID=interaction.message.id)
+            modal = QuestionModal(Question=self.question, isForced=False, retries=0, userID=interaction.user.id, guildID=interaction.guild.id, messageID=interaction.message.id, isSteal=True)
             await interaction.response.send_modal(modal)
             #disable the button
             
         return
 
 class QuestionModal(discord.ui.Modal):
-    def __init__(self, Question=None, isForced=False, retries=0, guildID=None, userID=None, messageID=None):
+    def __init__(self, Question=None, isForced=False, retries=0, guildID=None, userID=None, messageID=None, isSteal=False):
         super().__init__(title="Trivia Question")
         self.question= Question  # Store the question data
         self.question_id = Question[0]  # Question ID
@@ -1034,6 +1034,7 @@ class QuestionModal(discord.ui.Modal):
         self.guildID = guildID
         self.userID = userID
         self.messageID = messageID
+        self.stealFlag = isSteal
         self.question_ask = discord.ui.TextInput(label=f"Answer Below:", placeholder="answer", max_length=100, style=discord.TextStyle.short)
         self.questionUI=discord.ui.TextDisplay(content=self.question_text)
         self.retryText = discord.ui.TextDisplay(content=f"Number of retries left: {self.retries}")
@@ -1163,10 +1164,13 @@ class QuestionModal(discord.ui.Modal):
             questions_answered_today = 0
             questions_answered_today_correct = 0
         mode=""
-        if self.isForced:
-            mode="Daily"
+        if self.stealFlag:
+            mode="Steal"
         else:
-            mode="Random"
+            if self.isForced:
+                mode="Daily"
+            else:
+                mode="Random"
         if classicResponse:
             classicResponse = 1
         else:
