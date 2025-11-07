@@ -1010,11 +1010,12 @@ class QuestionStealButton(discord.ui.Button):
             await interaction.response.send_message("You have already answered this question in the last 24 hours and cannot steal it.", ephemeral=True)
             return
         if await ButtonLockout(interaction):
+            self.disabled = True
+            await interaction.message.edit(view=self.view)
             modal = QuestionModal(Question=self.question, isForced=True, retries=0, userID=interaction.user.id, guildID=interaction.guild.id, messageID=interaction.message.id)
             await interaction.response.send_modal(modal)
             #disable the button
-            self.disabled = True
-            await interaction.message.edit(view=self.view)
+            
         return
 
 class QuestionModal(discord.ui.Modal):
