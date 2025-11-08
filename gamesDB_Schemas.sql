@@ -241,7 +241,7 @@ CREATE TABLE if not exists Wiki (
 	PRIMARY KEY("CommandName")
 );
 
-CREATE TABLE if note exists ActiveSteals (
+CREATE TABLE if not exists ActiveSteals (
 	"GuildID"	INTEGER NOT NULL,
 	"ChannelID"	INTEGER NOT NULL,
 	"MessageID"	INTEGER NOT NULL,
