@@ -241,6 +241,14 @@ CREATE TABLE if not exists Wiki (
 	PRIMARY KEY("CommandName")
 );
 
+CREATE TABLE if note exists ActiveSteals (
+	"GuildID"	INTEGER NOT NULL,
+	"ChannelID"	INTEGER NOT NULL,
+	"MessageID"	INTEGER NOT NULL,
+	"Timestamp"	TEXT DEFAULT (datetime('now', 'localtime')),
+	PRIMARY KEY("MessageID")
+);
+
 CREATE VIEW if not exists GamblingUnlockMetricsView AS
 SELECT
     GuildID,

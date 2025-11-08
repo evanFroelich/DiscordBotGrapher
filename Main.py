@@ -179,6 +179,50 @@ async def cleanup_abandoned_trivia_loop():
         guildID, userID, messageID, questionID, questionType, questionDifficulty, questionText = session[0], session[1], session[2], session[3], session[4], session[5], session[6]
         await abandoned_trivia_cleanup(guildID, userID, messageID, questionID, questionType, questionDifficulty, questionText)
     return
+
+@tasks.loop(hours=1)
+async def clear_steals_loop():
+    print("Clearing old steal messages...")
+    games_conn = sqlite3.connect("games.db")
+    games_curs = games_conn.cursor()
+    # Perform cleanup operations on abandoned trivia sessions
+    games_curs.execute('''SELECT GuildID, ChannelID, MessageID, Timestamp FROM ActiveSteals''')
+    active_steals = games_curs.fetchall()
+    for steal in active_steals:
+        guildID, channelID, messageID, timestamp = steal
+        print(f"{datetime.now() - datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S')}")
+        if datetime.now() - datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S') > timedelta(hours=2):
+            print(f"Clearing steal message {messageID} in guild {guildID}, channel {channelID}...")
+            guild = client.get_guild(guildID)
+            if guild:
+                channel = guild.get_channel(channelID)
+                if channel:
+                    try:
+                        message = await channel.fetch_message(messageID)
+                        #grey out the button on the message
+                        view=discord.ui.View()
+                        button=discord.ui.Button(label="STEAL", style=discord.ButtonStyle.gray, disabled=True)
+                        view.add_item(button)
+                        await message.edit(view=view)
+                    except Exception as e:
+                        print(f"Failed to delete steal message {messageID} in guild {guildID}, channel {channelID}: {e}")
+                else:
+                    thread = await guild.fetch_channel(channelID)
+                    if thread:
+                        try:
+                            message = await thread.fetch_message(messageID)
+                            view=discord.ui.View()
+                            button=discord.ui.Button(label="STEAL", style=discord.ButtonStyle.gray, disabled=True)
+                            view.add_item(button)
+                            await message.edit(view=view)
+                        except Exception as e:
+                            print(f"Failed to delete steal message {messageID} in guild {guildID}, thread {channelID}: {e}")
+            games_curs.execute('''DELETE FROM ActiveSteals WHERE GuildID=? AND ChannelID=? AND MessageID=?''', (guildID, channelID, messageID))
+    
+    games_conn.commit()
+    games_curs.close()
+    games_conn.close()
+    return
     
 
 class MyClient(discord.Client):
@@ -238,6 +282,8 @@ class MyClient(discord.Client):
             package_daily_gambling.start()
         if not daily_question_leaderboard.is_running():
             daily_question_leaderboard.start()
+        if not clear_steals_loop.is_running():
+            clear_steals_loop.start()
         #sched.start()
         #await checkAnswer(question="test",userAnswer="test",correctAnswer="test")
         await client.tree.sync()
@@ -1148,12 +1194,18 @@ class QuestionModal(discord.ui.Modal):
                 view.add_item(stealButton)
                 shameChannel = interaction.guild.get_channel(shameSettings[1])
                 if shameChannel:
-                    await shameChannel.send(f"Oops! <@{interaction.user.id}> didn't know the answer to: {self.question_text}",allowed_mentions=discord.AllowedMentions.none(), view=view)
+                    shameMessage = await shameChannel.send(f"Oops! <@{interaction.user.id}> didn't know the answer to: {self.question_text}",allowed_mentions=discord.AllowedMentions.none(), view=view)
+                    shameMessageID = shameMessage.id
+                    games_curs.execute('''INSERT INTO ActiveSteals (GuildID, ChannelID, MessageID) VALUES (?, ?, ?)''', (interaction.guild.id, shameChannel.id, shameMessageID))
+                    games_conn.commit()
                 else:
                     #try to get the thread
                     shameThread = interaction.guild.get_thread(shameSettings[1])
                     if shameThread:
-                        await shameThread.send(f"Oops! <@{interaction.user.id}> didn't know the answer to: {self.question_text}",allowed_mentions=discord.AllowedMentions.none(), view=view)
+                        shameMessage = await shameThread.send(f"Oops! <@{interaction.user.id}> didn't know the answer to: {self.question_text}",allowed_mentions=discord.AllowedMentions.none(), view=view)
+                        shameMessageID = shameMessage.id
+                        games_curs.execute('''INSERT INTO ActiveSteals (GuildID, ChannelID, MessageID) VALUES (?, ?, ?)''', (interaction.guild.id, shameThread.id, shameMessageID))
+                        games_conn.commit()
 
         games_curs.execute('''SELECT QuestionsAnsweredToday, QuestionsAnsweredTodayCorrect FROM GamblingUserStats WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
         userStats = games_curs.fetchone()
