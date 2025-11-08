@@ -1165,6 +1165,7 @@ class QuestionModal(discord.ui.Modal):
             questions_answered_today_correct = 0
         mode=""
         if self.stealFlag:
+            print("steal mode")
             mode="Steal"
         else:
             if self.isForced:
