@@ -1062,8 +1062,12 @@ class QuestionStealButton(discord.ui.Button):
             await interaction.message.edit(view=self.view)
             modal = QuestionModal(Question=self.question, isForced=False, retries=0, userID=interaction.user.id, guildID=interaction.guild.id, messageID=interaction.message.id, isSteal=True)
             await interaction.response.send_modal(modal)
-            #disable the button
-            
+            games_conn = sqlite3.connect("games.db")
+            games_curs = games_conn.cursor()
+            games_curs.execute('''DELETE FROM ActiveSteals WHERE GuildID=? AND UserID=? AND MessageID=?''', (interaction.guild.id, interaction.user.id, interaction.message.id))
+            games_conn.commit()
+            games_curs.close()
+            games_conn.close()
         return
 
 class QuestionModal(discord.ui.Modal):
