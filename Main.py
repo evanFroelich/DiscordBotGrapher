@@ -949,7 +949,8 @@ Output:
     print(f"LLM response time: {timeTaken} seconds")
     #if the result is longer than one word, re run the llm
     if len(result.split()) > 1:
-        result = (await askLLM(prompt)).strip().lower()
+        result, timeTaken = await askLLM(prompt)
+        result = result.strip().lower()
     return "abc123" in result, result, timeTaken
 
 class QuestionRetryButton(discord.ui.Button):
@@ -1011,6 +1012,7 @@ class QuestionStealButton(discord.ui.Button):
             return
         if await ButtonLockout(interaction):
             self.disabled = True
+            self.style = discord.ButtonStyle.secondary
             await interaction.message.edit(view=self.view)
             modal = QuestionModal(Question=self.question, isForced=False, retries=0, userID=interaction.user.id, guildID=interaction.guild.id, messageID=interaction.message.id, isSteal=True)
             await interaction.response.send_modal(modal)
