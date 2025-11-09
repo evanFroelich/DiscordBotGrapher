@@ -191,7 +191,7 @@ async def clear_steals_loop():
     for steal in active_steals:
         guildID, channelID, messageID, timestamp = steal
         print(f"{datetime.now() - datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S')}")
-        if datetime.now() - datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S') > timedelta(hours=2):
+        if datetime.now() - datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S') > timedelta(hours=1):
             print(f"Clearing steal message {messageID} in guild {guildID}, channel {channelID}...")
             guild = client.get_guild(guildID)
             if guild:
