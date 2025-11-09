@@ -949,7 +949,7 @@ async def askLLM(question):
     async with aiohttp.ClientSession() as session:
         async with session.post(
             "http://localhost:11434/api/generate",
-            json={"model": "phi3", "prompt": question, "stream": False}
+            json={"model": "llama3:8b", "prompt": question, "stream": False, "stop": ["abc123", "987zyx"], "options": {"temperature": 0.1, "num_predict": 10}}
         ) as response:
             if response.status != 200:
                 print(f"Error: Received status code {response.status}")
@@ -974,7 +974,7 @@ Only respond with "abc123" or "987zyx" — nothing else.
 Do not elaborate. do not explain. Do not talk.
 
 Rules:
-- If the user's answer means the same thing as the correct answer (allowing of spelling and grammar mistakes), reply exactly: abc123
+- If the user's answer means the same thing as the correct answer (being forgiving of spelling and grammar mistakes), reply exactly: abc123
 - Be tolerant of spelling, grammar, and typing mistakes (e.g., missing letters, swapped letters, or phonetically similar words).
 -Things like 3 and three are to be treated the same. someone misspelling a word like ghandi and gandhi are the same.
 - Accept answers that would be recognized as the same word if read aloud.
