@@ -1063,7 +1063,7 @@ class QuestionStealButton(discord.ui.Button):
             await interaction.response.send_modal(modal)
             games_conn = sqlite3.connect("games.db")
             games_curs = games_conn.cursor()
-            games_curs.execute('''DELETE FROM ActiveSteals WHERE GuildID=? AND UserID=? AND MessageID=?''', (interaction.guild.id, interaction.user.id, interaction.message.id))
+            games_curs.execute('''DELETE FROM ActiveSteals WHERE GuildID=? AND ChannelID=? AND MessageID=?''', (interaction.guild.id, interaction.channel.id, interaction.message.id))
             games_conn.commit()
             games_curs.close()
             games_conn.close()
@@ -3095,6 +3095,10 @@ async def questionSpawner(message):
     games_curs.close()
     games_conn.close()
     return
+
+
+
+
 
 class TestSelectMenu(discord.ui.Select):
     def __init__(self):
