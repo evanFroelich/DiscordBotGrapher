@@ -1971,34 +1971,35 @@ async def auction_house(interaction: discord.Interaction):
     games_conn.commit()
     games_curs.close()
     games_conn.close()
-    embed = discord.Embed(title="Auction House", description="Bid on winners!", color=0x228a65)
-    totalRows=0
-    if auction_data:
-        for item in auction_data:
-            totalRows+=1
-            userTag=""
-            if int(item['CurrentBidderGuildID']) == interaction.guild.id:
-                userTag = f"<@{item['CurrentBidderUserID']}>"
-            else:
-                userTag = f"*a user from another server*"
-            if totalRows == 1:
-                aucName = f"[{int(item['PercentAuctioned']*100)}% of yesterdays total from {item['Zone']}]"
-                aucValue = f":right_arrow: Current top bid: {item['CurrentPrice']} by {userTag}"
-            else:
-                aucName = f"{int(item['PercentAuctioned']*100)}% of yesterdays total from {item['Zone']}"
-                aucValue = f"Current top bid: {item['CurrentPrice']} by <@{item['CurrentBidderUserID']}>"
-            embed.add_field(name=aucName, value=aucValue, inline=False)
-            #embed.add_field(name="Current Price", value=item["CurrentPrice"], inline=False)
-            #embed.add_field(name="Percent of yesterdays total", value=item["PercentAuctioned"], inline=False)
-    else:
-        embed.add_field(name="No auction data available for today.", value="Please check back tomorrow.", inline=False)
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+    print(f"DEBUG: auction_data fetched: {len(auction_data)} items")
+    #if no auction data found
+    if not auction_data:
+        await interaction.response.send_message("No auction data found for today. Please try again later.", ephemeral=True)
         return
+    AUCTIONINFO={"ZoneInfo": {}}
+    for item in auction_data:
+        AUCTIONINFO["ZoneInfo"][item['Zone']] = {
+            'PercentAuctioned': item['PercentAuctioned'],
+            'CurrentPrice': item['CurrentPrice'],
+            'CurrentBidderUserID': item['CurrentBidderUserID'],
+            'CurrentBidderGuildID': item['CurrentBidderGuildID']
+        }
+    #print(f"DEBUG: AUCTIONINFO constructed: {AUCTIONINFO}")
+    AUCTIONINFO["AuctionList"]= list(AUCTIONINFO["ZoneInfo"].keys())
+    #print(f"DEBUG: AUCTIONINFO['AuctionList']: {AUCTIONINFO['AuctionList']}")
+    AUCTIONINFO["CurrentAuctionSelected"]=auction_data[0]['Zone']
+    #print(f"DEBUG: AUCTIONINFO['CurrentAuctionSelected']: {AUCTIONINFO['CurrentAuctionSelected']}")
+    embed = await auction_text_generator(interaction=interaction, AUCTIONINFO=AUCTIONINFO)
+    if embed == "exit":
+        return
+    
     view=discord.ui.View(timeout=None)
-    bidButton=OpenBidButton(label="Place a Bid")
-    refreshButton=RefreshAuctionButton(label="🔄")
-    plus5Button=SimpleBidButton(label="+5", bid_amount=5)
-    plus1Button=SimpleBidButton(label="+1", bid_amount=1)
+    bidButton=OpenBidButton(label="Place a Bid", selected_auction=AUCTIONINFO["CurrentAuctionSelected"])
+    refreshButton=RefreshAuctionButton(label="🔄", AUCTIONINFO=AUCTIONINFO)
+    plus5Button=SimpleBidButton(label="+5", bid_amount=5, selected_auction=AUCTIONINFO["CurrentAuctionSelected"])
+    plus1Button=SimpleBidButton(label="+1", bid_amount=1, selected_auction=AUCTIONINFO["CurrentAuctionSelected"])
+    switchAuctionButton=SwitchAuctionButton(label="Switch Auction", AUCTIONINFO=AUCTIONINFO)
+    view.add_item(switchAuctionButton)
     view.add_item(bidButton)
     view.add_item(refreshButton)
     view.add_item(plus5Button)
@@ -2006,8 +2007,10 @@ async def auction_house(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed, ephemeral=True, view=view)
 
 class RefreshAuctionButton(discord.ui.Button):
-    def __init__(self, label=None, style=discord.ButtonStyle.primary):
+    def __init__(self, label=None, style=discord.ButtonStyle.primary, AUCTIONINFO=None):
         super().__init__(label=label, style=style)
+        self.AUCTIONINFO = AUCTIONINFO
+
     async def callback(self, interaction: discord.Interaction):
          # 🟩 re-fetch auction data from DB
         games_conn = sqlite3.connect("games.db")
@@ -2016,45 +2019,45 @@ class RefreshAuctionButton(discord.ui.Button):
         games_curs.execute('''SELECT Zone, PercentAuctioned, CurrentPrice, CurrentBidderUserID, CurrentBidderGuildID
                               FROM AuctionHousePrize WHERE Date = ?''', (datetime.now().date(),))
         auction_data = games_curs.fetchall()
+        print(f"DEBUG: Refreshed auction_data fetched: {len(auction_data)} items")
         games_curs.close()
         games_conn.close()
-
+        AUCTIONINFO={"ZoneInfo": {}}
+        for item in auction_data:
+            AUCTIONINFO["ZoneInfo"][item['Zone']] = {
+                'PercentAuctioned': item['PercentAuctioned'],
+                'CurrentPrice': item['CurrentPrice'],
+                'CurrentBidderUserID': item['CurrentBidderUserID'],
+                'CurrentBidderGuildID': item['CurrentBidderGuildID']
+            }
+        AUCTIONINFO["AuctionList"]= list(AUCTIONINFO["ZoneInfo"].keys())
+        AUCTIONINFO["CurrentAuctionSelected"]=self.AUCTIONINFO["CurrentAuctionSelected"]
+        print(f"DEBUG: Refreshed AUCTIONINFO: {AUCTIONINFO}")
+        embed = await auction_text_generator(interaction=interaction, AUCTIONINFO=AUCTIONINFO)
         # 🟩 rebuild embed with new data
-        embed = discord.Embed(title="Auction House", description="Bid on winners!", color=0x228a65)
-        totalRows = 0
-        if auction_data:
-            for item in auction_data:
-                totalRows += 1
-                userTag = f"<@{item['CurrentBidderUserID']}>" if int(item['CurrentBidderGuildID']) == interaction.guild.id else "*a user from another server*"
-
-                if totalRows == 1:
-                    aucName = f"[{int(item['PercentAuctioned'] * 100)}% of yesterday's total from {item['Zone']}]"
-                    aucValue = f":right_arrow: Current top bid: {item['CurrentPrice']} by {userTag}"
-                else:
-                    aucName = f"{int(item['PercentAuctioned'] * 100)}% of yesterday's total from {item['Zone']}"
-                    aucValue = f"Current top bid: {item['CurrentPrice']} by <@{item['CurrentBidderUserID']}>"
-
-                embed.add_field(name=aucName, value=aucValue, inline=False)
-
         # 🟩 update message in place
         view = discord.ui.View(timeout=None)
-        view.add_item(OpenBidButton(label="Place a Bid"))
-        view.add_item(RefreshAuctionButton(label="🔄"))
-        view.add_item(SimpleBidButton(label="+5", bid_amount=5))
-        view.add_item(SimpleBidButton(label="+1", bid_amount=1))
+        view.add_item(SwitchAuctionButton(label="Switch Auction", AUCTIONINFO=AUCTIONINFO))
+        view.add_item(OpenBidButton(label="Place a Bid", selected_auction=AUCTIONINFO["CurrentAuctionSelected"]))
+        view.add_item(RefreshAuctionButton(label="🔄", AUCTIONINFO=AUCTIONINFO))
+        view.add_item(SimpleBidButton(label="+5", bid_amount=5, selected_auction=AUCTIONINFO["CurrentAuctionSelected"]))
+        view.add_item(SimpleBidButton(label="+1", bid_amount=1, selected_auction=AUCTIONINFO["CurrentAuctionSelected"]))
         await interaction.response.edit_message(embed=embed, view=view)
         #await interaction.followup.send("✅ Auction info refreshed!", ephemeral=True)  # optional confirmation
 
 class OpenBidButton(discord.ui.Button):
-    def __init__(self, label=None, style=discord.ButtonStyle.primary):
+    def __init__(self, label=None, style=discord.ButtonStyle.primary, selected_auction=None):
         super().__init__(label=label, style=style)
+        self.selected_auction = selected_auction
+
     async def callback(self, interaction: discord.Interaction):
-        placeABidModal=BidModal(interaction)
+        placeABidModal=BidModal(interaction, selected_auction=self.selected_auction)
         await interaction.response.send_modal(placeABidModal)
 
 class BidModal(discord.ui.Modal):
-    def __init__(self, interaction: discord.Interaction):
+    def __init__(self, interaction: discord.Interaction, selected_auction: str = None):
         super().__init__(title="Place Your Bid")
+        self.selected_auction = selected_auction
         games_conn=sqlite3.connect("games.db",timeout=10)
         games_conn.row_factory = sqlite3.Row
         games_curs=games_conn.cursor()
@@ -2063,10 +2066,10 @@ class BidModal(discord.ui.Modal):
         self.add_item(discord.ui.TextInput(label=f"Enter bid. Current bal: {currentBalance['CurrentBalance']}", placeholder="Enter your bid amount"))
     async def on_submit(self, interaction: discord.Interaction):
         bid_amount = self.children[0].value
-        await placeBid(interaction, bid_amount)
+        await placeBid(interaction, bid_amount, selected_auction=self.selected_auction)
         
 
-async def placeBid(interaction: discord.Interaction, bid_amount: int, is_simple_bid: bool = False):
+async def placeBid(interaction: discord.Interaction, bid_amount: int, is_simple_bid: bool = False, selected_auction: str = None):
         games_conn=sqlite3.connect("games.db",timeout=10)
         games_conn.row_factory = sqlite3.Row
         games_curs=games_conn.cursor()
@@ -2077,12 +2080,14 @@ async def placeBid(interaction: discord.Interaction, bid_amount: int, is_simple_
             games_curs.close()
             games_conn.close()
             return
-        games_curs.execute('''SELECT CurrentPrice FROM AuctionHousePrize where Date = ?''', (datetime.now().date(),))
+        print(f"DEBUG: selected_auction in placeBid: {selected_auction}")
+        games_curs.execute('''SELECT CurrentPrice FROM AuctionHousePrize where Date = ? and Zone = ?''', (datetime.now().date(), selected_auction))
         currentPrice= games_curs.fetchone()
+        print(f"DEBUG: currentPrice in placeBid: {currentPrice['CurrentPrice'] if currentPrice else 'None'}")
         if is_simple_bid:
             bid_amount = currentPrice['CurrentPrice'] + bid_amount
         if currentPrice and int(bid_amount) > currentPrice['CurrentPrice']:
-            games_curs.execute('''UPDATE AuctionHousePrize SET CurrentPrice = ?, CurrentBidderUserID = ?, CurrentBidderGuildID = ? WHERE Date = ?''', (int(bid_amount), interaction.user.id, interaction.guild.id, datetime.now().date()))
+            games_curs.execute('''UPDATE AuctionHousePrize SET CurrentPrice = ?, CurrentBidderUserID = ?, CurrentBidderGuildID = ? WHERE Date = ? and Zone = ?''', (int(bid_amount), interaction.user.id, interaction.guild.id, datetime.now().date(), selected_auction))
             games_conn.commit()
             await interaction.response.send_message(f"You placed a bid of {bid_amount}!",ephemeral=True)
         else:
@@ -2092,20 +2097,61 @@ async def placeBid(interaction: discord.Interaction, bid_amount: int, is_simple_
 
 
 class SimpleBidButton(discord.ui.Button):
-    def __init__(self, label=None, style=discord.ButtonStyle.primary, bid_amount=0):
+    def __init__(self, label=None, style=discord.ButtonStyle.primary, bid_amount=0, selected_auction=None):
         super().__init__(label=label, style=style)
         self.bid_amount = bid_amount
+        self.selected_auction = selected_auction
 
     async def callback(self, interaction: discord.Interaction):
-        await placeBid(interaction, self.bid_amount, is_simple_bid=True)
+        await placeBid(interaction, self.bid_amount, is_simple_bid=True, selected_auction=self.selected_auction)
         
 
 class SwitchAuctionButton(discord.ui.Button):
-    def __init__(self, label=None, style=discord.ButtonStyle.primary):
+    def __init__(self, label=None, style=discord.ButtonStyle.primary, AUCTIONINFO=None):
         super().__init__(label=label, style=style)
+        self.AUCTIONINFO = AUCTIONINFO
 
     async def callback(self, interaction: discord.Interaction):
-       return
+       #switch the current auction selected to the next one in the list
+        current_index = self.AUCTIONINFO["AuctionList"].index(self.AUCTIONINFO["CurrentAuctionSelected"])
+        next_index = (current_index + 1) % len(self.AUCTIONINFO["AuctionList"])
+        self.AUCTIONINFO["CurrentAuctionSelected"] = self.AUCTIONINFO["AuctionList"][next_index]
+        embed = await auction_text_generator(self.AUCTIONINFO, interaction=interaction)
+        view=discord.ui.View(timeout=None)
+        switchButton=SwitchAuctionButton(label="Switch Auction", AUCTIONINFO=self.AUCTIONINFO)
+        bidButton=OpenBidButton(label="Place a Bid", selected_auction=self.AUCTIONINFO["CurrentAuctionSelected"])
+        refreshButton=RefreshAuctionButton(label="🔄",AUCTIONINFO=self.AUCTIONINFO)
+        plus5Button=SimpleBidButton(label="+5", bid_amount=5, selected_auction=self.AUCTIONINFO["CurrentAuctionSelected"])
+        plus1Button=SimpleBidButton(label="+1", bid_amount=1, selected_auction=self.AUCTIONINFO["CurrentAuctionSelected"])
+        view.add_item(switchButton)
+        view.add_item(bidButton)
+        view.add_item(refreshButton)
+        view.add_item(plus5Button)
+        view.add_item(plus1Button)
+        await interaction.response.edit_message(embed=embed, view=view)
+        return
+
+async def auction_text_generator(AUCTIONINFO=None, interaction: discord.Interaction=None):
+    embed = discord.Embed(title="Auction House", description="Bid on winners!", color=0x228a65)
+    if AUCTIONINFO["ZoneInfo"]:
+        for zoneName, item in AUCTIONINFO["ZoneInfo"].items():
+            userTag=""
+            if int(item['CurrentBidderGuildID']) == interaction.guild.id:
+                userTag = f"<@{item['CurrentBidderUserID']}>"
+            else:
+                userTag = f"*a user from another server*"
+            if zoneName == AUCTIONINFO["CurrentAuctionSelected"]:
+                aucName = f"[{int(item['PercentAuctioned']*100)}% of yesterdays total from {zoneName}]"
+                aucValue = f":right_arrow: Current top bid: {item['CurrentPrice']} by {userTag}"
+            else:
+                aucName = f"{int(item['PercentAuctioned']*100)}% of yesterdays total from {zoneName}"
+                aucValue = f"Current top bid: {item['CurrentPrice']} by {userTag}"
+            embed.add_field(name=aucName, value=aucValue, inline=False)
+    else:
+        embed.add_field(name="No auction data available for today.", value="Please check back tomorrow.", inline=False)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+        return "exit"
+    return embed
 
 @client.tree.command(name="wiki", description="A wiki for understanding the bot's features")
 async def wiki(interaction: discord.Interaction):
