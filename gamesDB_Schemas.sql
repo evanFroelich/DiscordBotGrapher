@@ -249,6 +249,19 @@ CREATE TABLE if not exists ActiveSteals (
 	PRIMARY KEY("MessageID")
 );
 
+CREATE TABLE if not exists PassPhraseMasterList (
+	"ID"	INTEGER NOT NULL UNIQUE,
+	"Phrase"	TEXT,
+	PRIMARY KEY("ID" AUTOINCREMENT)
+);
+
+CREATE TABLE if not exists UserCasinoPassPhrases (
+	"UserID"	INTEGER NOT NULL,
+	"GuildID"	INTEGER NOT NULL,
+	"Phrase"	TEXT,
+	PRIMARY KEY("UserID","GuildID")
+);
+
 CREATE VIEW if not exists GamblingUnlockMetricsView AS
 SELECT
     GuildID,

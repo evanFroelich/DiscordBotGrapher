@@ -1,3 +1,4 @@
+from email.mime import message
 import discord
 import sqlite3
 import os
@@ -911,7 +912,7 @@ class QuestionThankYouButton(discord.ui.Button):
         games_conn.commit()
         contentPayload=""
         thanksView=discord.ui.View(timeout=None)
-        games_curs.execute('''SELECT Game1 FROM GamblingGamesUnlocked WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
+        games_curs.execute('''SELECT Game1, Game2 FROM GamblingGamesUnlocked WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
         unlockedGames = games_curs.fetchone()
         if unlockedGames:
             if unlockedGames[0] == 1:
@@ -921,13 +922,26 @@ class QuestionThankYouButton(discord.ui.Button):
                 if storyProgress:
                     if storyProgress[0] == 1:
                         thanksView.add_item(GamblingButton(label="Lets Go Gambling!", user_id=interaction.user.id, guild_id=interaction.guild.id, style=discord.ButtonStyle.primary))
-                    if storyProgress[0] == 0:
+                    elif storyProgress[0] == 0:
                         contentPayload += f"You seem smart, friend. I’ve noticed you’ve got more coins than you need, so if you’re looking for a way to spend them and have some fun at the same time… I might just know a guy."
                         thanksView.add_item(GamblingButton(label="Step out around back into the allyway", user_id=interaction.user.id, guild_id=interaction.guild.id, style=discord.ButtonStyle.primary))
                         games_curs.execute('''UPDATE StoryProgression SET Story1 = 1 WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
                         games_conn.commit()
                 else:
                     games_curs.execute('''INSERT INTO StoryProgression (GuildID, UserID) VALUES (?, ?)''', (interaction.guild.id, interaction.user.id))
+                    games_conn.commit()
+            if unlockedGames[1] == 1:
+                games_curs.execute('''SELECT Story2 FROM StoryProgression WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
+                storyProgress = games_curs.fetchone()
+                if storyProgress[0] == 1:
+                        thanksView.add_item(CasinoIntroButton(label="Enter the Casino", userID=interaction.user.id, guildID=interaction.guild.id, style=discord.ButtonStyle.primary))
+                elif storyProgress[0] == 0:
+                    keyPhrase = await passPhraseAssignment()
+                    games_curs.execute('''INSERT INTO UserCasinoPassPhrases (GuildID, UserID, Phrase) VALUES (?, ?, ?)''', (interaction.guild.id, interaction.user.id, keyPhrase))
+                    games_conn.commit()
+                    contentPayload += f"I see you have been doing well for yourself. If you’re looking for something more upscale, I know just the place. \nBut you’ll need the right password to get in. \nThe password is '{keyPhrase}'. Remember it well."
+                    thanksView.add_item(CasinoIntroButton(label="Enter the Casino", userID=interaction.user.id, guildID=interaction.guild.id, style=discord.ButtonStyle.primary))
+                    games_curs.execute('''UPDATE StoryProgression SET Story2 = 1 WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
                     games_conn.commit()
            
            
@@ -1158,6 +1172,10 @@ class QuestionModal(discord.ui.Modal):
                     # questionAnsweredView.add_item(GamblingButton(label="🎰", user_id=interaction.user.id, guild_id=interaction.guild.id, style=discord.ButtonStyle.primary))
                     games_curs.execute('''INSERT INTO GamblingGamesUnlocked (GuildID, UserID, Game1) VALUES (?, ?, 1) ON CONFLICT(GuildID, UserID) DO UPDATE SET Game1=1''', (interaction.guild.id, interaction.user.id))
                     games_conn.commit()
+                if userStats[5]>= unlockConditions[4] and userStats[6]>= unlockConditions[5] and userStats[7]>= unlockConditions[6]:
+                    # questionAnsweredView.add_item(GamblingButton(label="🎰", user_id=interaction.user.id, guild_id=interaction.guild.id, style=discord.ButtonStyle.primary))
+                    games_curs.execute('''INSERT INTO GamblingGamesUnlocked (GuildID, UserID, Game2) VALUES (?, ?, 1) ON CONFLICT(GuildID, UserID) DO UPDATE SET Game2=1''', (interaction.guild.id, interaction.user.id))
+                    games_conn.commit()
             #await interaction.response.send_message(f"Correct!", ephemeral=True, view=questionAnsweredView)
             #check if they can still do a daily trivia question by checking if the LastDailyQuestionTime is not from today
             games_curs.execute('''SELECT LastDailyQuestionTime FROM GamblingUserStats WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
@@ -1173,6 +1191,7 @@ class QuestionModal(discord.ui.Modal):
                await interaction.followup.send(f"Correct! You have been awarded {gamblingPoints} gambling points.\n\nYou still have a daily trivia question available! /daily-trivia", ephemeral=True, view=questionAnsweredView)
         else:
             games_curs.execute('''INSERT INTO Scores (GuildID, UserID, Category, Difficulty, Num_Correct, Num_Incorrect) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(GuildID, UserID, Category, Difficulty) DO UPDATE SET Num_Incorrect = Num_Incorrect + 1;''', (interaction.guild.id, interaction.user.id, self.question_type, self.question_difficulty, 0, 1))
+            games_conn.commit()
             games_curs.execute('''UPDATE QuestionList SET GlobalIncorrect = GlobalIncorrect + 1 WHERE ID=?''', (self.question_id,))
             games_conn.commit()
             questionAnsweredView = discord.ui.View(timeout=None)
@@ -1623,11 +1642,15 @@ async def inventory(interaction: discord.Interaction):
     games_conn.commit()
     games_curs.execute('''SELECT CurrentBalance FROM GamblingUserStats WHERE GuildID=? AND UserID=?''', (guild_id, user_id))
     current_balance = games_curs.fetchone()
+    games_curs.execute('''SELECT Phrase from UserCasinoPassPhrases WHERE GuildID=? AND UserID=?''', (guild_id, user_id))
+    passphrase = games_curs.fetchone()
     embed = discord.Embed(title=f"---WIP---\n{interaction.user.name}'s Inventory", color=discord.Color.green())
     if current_balance:
         embed.add_field(name="Current Balance", value=current_balance[0], inline=False)
     else:
         embed.add_field(name="Current Balance", value="No balance information available.", inline=False)
+    if passphrase:
+        embed.add_field(name="Casino Passphrase", value=passphrase[0], inline=False)
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
 @client.tree.command(name="stats", description="Displays your personal stats from this server")
@@ -3096,8 +3119,245 @@ async def questionSpawner(message):
     games_conn.close()
     return
 
+async def passPhraseAssignment():
+    games_conn = sqlite3.connect("games.db")
+    games_curs = games_conn.cursor()
+    games_curs.execute('''SELECT Phrase FROM PassPhraseMasterList ORDER BY RANDOM() LIMIT 1''')
+    phrase = games_curs.fetchone()
+    if phrase:
+        return phrase[0]
+    return None
 
+class PassPhraseModal(discord.ui.Modal, title="Enter the Casino"):
+    def __init__(self, guildID, userID):
+        super().__init__()
+        self.guildID = guildID
+        self.userID = userID
+        self.doorRamble = discord.ui.TextDisplay(content=f"Who are you?")
+        self.passphrase_input = discord.ui.TextInput(label="Pass Phrase", placeholder="Enter the pass phrase to enter the casino", required=True)
+        self.add_item(self.doorRamble)
+        self.add_item(self.passphrase_input)
 
+    async def on_submit(self, interaction: discord.Interaction):
+        gamesDB = "games.db"
+        games_conn = sqlite3.connect(gamesDB)
+        games_curs = games_conn.cursor()
+        games_curs.execute('''SELECT Phrase FROM UserCasinoPassPhrases WHERE GuildID=? and UserID=?''', (self.guildID, self.userID))
+        correct_phrase = games_curs.fetchone()
+        if correct_phrase and self.passphrase_input.value.strip().lower() == correct_phrase[0].strip().lower():
+            walkinButton=WalkIntoCasinoButton(label="Walk into the casino", userID=self.userID, guildID=self.guildID)
+            view = discord.ui.View()
+            view.add_item(walkinButton)
+            await interaction.response.send_message("Welcome in bud.", ephemeral=True, view=view)
+        else:
+            await interaction.response.send_message("Access denied! Incorrect pass phrase.", ephemeral=True)
+        games_curs.close()
+        games_conn.close()
+
+class WalkIntoCasinoButton(discord.ui.Button):
+    def __init__(self, label: str, userID, guildID, style=discord.ButtonStyle.primary):
+        super().__init__(label=label, style=style)
+        self.userID = userID
+        self.guildID = guildID
+
+    async def callback(self, interaction: discord.Interaction):
+        blackjackButton=BlackJackIntroButton(label="Walk over to the blackjack table", userID=self.userID, guildID=self.guildID)
+        view = discord.ui.View()
+        view.add_item(blackjackButton)
+        #edit the current message
+        await interaction.response.edit_message(content="You walk into the casino and look around the damp, dimly lit room.", view=view)
+
+class BlackJackIntroButton(discord.ui.Button):
+    def __init__(self, label: str, userID, guildID, style=discord.ButtonStyle.primary):
+        super().__init__(label=label, style=style)
+        self.userID = userID
+        self.guildID = guildID
+
+    async def callback(self, interaction: discord.Interaction):
+        #fill the deck with a new deck of cards in ascii format
+        GAMEINFO={"deck": ["A❤️", "2❤️", "3❤️", "4❤️", "5❤️", "6❤️", "7❤️", "8❤️", "9❤️", "10❤️", "J❤️", "Q❤️", "K❤️","A♦️", "2♦️", "3♦️", "4♦️", "5♦️", "6♦️", "7♦️", "8♦️", "9♦️", "10♦️", "J♦️", "Q♦️", "K♦️","A♣️", "2♣️", "3♣️", "4♣️", "5♣️", "6♣️", "7♣️", "8♣️", "9♣️", "10♣️", "J♣️", "Q♣️", "K♣️","A♠️", "2♠️", "3♠️", "4♠️", "5♠️", "6♠️", "7♠️", "8♠️", "9♠️", "10♠️", "J♠️", "Q♠️", "K♠️"],"userHand": [], "dealerHand": [], "betAmount": 0, "roundsLeft": 3}
+        betButton=BlackjackBetButton(label="Place your bet", userID=self.userID, guildID=self.guildID, GAMEINFO=GAMEINFO)
+        view = discord.ui.View()
+        view.add_item(betButton)
+        await interaction.response.edit_message(content="You approach the blackjack table. and sit down.", view=view)
+
+async def calculate_hand_value(hand):
+    value = 0
+    aces = 0
+    for card in hand:
+        rank = card[:-2]  # Remove the suit symbol
+        if rank in ['J', 'Q', 'K']:
+            value += 10
+        elif rank == 'A':
+            aces += 1
+            value += 11  # Initially count Ace as 11
+        else:
+            value += int(rank)
+    # Adjust for Aces if value exceeds 21
+    while value > 21 and aces:
+        value -= 10
+        aces -= 1
+    return value
+
+class BlackjackBetButton(discord.ui.Button):
+    def __init__(self, label: str, userID, guildID, style=discord.ButtonStyle.primary, GAMEINFO=None):
+        super().__init__(label=label, style=style)
+        self.userID = userID
+        self.guildID = guildID
+        self.GAMEINFO = GAMEINFO
+
+    async def callback(self, interaction: discord.Interaction):
+        #start a new blackjack game
+        if await ButtonLockout(interaction):
+            blackjackBetModal=BlackjackBetModal(guildID=self.guildID, userID=self.userID, GAMEINFO=self.GAMEINFO)
+            await interaction.response.send_modal(blackjackBetModal)
+
+class BlackjackBetModal(discord.ui.Modal, title="Place your bet"):
+    def __init__(self, guildID, userID, GAMEINFO=None):
+        super().__init__()
+        self.guildID = guildID
+        self.userID = userID
+        self.GAMEINFO = GAMEINFO
+        self.bet_input = discord.ui.TextInput(label="Bet Amount", placeholder="Enter your bet amount", required=True)
+        self.add_item(self.bet_input)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        #edit the message passed in to show the bet amount
+        games_conn = sqlite3.connect("games.db")
+        games_curs = games_conn.cursor()
+        games_curs.execute('''SELECT CurrentBalance FROM GamblingUserStats WHERE GuildID=? AND UserID=?''', (self.guildID, self.userID))
+        row = games_curs.fetchone()
+        if row:
+            current_balance = row[0]
+            bet_amount = int(self.bet_input.value)
+            if bet_amount > current_balance:
+                betButton=BlackjackBetButton(label="Place your bet", userID=self.userID, guildID=self.guildID, GAMEINFO=self.GAMEINFO)
+                view = discord.ui.View()
+                view.add_item(betButton)
+                await interaction.response.send_message(content="You do not have enough points to place that bet.", view=view,ephemeral=True)
+                return
+            else:
+                self.GAMEINFO["betAmount"] = bet_amount
+
+        #print(f"the message is: {self.message}")
+        #generate hands for the user and the dealer
+        random.shuffle(self.GAMEINFO["deck"])
+        self.GAMEINFO["userHand"] = [self.GAMEINFO["deck"].pop(), self.GAMEINFO["deck"].pop()]
+        self.GAMEINFO["dealerHand"] = [self.GAMEINFO["deck"].pop(), self.GAMEINFO["deck"].pop()]
+        #display the hands
+        view = discord.ui.View()
+        hitButton=HitButton(label="Hit", userID=self.userID, guildID=self.guildID, GAMEINFO=self.GAMEINFO)
+        view.add_item(hitButton)
+        standButton=StandButton(label="Stand", userID=self.userID, guildID=self.guildID, GAMEINFO=self.GAMEINFO)
+        view.add_item(standButton)
+        #edit this to be a new message instead of an edit
+        await interaction.response.send_message(content=await game_state_display(self.GAMEINFO), view=view,ephemeral=True)
+
+class HitButton(discord.ui.Button):
+    def __init__(self, label: str, userID, guildID, style=discord.ButtonStyle.primary, GAMEINFO=None):
+        super().__init__(label=label, style=style)
+        self.userID = userID
+        self.guildID = guildID
+        self.GAMEINFO = GAMEINFO
+
+    async def callback(self, interaction: discord.Interaction):
+        #add a card to the user's hand
+        self.GAMEINFO["userHand"].append(self.GAMEINFO["deck"].pop())
+        userHandValue = await calculate_hand_value(self.GAMEINFO["userHand"])
+        dealerHandValue = await calculate_hand_value([self.GAMEINFO["dealerHand"][0]])
+        #if users hand value is over 21, they bust
+        if userHandValue > 21:
+            await award_points(self.guildID, self.userID, -self.GAMEINFO["betAmount"])
+            if self.GAMEINFO["roundsLeft"] <=0:
+                await interaction.response.edit_message(content=f"{await game_state_display(self.GAMEINFO,hidden=False)}\nYou busted! You lose!\nNo rounds left. Game over.")
+                return
+            #newGameButton=BlackJackIntroButton(label="Start a new game", userID=self.userID, guildID=self.guildID)
+            newGameButton=BlackjackBetButton(label="Place your bet", userID=self.userID, guildID=self.guildID, GAMEINFO={"deck": ["A❤️", "2❤️", "3❤️", "4❤️", "5❤️", "6❤️", "7❤️", "8❤️", "9❤️", "10❤️", "J❤️", "Q❤️", "K❤️","A♦️", "2♦️", "3♦️", "4♦️", "5♦️", "6♦️", "7♦️", "8♦️", "9♦️", "10♦️", "J♦️", "Q♦️", "K♦️","A♣️", "2♣️", "3♣️", "4♣️", "5♣️", "6♣️", "7♣️", "8♣️", "9♣️", "10♣️", "J♣️", "Q♣️", "K♣️","A♠️", "2♠️", "3♠️", "4♠️", "5♠️", "6♠️", "7♠️", "8♠️", "9♠️", "10♠️", "J♠️", "Q♠️", "K♠️"],"userHand": [], "dealerHand": [], "betAmount": 0, "roundsLeft": self.GAMEINFO["roundsLeft"]-1})
+            view = discord.ui.View()
+            view.add_item(newGameButton)
+            #use game state display
+            await interaction.response.edit_message(content=f"{await game_state_display(self.GAMEINFO)}\n\nYou went bust! Try again next time.", view=view)
+            return
+        view = discord.ui.View()
+        hitButton=HitButton(label="Hit", userID=self.userID, guildID=self.guildID, GAMEINFO=self.GAMEINFO)
+        view.add_item(hitButton)
+        standButton=StandButton(label="Stand", userID=self.userID, guildID=self.guildID, GAMEINFO=self.GAMEINFO)
+        view.add_item(standButton)
+        await interaction.response.edit_message(content=await game_state_display(self.GAMEINFO), view=view)
+
+class StandButton(discord.ui.Button):
+    def __init__(self, label: str, userID, guildID, style=discord.ButtonStyle.primary, GAMEINFO=None):
+        super().__init__(label=label, style=style)
+        self.userID = userID
+        self.guildID = guildID
+        self.GAMEINFO = GAMEINFO
+
+    async def callback(self, interaction: discord.Interaction):
+        #dealer draws cards until hand value is at least 17
+        await interaction.response.defer(ephemeral=True)
+        msg = await interaction.original_response()
+        #disable the buttons
+        view = discord.ui.View()
+        await msg.edit(content=f"{await game_state_display(self.GAMEINFO,hidden=False)}", view=view)
+        await asyncio.sleep(2)
+        dealerHandValue = await calculate_hand_value(self.GAMEINFO["dealerHand"])
+        while dealerHandValue < 17:
+            self.GAMEINFO["dealerHand"].append(self.GAMEINFO["deck"].pop())
+            dealerHandValue = await calculate_hand_value(self.GAMEINFO["dealerHand"])
+            await msg.edit(content=f"{await game_state_display(self.GAMEINFO,hidden=False)}")
+            await asyncio.sleep(1.5)
+        userHandValue = await calculate_hand_value(self.GAMEINFO["userHand"])
+        #determine winner
+        if dealerHandValue > 21 or userHandValue > dealerHandValue:
+            #user wins
+            rewarded_points = round((3 * self.GAMEINFO["betAmount"])/2)
+            await award_points(self.guildID, self.userID, rewarded_points)
+            result = f"You win!\nYou are awarded {rewarded_points} points!"
+            perfectScore=0
+            if userHandValue == 21:
+                perfectScore=1
+            games_conn = sqlite3.connect("games.db")
+            games_curs = games_conn.cursor()
+            games_curs.execute('''UPDATE GamblingUserStats SET BlackjackWins=BlackjackWins+1, BlackjackEarnings=BlackjackEarnings+?, Blackjack21s=Blackjack21s+? WHERE GuildID=? AND UserID=?''', (rewarded_points, perfectScore, self.guildID, self.userID))
+            games_curs.execute('''INSERT INTO DailyGamblingTotals (GuildID, Date, Category, Funds) Values (?, ?, ?, ?) ON CONFLICT(GuildID, Date, Category) DO UPDATE SET Funds=Funds+?''', (self.guildID, datetime.now().strftime("%Y-%m-%d"), "Casino", rewarded_points, rewarded_points))
+            games_conn.commit()
+            games_curs.close()
+            games_conn.close()
+        elif userHandValue < dealerHandValue:
+            #dealer wins
+            await award_points(self.guildID, self.userID, -self.GAMEINFO["betAmount"])
+            result = f"You lose!\nYou lose {self.GAMEINFO['betAmount']} points!"
+        else:
+            result = "It's a tie!"
+
+        if self.GAMEINFO["roundsLeft"] <=0:
+            await msg.edit(content=f"{await game_state_display(self.GAMEINFO, hidden=False)}\n{result}\nNo rounds left. Game over.")
+            return
+        newGameButton=BlackjackBetButton(label="Place your next bet", userID=self.userID, guildID=self.guildID, GAMEINFO={"deck": ["A❤️", "2❤️", "3❤️", "4❤️", "5❤️", "6❤️", "7❤️", "8❤️", "9❤️", "10❤️", "J❤️", "Q❤️", "K❤️","A♦️", "2♦️", "3♦️", "4♦️", "5♦️", "6♦️", "7♦️", "8♦️", "9♦️", "10♦️", "J♦️", "Q♦️", "K♦️","A♣️", "2♣️", "3♣️", "4♣️", "5♣️", "6♣️", "7♣️", "8♣️", "9♣️", "10♣️", "J♣️", "Q♣️", "K♣️","A♠️", "2♠️", "3♠️", "4♠️", "5♠️", "6♠️", "7♠️", "8♠️", "9♠️", "10♠️", "J♠️", "Q♠️", "K♠️"],"userHand": [], "dealerHand": [], "betAmount": 0, "roundsLeft": self.GAMEINFO["roundsLeft"]-1})
+        view = discord.ui.View()
+        view.add_item(newGameButton)
+        await msg.edit(content=f"{await game_state_display(self.GAMEINFO, hidden=False)}\n\n{result}", view=view)
+        #await interaction.response.edit_message(content=f"{await game_state_display(self.GAMEINFO, hidden=False)}\n\n{result}", view=view)
+
+async def game_state_display(GAMEINFO=None, hidden=True):
+    userHandValue = await calculate_hand_value(GAMEINFO["userHand"])
+    if hidden:
+        dealerHandValue = await calculate_hand_value([GAMEINFO["dealerHand"][0]])
+        return f"Your bet: {GAMEINFO['betAmount']}\nYour hand: {GAMEINFO['userHand']}\nDealer's hand: {GAMEINFO['dealerHand'][0]}\nYour hand's value: {userHandValue}\nDealer's hand's value: {dealerHandValue}"
+    else:
+        dealerHandValue = await calculate_hand_value(GAMEINFO["dealerHand"])
+        return f"Your bet: {GAMEINFO['betAmount']}\nYour hand: {GAMEINFO['userHand']}\nDealer's hand: {GAMEINFO['dealerHand']}\nYour hand's value: {userHandValue}\nDealer's hand's value: {dealerHandValue}"
+
+class CasinoIntroButton(discord.ui.Button):
+    def __init__(self, label: str, userID, guildID, style=discord.ButtonStyle.primary):
+        super().__init__(label=label, style=style)
+        self.userID = userID
+        self.guildID = guildID
+
+    async def callback(self, interaction: discord.Interaction):
+        if await ButtonLockout(interaction):
+            casinoModal=PassPhraseModal(guildID=self.guildID, userID=self.userID)
+            await interaction.response.send_modal(casinoModal)
 
 
 class TestSelectMenu(discord.ui.Select):
