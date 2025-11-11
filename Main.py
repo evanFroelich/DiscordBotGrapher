@@ -2073,6 +2073,14 @@ async def placeBid(interaction: discord.Interaction, bid_amount: int, is_simple_
         games_conn=sqlite3.connect("games.db",timeout=10)
         games_conn.row_factory = sqlite3.Row
         games_curs=games_conn.cursor()
+        if selected_auction == "Casino":
+            games_curs.execute('''SELECT Game2 from GamblingGamesUnlocked where GuildID = ? AND UserID = ?''', (interaction.guild.id, interaction.user.id))
+            row = games_curs.fetchone()
+            if row is None or row['Game2'] == 0:
+                await interaction.response.send_message("You have not unlocked the Casino auction yet. Play more to unlock it!", ephemeral=True)
+                games_curs.close()
+                games_conn.close()
+                return
         games_curs.execute('''SELECT CurrentBalance FROM GamblingUserStats WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
         currentBalance = games_curs.fetchone()
         if not currentBalance or int(bid_amount) > currentBalance['CurrentBalance']:
