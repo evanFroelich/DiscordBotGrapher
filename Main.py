@@ -3328,7 +3328,7 @@ class HitButton(discord.ui.Button):
         dealerHandValue = await calculate_hand_value([self.GAMEINFO["dealerHand"][0]])
         #if users hand value is over 21, they bust
         if userHandValue > 21:
-            await award_points(self.guildID, self.userID, -self.GAMEINFO["betAmount"])
+            await award_points(guild_id=self.guildID, user_id=self.userID, amount=-self.GAMEINFO["betAmount"])
             if self.GAMEINFO["roundsLeft"] <=0:
                 await interaction.response.edit_message(content=f"{await game_state_display(self.GAMEINFO,hidden=False)}\nYou busted! You lose!\nNo rounds left. Game over.")
                 return
@@ -3372,7 +3372,7 @@ class StandButton(discord.ui.Button):
         if dealerHandValue > 21 or userHandValue > dealerHandValue:
             #user wins
             rewarded_points = round((3 * self.GAMEINFO["betAmount"])/2)
-            await award_points(self.guildID, self.userID, rewarded_points)
+            await award_points(guild_id=self.guildID, user_id=self.userID, amount=rewarded_points)
             result = f"You win!\nYou are awarded {rewarded_points} points!"
             perfectScore=0
             if userHandValue == 21:
@@ -3386,7 +3386,7 @@ class StandButton(discord.ui.Button):
             games_conn.close()
         elif userHandValue < dealerHandValue:
             #dealer wins
-            await award_points(self.guildID, self.userID, -self.GAMEINFO["betAmount"])
+            await award_points(guild_id=self.guildID, user_id=self.userID, amount=-self.GAMEINFO["betAmount"])
             result = f"You lose!\nYou lose {self.GAMEINFO['betAmount']} points!"
         else:
             result = "It's a tie!"
