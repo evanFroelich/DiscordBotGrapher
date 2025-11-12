@@ -1679,6 +1679,8 @@ async def stats(interaction: discord.Interaction, visibility: app_commands.Choic
     auction_stats = games_curs.fetchone()
     games_curs.execute('''SELECT CoinFlipWins, CoinFlipEarnings, CoinFlipDoubleWins FROM GamblingUserStats WHERE GuildID=? AND UserID=?''', (guild_id, user_id))
     coin_flip_stats = games_curs.fetchone()
+    games_curs.execute('''SELECT BlackJackWins, BlackJackEarnings, Blackjack21s FROM GamblingUserStats WHERE GuildID=? AND UserID=?''', (guild_id, user_id))
+    black_jack_stats = games_curs.fetchone()
     embed = discord.Embed(title=f"---WIP---\n{interaction.user.name}'s Stats", color=discord.Color.green())
     if user_stats:
         embed.add_field(name="Ping Responses", value=f"Pong:{user_stats['PingPongCount']}\nSong: {user_stats['PingSongCount']}\nDong: {user_stats['PingDongCount']}\nLong: {user_stats['PingLongCount']}\nKong: {user_stats['PingKongCount']}\nGoldStar: {user_stats['PingGoldStarCount']}", inline=False)
@@ -1720,6 +1722,8 @@ async def stats(interaction: discord.Interaction, visibility: app_commands.Choic
             embed.add_field(name="Trivia stats", value=f"Questions Answered: {general_stats['TriviaCount']}\nLifetime Earnings: {general_stats['LifetimeEarnings']}\nCurrent Balance: {general_stats['CurrentBalance']}\nTips Given: {general_stats['TipsGiven']}", inline=False)
             if coin_flip_stats and visibility.value == "private":
                 embed.add_field(name="Gambling Coin Flip Stats", value=f"Wins: {coin_flip_stats['CoinFlipWins']}\nEarnings: {coin_flip_stats['CoinFlipEarnings']}\nDouble Wins: {coin_flip_stats['CoinFlipDoubleWins']}", inline=False)
+            if black_jack_stats and visibility.value == "private":
+                embed.add_field(name="Gambling Black Jack Stats", value=f"Wins: {black_jack_stats['BlackJackWins']}\nEarnings: {black_jack_stats['BlackJackEarnings']}\n21's hit: {black_jack_stats['Blackjack21s']}", inline=False)
             if auction_stats:
                 embed.add_field(name="Auction House Stats", value=f"Winnings: {auction_stats['AuctionHouseWinnings']}\nLosses: {auction_stats['AuctionHouseLosses']}", inline=False)
             embed.add_field(name="Coin Flip Stats", value=f"Times Flipped: {general_stats['TimesFlipped']}\nCurrent Streak: {general_stats['CurrentStreak']}\nLast Flipped: {general_stats['LastFlip']}", inline=False)
