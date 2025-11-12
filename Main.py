@@ -3342,7 +3342,8 @@ class HitButton(discord.ui.Button):
         if userHandValue > 21:
             await award_points(guild_id=self.guildID, user_id=self.userID, amount=-self.GAMEINFO["betAmount"])
             if self.GAMEINFO["roundsLeft"] <=0:
-                await interaction.response.edit_message(content=f"{await game_state_display(self.GAMEINFO,hidden=False)}\nYou busted! You lose!\nNo rounds left. Game over.")
+                view = discord.ui.View()
+                await interaction.response.edit_message(content=f"{await game_state_display(self.GAMEINFO,hidden=False)}\nYou busted! You lose!\nNo rounds left. Game over.", view=view)
                 return
             #newGameButton=BlackJackIntroButton(label="Start a new game", userID=self.userID, guildID=self.guildID)
             newGameButton=BlackjackBetButton(label="Place your bet", userID=self.userID, guildID=self.guildID, GAMEINFO={"deck": ["A❤️", "2❤️", "3❤️", "4❤️", "5❤️", "6❤️", "7❤️", "8❤️", "9❤️", "10❤️", "J❤️", "Q❤️", "K❤️","A♦️", "2♦️", "3♦️", "4♦️", "5♦️", "6♦️", "7♦️", "8♦️", "9♦️", "10♦️", "J♦️", "Q♦️", "K♦️","A♣️", "2♣️", "3♣️", "4♣️", "5♣️", "6♣️", "7♣️", "8♣️", "9♣️", "10♣️", "J♣️", "Q♣️", "K♣️","A♠️", "2♠️", "3♠️", "4♠️", "5♠️", "6♠️", "7♠️", "8♠️", "9♠️", "10♠️", "J♠️", "Q♠️", "K♠️"],"userHand": [], "dealerHand": [], "betAmount": 0, "roundsLeft": self.GAMEINFO["roundsLeft"]-1})
