@@ -1,0 +1,288 @@
+import discord
+from discord import app_commands
+from discord.ext import commands
+import sqlite3
+import json
+
+from Helpers.Helpers import isAuthorized
+
+class News(commands.Cog):
+    def __init__(self, client: commands.Bot):
+        self.client = client
+    @app_commands.command(name="news", description="Displays the recent news")
+    async def news(self, interaction: discord.Interaction):
+        # Fetch news from a news API or database
+        gamesDB="games.db"
+        games_conn = sqlite3.connect(gamesDB)
+        games_curs = games_conn.cursor()
+        games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName) VALUES (?, ?, ?)''', (interaction.guild.id, interaction.user.id, "news"))
+        games_conn.commit()
+        games_curs.execute('''SELECT Date, Notes, Headline from NewsFeed order by Date desc Limit 3''')
+        rows = games_curs.fetchall()
+        embed = discord.Embed(title="Recent News", color=discord.Color.blue())
+        for row in rows:
+            embed.add_field(name=f"{row[0]}: {row[2]}", value=row[1], inline=False)
+        view = discord.ui.View()
+        next_button = NewsPageButton(label="Next", page_number=2)
+        view.add_item(next_button)
+        await interaction.response.send_message(embed=embed, ephemeral=True, view=view)
+        games_curs.close()
+        games_conn.close()
+
+class NewsPageButton(discord.ui.Button):
+    def __init__(self, label=None, page_number=1):
+        super().__init__(label=label, style=discord.ButtonStyle.primary)
+        self.page_number = page_number
+
+    async def callback(self, interaction: discord.Interaction):
+        gamesDB="games.db"
+        games_conn = sqlite3.connect(gamesDB)
+        games_curs = games_conn.cursor()
+        offset = (self.page_number - 1) * 3
+        games_curs.execute('''SELECT Date, Notes, Headline from NewsFeed order by Date desc Limit 3 OFFSET ?''', (offset,))
+        rows = games_curs.fetchall()
+        embed = discord.Embed(title="Recent News", color=discord.Color.blue())
+        for row in rows:
+            embed.add_field(name=f"{row[0]}: {row[2]}", value=row[1], inline=False)
+        view = discord.ui.View()
+        if self.page_number > 1:
+            prev_button = NewsPageButton(label="Previous", page_number=self.page_number - 1)
+            view.add_item(prev_button)
+        # Check if there are more news items for the next page
+        games_curs.execute('''SELECT COUNT(*) FROM NewsFeed''')
+        total_news = games_curs.fetchone()[0]
+        if offset + 3 < total_news:
+            next_button = NewsPageButton(label="Next", page_number=self.page_number + 1)
+            view.add_item(next_button)
+        await interaction.response.edit_message(embed=embed, view=view)
+        games_curs.close()
+        games_conn.close()
+
+class Inventory(commands.Cog):
+    def __init__(self, client: commands.Bot):
+        self.client = client
+    @app_commands.command(name="inventory", description="Displays the user's inventory")
+    async def inventory(self, interaction: discord.Interaction):
+        user_id = interaction.user.id
+        guild_id = interaction.guild.id
+
+        # Fetch the user's inventory from the database
+        gamesDB="games.db"
+        games_conn = sqlite3.connect(gamesDB)   
+        games_curs = games_conn.cursor()
+        games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName) VALUES (?, ?, ?)''', (interaction.guild.id, interaction.user.id, "inventory"))
+        games_conn.commit()
+        games_curs.execute('''SELECT CurrentBalance FROM GamblingUserStats WHERE GuildID=? AND UserID=?''', (guild_id, user_id))
+        current_balance = games_curs.fetchone()
+        games_curs.execute('''SELECT Phrase from UserCasinoPassPhrases WHERE GuildID=? AND UserID=?''', (guild_id, user_id))
+        passphrase = games_curs.fetchone()
+        embed = discord.Embed(title=f"---WIP---\n{interaction.user.name}'s Inventory", color=discord.Color.green())
+        if current_balance:
+            embed.add_field(name="Current Balance", value=current_balance[0], inline=False)
+        else:
+            embed.add_field(name="Current Balance", value="No balance information available.", inline=False)
+        if passphrase:
+            embed.add_field(name="Casino Passphrase", value=passphrase[0], inline=False)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+
+class Stats(commands.Cog):
+    def __init__(self, client: commands.Bot):
+        self.client = client
+    @app_commands.command(name="stats", description="Displays your personal stats from this server")
+    @app_commands.choices(visibility=[
+        app_commands.Choice(name="Private", value="private"),
+        app_commands.Choice(name="Public", value="public")
+    ])
+    async def stats(self, interaction: discord.Interaction, visibility: app_commands.Choice[str]):
+        user_id = interaction.user.id
+        guild_id = interaction.guild.id
+
+        # Fetch the user's stats from the database
+        gamesDB="games.db"
+        games_conn = sqlite3.connect(gamesDB)   
+        games_conn.row_factory = sqlite3.Row
+        games_curs = games_conn.cursor()
+        games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName, CommandParameters) VALUES (?, ?, ?, ?)''', (interaction.guild.id, interaction.user.id, "stats", f"visibility: {visibility.value}"))
+        games_conn.commit()
+        games_curs.execute('''SELECT * FROM UserStats WHERE GuildID=? AND UserID=?''', (guild_id, user_id))
+        user_stats = games_curs.fetchone()
+        games_curs.execute('''SELECT * FROM UserStatsGeneralView WHERE GuildID=? AND UserID=?''', (guild_id, user_id))
+        general_stats = games_curs.fetchone()
+        games_curs.execute('''SELECT CommandName, CommandCount FROM UserStatsCommandView WHERE GuildID=? AND UserID=? Order by CommandCount desc''', (guild_id, user_id))
+        command_stats = games_curs.fetchall()
+        games_curs.execute('''SELECT AuctionHouseWinnings, AuctionHouseLosses FROM GamblingUserStats WHERE GuildID=? AND UserID=?''', (guild_id, user_id))
+        auction_stats = games_curs.fetchone()
+        games_curs.execute('''SELECT CoinFlipWins, CoinFlipEarnings, CoinFlipDoubleWins FROM GamblingUserStats WHERE GuildID=? AND UserID=?''', (guild_id, user_id))
+        coin_flip_stats = games_curs.fetchone()
+        games_curs.execute('''SELECT BlackJackWins, BlackJackEarnings, Blackjack21s FROM GamblingUserStats WHERE GuildID=? AND UserID=?''', (guild_id, user_id))
+        black_jack_stats = games_curs.fetchone()
+        games_curs.execute('''SELECT * FROM GamblingGamesUnlocked WHERE GuildID=? AND UserID=?''', (guild_id, user_id))
+        unlocked_games = games_curs.fetchone()
+        embed = discord.Embed(title=f"---WIP---\n{interaction.user.name}'s Stats", color=discord.Color.green())
+        if user_stats:
+            embed.add_field(name="Ping Responses", value=f"Pong:{user_stats['PingPongCount']}\nSong: {user_stats['PingSongCount']}\nDong: {user_stats['PingDongCount']}\nLong: {user_stats['PingLongCount']}\nKong: {user_stats['PingKongCount']}\nGoldStar: {user_stats['PingGoldStarCount']}", inline=False)
+            #divide hits and misses to get a percent rounded to the whole number. if miss is 0 then default to 100%
+            hitRate=0
+            if user_stats['HorseMissCount'] == 0:
+                if user_stats['HorseHitCount'] == 0:
+                    hitRate = "N/A"
+                else:
+                    hitRate = 100
+            else:
+                hitRate = round(user_stats['HorseHitCount'] / (user_stats['HorseHitCount'] + user_stats['HorseMissCount']) * 100)
+            embed.add_field(name="Horse Stats", value=f"Times hit: {user_stats['HorseHitCount']}\tHit Rate: {hitRate}%", inline=False)
+            if user_stats['CatMissCount'] == 0:
+                if user_stats['CatHitCount'] == 0:
+                    hitRate = "N/A"
+                else:
+                    hitRate = 100
+            else:
+                hitRate = round(user_stats['CatHitCount'] / (user_stats['CatHitCount'] + user_stats['CatMissCount']) * 100)
+            embed.add_field(name="Cat Stats", value=f"Times hit: {user_stats['CatHitCount']}\tHit Rate: {hitRate}%", inline=False)
+            if user_stats['MarathonMissCount'] == 0:
+                if user_stats['MarathonHitCount'] == 0:
+                    hitRate = "N/A"
+                else:
+                    hitRate = 100
+            else:
+                hitRate = round(user_stats['MarathonHitCount'] / (user_stats['MarathonHitCount'] + user_stats['MarathonMissCount']) * 100)
+            embed.add_field(name="Marathon Stats", value=f"Times hit: {user_stats['MarathonHitCount']}\tHit Rate: {hitRate}%", inline=False)
+            if user_stats['TwitterAltMissCount'] == 0:
+                if user_stats['TwitterAltHitCount'] == 0:
+                    hitRate = "N/A"
+                else:
+                    hitRate = 100
+            else:
+                hitRate = round(user_stats['TwitterAltHitCount'] / (user_stats['TwitterAltHitCount'] + user_stats['TwitterAltMissCount']) * 100)
+            embed.add_field(name="Twitter Alt Stats", value=f"Times hit: {user_stats['TwitterAltHitCount']}\tHit Rate: {hitRate}%", inline=False)
+            if general_stats:
+                embed.add_field(name="Trivia stats", value=f"Questions Answered: {general_stats['TriviaCount']}\nLifetime Earnings: {general_stats['LifetimeEarnings']}\nCurrent Balance: {general_stats['CurrentBalance']}\nTips Given: {general_stats['TipsGiven']}", inline=False)
+                if coin_flip_stats and visibility.value == "private":
+                    if unlocked_games:
+                        if int(unlocked_games['Game1'])==1:
+                            embed.add_field(name="Gambling Coin Flip Stats", value=f"Wins: {coin_flip_stats['CoinFlipWins']}\nEarnings: {coin_flip_stats['CoinFlipEarnings']}\nDouble Wins: {coin_flip_stats['CoinFlipDoubleWins']}", inline=False)
+                if black_jack_stats and visibility.value == "private":
+                    if unlocked_games:
+                        if int(unlocked_games['Game2'])==1:
+                            embed.add_field(name="Gambling Black Jack Stats", value=f"Wins: {black_jack_stats['BlackJackWins']}\nEarnings: {black_jack_stats['BlackJackEarnings']}\n21's hit: {black_jack_stats['Blackjack21s']}", inline=False)
+                if auction_stats:
+                    if unlocked_games:
+                        if int(unlocked_games['Game1'])==1:
+                            embed.add_field(name="Auction House Stats", value=f"Winnings: {auction_stats['AuctionHouseWinnings']}\nLosses: {auction_stats['AuctionHouseLosses']}", inline=False)
+                embed.add_field(name="Coin Flip Stats", value=f"Times Flipped: {general_stats['TimesFlipped']}\nCurrent Streak: {general_stats['CurrentStreak']}\nLast Flipped: {general_stats['LastFlip']}", inline=False)
+                commandStr=""
+                #go through the results of command_stats and add them all into the string
+                for command in command_stats:
+                    commandStr += f"{command['CommandName']}: {command['CommandCount']}\n"
+                embed.add_field(name=f"Total Commands Used: {general_stats['TotalCommands']}",value=f"{commandStr}", inline=False)
+
+        else:
+            embed.add_field(name="Stats", value="No stats information available.", inline=False)
+        visibility = "Public" if visibility.value == "public" else "Private"
+        await interaction.response.send_message(embed=embed, ephemeral=visibility == "Private")
+
+class AddAuthorizedUser(commands.Cog):
+    def __init__(self, client: commands.Bot):
+        self.client = client
+
+
+    @app_commands.command(name="add-authorized-user", description="User ID")
+    async def add_authorized_user(self, interaction: discord.Interaction, userid: str):
+        gamesDB="games.db"
+        games_conn = sqlite3.connect(gamesDB)
+        games_curs = games_conn.cursor()
+        games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName, CommandParameters) VALUES (?, ?, ?, ?)''', (interaction.guild.id, interaction.user.id, "add-authorized-user", f"User: {userid}"))
+        games_conn.commit()
+        games_curs.close()
+        games_conn.close()
+        if not await isAuthorized(interaction.user.id, str(interaction.guild.id), self.client):
+            await interaction.response.send_message("You are not authorized to use this command.")
+            return
+        #validate that the user id is from a user in this guild
+        guild = self.client.get_guild(interaction.guild.id)
+        member = guild.get_member(int(userid))
+        if not member:
+            await interaction.response.send_message("User not found in this guild.")
+            return
+        main_db = "MY_DB"
+        main_conn = sqlite3.connect(main_db)
+        main_curs = main_conn.cursor()
+        main_curs.execute("SELECT AuthorizedUsers FROM ServerSettings WHERE GuildID = ?", (interaction.guild.id,))
+        result = main_curs.fetchone()
+        if result and result[0]:
+            authorized_users = json.loads(result[0])
+            if userid not in authorized_users:
+                authorized_users.append(userid)
+                main_curs.execute("UPDATE ServerSettings SET AuthorizedUsers = ? WHERE GuildID = ?", (json.dumps(authorized_users), interaction.guild.id))
+            else:
+                authorized_users.remove(userid)
+                main_curs.execute("UPDATE ServerSettings SET AuthorizedUsers = ? WHERE GuildID = ?", (json.dumps(authorized_users), interaction.guild.id))
+        else:
+            authorized_users=[]
+            authorized_users.append(userid)
+            main_curs.execute("UPDATE ServerSettings SET AuthorizedUsers = ? WHERE GuildID = ?", (json.dumps(authorized_users), interaction.guild.id))
+        main_conn.commit()
+        main_curs.close()
+        main_conn.close()
+        await interaction.response.send_message(f"User {userid  } has been added to the authorized users list.")
+
+class Wiki(commands.Cog):
+    def __init__(self, client: commands.Bot):
+        self.client = client
+    @app_commands.command(name="wiki", description="A wiki for understanding the bot's features")
+    async def wiki(self, interaction: discord.Interaction):
+        #log it to the command log
+        games_conn=sqlite3.connect("games.db",timeout=10)
+        games_curs = games_conn.cursor()
+        games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName) VALUES (?, ?, ?)''', (interaction.guild.id, interaction.user.id, "wiki"))
+        games_conn.commit()
+        games_curs.close()
+        games_conn.close()
+        embed = discord.Embed(title="Bot Wiki", description="A wiki for understanding the bot's features.", color=0x228a65)
+        pages = await get_wiki_page()
+        for page in pages:
+            embed.add_field(name=page['CommandName'], value=page['CommandDescription'], inline=False)
+        view = discord.ui.View(timeout=None)
+        view.add_item(WikiChangeButton(label="General", group="General"))
+        view.add_item(WikiChangeButton(label="Data", group="Data"))
+        view.add_item(WikiChangeButton(label="Trivia", group="Trivia"))
+        view.add_item(WikiChangeButton(label="Other", group="Other"))
+        await interaction.response.send_message(embed=embed, ephemeral=True, view=view)
+
+class WikiChangeButton(discord.ui.Button):
+    def __init__(self, label=None, style=discord.ButtonStyle.primary, group="General"):
+        super().__init__(label=label, style=style)
+        self.group = group
+
+    async def callback(self, interaction: discord.Interaction):
+        pages = await get_wiki_page(self.group)
+        embed = discord.Embed(title=f"Wiki - {self.group}", color=0x228a65)
+        for page in pages:
+            embed.add_field(name=page['CommandName'], value=page['CommandDescription'], inline=False)
+        view = discord.ui.View(timeout=None)
+        view.add_item(WikiChangeButton(label="General", group="General"))
+        view.add_item(WikiChangeButton(label="Data", group="Data"))
+        view.add_item(WikiChangeButton(label="Trivia", group="Trivia"))
+        view.add_item(WikiChangeButton(label="Other", group="Other"))
+        await interaction.response.edit_message(embed=embed, view=view)
+        return
+    
+async def get_wiki_page(group: str= "General"):
+    games_conn=sqlite3.connect("games.db",timeout=10)
+    games_conn.row_factory = sqlite3.Row
+    games_curs = games_conn.cursor()
+    games_curs.execute("select CommandName, CommandDescription from Wiki where CommandGroup=? order by ListOrder asc", (group,))
+    pages = games_curs.fetchall()
+    games_curs.close()
+    games_conn.close()
+    return pages
+
+
+
+async def setup(client: commands.Bot):
+    await client.add_cog(News(client))
+    await client.add_cog(Inventory(client))
+    await client.add_cog(Stats(client))
+    await client.add_cog(AddAuthorizedUser(client))
+    await client.add_cog(Wiki(client))
