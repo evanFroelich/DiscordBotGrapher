@@ -262,7 +262,7 @@ class MyClient(commands.Bot):
         await self.load_extension('cogs.Core')
         await self.load_extension('cogs.Analytics')
 
-        await self.tree.sync()
+        #await self.tree.sync()
         print('synced')
 
     async def on_thread_create(self,thread):

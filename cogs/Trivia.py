@@ -621,7 +621,7 @@ class GamblingIntroModal(discord.ui.Modal):
     async def on_submit(self, interaction: discord.Interaction):
         fundsInput = self.funds_input.value
         view=discord.ui.View()
-        if int(fundsInput) > self.funds or int(fundsInput)<10:
+        if not fundsInput.isdigit() or int(fundsInput) > self.funds or int(fundsInput)<10:
             view.add_item(GamblingButton(label="want to try that again?", user_id=self.user_id, guild_id=self.guild_id, style=discord.ButtonStyle.primary))
             await interaction.response.send_message(f"*I cant bring that amount.*\n(cannot bring more than you have or less than 10)", ephemeral=True, view=view)
             return
