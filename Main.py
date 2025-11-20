@@ -13,7 +13,7 @@ import asyncio
 import zoneinfo
 
 from Helpers.Helpers import award_points, checkIgnoredChannels, smrtGame
-
+import context
 from cogs.Trivia import questionSpawner
 
 
@@ -35,10 +35,10 @@ async def daily_question_leaderboard():
                 # Process leaderboard results
                 for userID, questionsAnswered in leaderboardResults:
                     embed.description += f"<@{userID}>: {questionsAnswered} correct answers today.\n"
-                    printstr += f"<@{userID}>: {questionsAnswered} correct answers today.\n"
+                    #printstr += f"<@{userID}>: {questionsAnswered} correct answers today.\n"
             #get the channel from the ShameChannel channelID
             channel = client.get_channel(guildID[2])
-            await channel.send(content=printstr)
+            await channel.send(content=printstr, embed=embed, allowed_mentions=discord.AllowedMentions.none())
 
 @tasks.loop(time=time(hour=0, minute=2, second=0, tzinfo=zoneinfo.ZoneInfo("America/Los_Angeles")))
 async def package_daily_gambling():
@@ -577,6 +577,7 @@ class MyClient(commands.Bot):
 
 intents=discord.Intents.all()
 client = MyClient(intents=intents) 
+context.bot=client
 script_dir = os.path.dirname(os.path.abspath(__file__))
 os.chdir(script_dir)
 log_file_path = 'log_file.log'

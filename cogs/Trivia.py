@@ -880,17 +880,26 @@ class BlackjackBetModal(discord.ui.Modal, title="Place your bet"):
         self.guildID = guildID
         self.userID = userID
         self.GAMEINFO = GAMEINFO
-        self.bet_input = discord.ui.TextInput(label="Bet Amount", placeholder="Enter your bet amount", required=True)
+        games_conn = sqlite3.connect("games.db")
+        games_curs = games_conn.cursor()
+        games_curs.execute('''SELECT CurrentBalance FROM GamblingUserStats WHERE GuildID=? AND UserID=?''', (self.guildID, self.userID))
+        row = games_curs.fetchone()
+        games_curs.close()
+        games_conn.close()
+        self.balance = int(row[0]) if row else 0
+        self.betText=discord.ui.TextDisplay(content=f"your current balance is {self.balance} and the upper bet limit is 500")
+        self.add_item(self.betText)
+        self.bet_input = discord.ui.TextInput(label=f"Bet Amount", placeholder="Enter your bet amount", required=True)
         self.add_item(self.bet_input)
 
     async def on_submit(self, interaction: discord.Interaction):
         #edit the message passed in to show the bet amount
         #make sure its a valid number greater than 0
-        if not self.bet_input.value.isdigit() or int(self.bet_input.value) <= 0:
+        if not self.bet_input.value.isdigit() or int(self.bet_input.value) <= 0 or int(self.bet_input.value) > 500 or int(self.bet_input.value)>self.balance:
             betButton=BlackjackBetButton(label="Place your bet", userID=self.userID, guildID=self.guildID, GAMEINFO=self.GAMEINFO)
             view = discord.ui.View()
             view.add_item(betButton)
-            await interaction.response.send_message(content="Please enter a valid bet amount greater than 0.", view=view,ephemeral=True)
+            await interaction.response.send_message(content="Please enter a valid bet amount greater than 0 and less than 500 or your current balance.", view=view,ephemeral=True)
             return
         games_conn = sqlite3.connect("games.db")
         games_curs = games_conn.cursor()

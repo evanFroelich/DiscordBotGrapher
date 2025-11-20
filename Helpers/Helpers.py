@@ -5,6 +5,7 @@ import numpy as np
 import random
 from datetime import datetime
 import json
+import context
 
 async def ButtonLockout(interaction: discord.Interaction):
     gamesDB = "games.db"
@@ -37,6 +38,7 @@ async def award_points(amount, guild_id, user_id):
     games_conn.commit()
     games_curs.close()
     games_conn.close()
+    #await achievementTrigger(guild_id, user_id, "LifetimeEarnings")
 
 async def delete_later(message,time):
     await asyncio.sleep(time)  # wait for the specified time
@@ -185,3 +187,37 @@ async def isAuthorized(userID: str, guildID: str, bot=None) -> bool:
         return False
     return False
 
+async def achievementTrigger(guildID: str, userID: str, eventType: str):
+    gamesDB = "games.db"
+    games_conn = sqlite3.connect(gamesDB)
+    games_curs = games_conn.cursor()
+    #get all achievements for this event type
+    games_curs.execute('''SELECT ID, Value, Name, Description, FlavorText from AchievementDefinitions WHERE TriggerType=? AND ID NOT IN (SELECT AchievementID FROM UserAchievements WHERE GuildID=? AND UserID=?)''', (eventType, guildID, userID))
+    achievements = games_curs.fetchall()
+    view=discord.ui.View()
+    embedList=[]
+    if eventType == "LifetimeEarnings":
+        #get the user's lifetime earnings
+        games_curs.execute('''SELECT LifetimeEarnings FROM GamblingUserStats WHERE GuildID=? AND UserID=?''', (guildID, userID))
+        row = games_curs.fetchone()
+        if row:
+            lifetimeEarnings = row[0]
+            for achievement in achievements:
+                achievementID = achievement[0]
+                targetValue = achievement[1]
+                if lifetimeEarnings >= targetValue:
+                    #award the achievement
+                    games_curs.execute('''INSERT INTO UserAchievements (GuildID, UserID, AchievementID) VALUES (?, ?, ?)''', (guildID, userID, achievementID))
+                    games_conn.commit()
+                    embed=discord.Embed(title=f"Achievement Unlocked: {achievement[2]}", description=f"{achievement[3]}\n*{achievement[4]}*", color=discord.Color.gold())
+                    embedList.append(embed)
+    #DM the user the achievement(s)
+    if embedList:
+        # for embed in embedList:
+        #     view.add_item(embed)
+        user = await context.bot.fetch_user(int(userID))
+        print(f"bot is: {context.bot}")
+        print(f"Sending achievement DM to user {user}")
+        await user.send("Congratulations! You've unlocked the following achievement(s):", embeds=embedList)
+    games_curs.close()
+    games_conn.close()
