@@ -90,7 +90,7 @@ async def package_daily_gambling():
     
     for row in yesterday_totals:
         random_multiplier = random.random()
-        random_multiplier=(random_multiplier*.1)+.05
+        random_multiplier=(random_multiplier*.07)+.03
         random_multiplier = round(random_multiplier, 2)
         category = row[0]
         yesterday_total = row[1]

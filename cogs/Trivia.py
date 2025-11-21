@@ -615,7 +615,7 @@ class GamblingIntroModal(discord.ui.Modal):
         self.user_id = user_id
         self.guild_id = guild_id
         self.funds = funds
-        self.storyMessage=discord.ui.TextDisplay(content=f"*First things first, you need to decide how much to bring along. As much or as little as you want, as long as it's not more than the {self.funds} you have.*")
+        self.storyMessage=discord.ui.TextDisplay(content=f"*First things first, you need to decide how much to bring along. As much or as little as you want, as long as it's not more than the {self.funds} you have or more than 500.*")
         self.funds_input = discord.ui.TextInput(label=f"Funds brought:", max_length=10, required=True,placeholder="e.g. 1000", style=discord.TextStyle.short)
         self.add_item(self.storyMessage)
         self.add_item(self.funds_input) #i dont think i need this
@@ -623,9 +623,9 @@ class GamblingIntroModal(discord.ui.Modal):
     async def on_submit(self, interaction: discord.Interaction):
         fundsInput = self.funds_input.value
         view=discord.ui.View()
-        if not fundsInput.isdigit() or int(fundsInput) > self.funds or int(fundsInput)<10:
+        if not fundsInput.isdigit() or int(fundsInput) > self.funds or int(fundsInput)<10 or int(fundsInput)>500:
             view.add_item(GamblingButton(label="want to try that again?", user_id=self.user_id, guild_id=self.guild_id, style=discord.ButtonStyle.primary))
-            await interaction.response.send_message(f"*I cant bring that amount.*\n(cannot bring more than you have or less than 10)", ephemeral=True, view=view)
+            await interaction.response.send_message(f"*I cant bring that amount.*\n(cannot bring more than you have or less than 10 or more than 500)", ephemeral=True, view=view)
             return
         
         gamesDB = "games.db"

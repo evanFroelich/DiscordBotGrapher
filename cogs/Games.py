@@ -96,7 +96,7 @@ class Leaderboard(commands.Cog):
         gamesDB = "games.db"
         games_conn = sqlite3.connect(gamesDB)
         games_curs = games_conn.cursor()
-        games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName, CommandParameters) VALUES (?, ?, ?, ?)''', (interaction.guild.id, interaction.user.id, "leaderboard", f"subtype: {subtype.value}"))
+        games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName, CommandParameters) VALUES (?, ?, ?, ?)''', (interaction.guild.id, interaction.user.id, "leaderboard", f"subtype: {subtype.value}, visibility: {visibility.value}"))
         games_conn.commit()
         privMsg=True if visibility.value=="private" else False
         await interaction.response.defer(thinking=True,ephemeral=privMsg)
