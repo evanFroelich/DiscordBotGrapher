@@ -4,7 +4,7 @@ from discord.ext import commands
 import sqlite3
 import asyncio
 import random
-from datetime import datetime
+from datetime import datetime, timedelta
 from Helpers.Helpers import create_user_db_entry, numToGrade, delete_later, isAuthorized, achievementTrigger
 
 
@@ -626,6 +626,24 @@ async def placeBid(interaction: discord.Interaction, bid_amount: int, is_simple_
             games_curs.close()
             games_conn.close()
             return
+        #check if the user won an auction yesterday and if so, prevent them from bidding today
+        games_curs.execute('''SELECT FinalBidderUserID FROM AuctionHousePrize WHERE Date = ?''', (datetime.now().date() - timedelta(days=1),))
+        won_auctions = games_curs.fetchall()
+        for auction in won_auctions:
+            if auction['FinalBidderUserID'] == interaction.user.id:
+                await interaction.response.send_message("You won an auction yesterday and cannot bid today. Please wait until tomorrow to bid again.", ephemeral=True)
+                games_curs.close()
+                games_conn.close()
+                return
+        #check if the user is the current highest bidder for other auctions today
+        games_curs.execute('''SELECT Zone FROM AuctionHousePrize WHERE Date = ? AND CurrentBidderUserID = ?''', (datetime.now().date(), interaction.user.id))
+        current_bids = games_curs.fetchall()
+        for bid in current_bids:
+            if bid['Zone'] != selected_auction:
+                await interaction.response.send_message("You are already the highest bidder for another auction today. You cannot bid on multiple auctions in the same day.", ephemeral=True)
+                games_curs.close()
+                games_conn.close()
+                return
         print(f"DEBUG: selected_auction in placeBid: {selected_auction}")
         games_curs.execute('''SELECT CurrentPrice FROM AuctionHousePrize where Date = ? and Zone = ?''', (datetime.now().date(), selected_auction))
         currentPrice= games_curs.fetchone()
