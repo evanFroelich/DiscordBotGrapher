@@ -6,7 +6,7 @@ import sqlite3
 import random
 import asyncio
 import aiohttp
-from Helpers.Helpers import ButtonLockout, award_points, delete_later, createTimers, sigmoid, create_user_db_entry
+from Helpers.Helpers import ButtonLockout, award_points, delete_later, createTimers, sigmoid, create_user_db_entry, achievementTrigger
 from datetime import timedelta, datetime
 import logging
 
@@ -268,6 +268,7 @@ class QuestionThankYouButton(discord.ui.Button):
         games_curs = games_conn.cursor()
         games_curs.execute('''UPDATE GamblingUserStats SET TipsGiven = TipsGiven + 1 WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
         games_conn.commit()
+        await achievementTrigger(interaction.guild.id, interaction.user.id, 'TipsGiven')
         contentPayload=""
         thanksView=discord.ui.View(timeout=None)
         games_curs.execute('''SELECT Game1, Game2 FROM GamblingGamesUnlocked WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
@@ -598,6 +599,7 @@ class QuestionModal(discord.ui.Modal):
         games_conn.commit()
         games_curs.close()
         games_conn.close()
+        await achievementTrigger(interaction.guild.id, interaction.user.id, 'TriviaCount')
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~GAMBLING SETUP~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -718,6 +720,9 @@ class GamblingCoinFlipWagers(discord.ui.Button):
                 games_conn.commit()
                 games_curs.close()
                 games_conn.close()
+                await achievementTrigger(self.guild_id, self.user_id, 'CoinFlipDoubleWins')
+                await achievementTrigger(self.guild_id, self.user_id, 'CoinFlipWins')
+                await achievementTrigger(self.guild_id, self.user_id, 'CoinFlipEarnings')
             else:
                 messageContent=f"So your luck ran out? Tough. Better luck next time pal."
                 await award_points(-self.wager, self.guild_id, self.user_id)
@@ -736,17 +741,16 @@ class GamblingCoinFlipWagers(discord.ui.Button):
             games_conn.close()
             self.streak += 1
             await award_points(self.wager, self.guild_id, self.user_id)
+            await achievementTrigger(self.guild_id, self.user_id, 'CoinFlipWins')
+            await achievementTrigger(self.guild_id, self.user_id, 'CoinFlipEarnings')
         else:
             self.streak = 0
             messageContent=f"You lost the flip! Your wager of {int(self.wager)} has been subtracted from your balance.\nYou have {self.remainingFlips} flips remaining."
             await award_points(-self.wager, self.guild_id, self.user_id)
-        #games_curs.execute('''UPDATE GamblingUserStats SET CurrentBalance = CurrentBalance + ? WHERE GuildID = ? AND UserID = ?''', (self.wager if result == 1 else -self.wager, self.guild_id, self.user_id))
-        #games_conn.commit()
         
         
         if self.remainingFlips <= 0:
             messageContent+=f"\nYou have run out of flips. Thanks for playing and I will see you again."
-            #await interaction.response.edit_message(content=messageContent, view=None)
             await interaction.followup.edit_message(message_id=interaction.message.id, content=messageContent, view=None)
             return
         #start here for triple down+
@@ -1002,6 +1006,9 @@ class StandButton(discord.ui.Button):
             games_conn.commit()
             games_curs.close()
             games_conn.close()
+            await achievementTrigger(self.guildID, self.userID, 'BlackjackWins')
+            await achievementTrigger(self.guildID, self.userID, 'BlackjackEarnings')
+            await achievementTrigger(self.guildID, self.userID, 'Blackjack21s')
         elif userHandValue < dealerHandValue:
             #dealer wins
             await award_points(guild_id=self.guildID, user_id=self.userID, amount=-self.GAMEINFO["betAmount"])

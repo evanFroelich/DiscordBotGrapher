@@ -359,3 +359,39 @@ async def assignRoles():
     curs.close()
     conn.close()
     
+if splitstr[0]=='top3':
+                tmp,extra=topChat('users','day',300,str(message.guild.id),3,'',curs)
+                for key in tmp:
+                    await message.channel.send(tmp[key])
+                    
+            if splitstr[0]=='enableRankedRoles':
+                print('trying')
+                try:
+                    f=open('RankedRoleConfig/config',"r")
+                    passing=True
+                    print("here")
+                    for line in f:
+                        print(line)
+                        splitLine=line.split()
+                        if splitLine[0]==str(message.guild.id):
+                            passing=False
+                    f.close()
+                    if passing:
+                        
+                        cfgFile=open('RankedRoleConfig/config',"a")
+                        cfgFile.write('\n'+str(message.guild.id)+' true '+splitstr[1]+' '+splitstr[2]+' '+splitstr[3]+' '+splitstr[4])
+                        cfgFile.close()
+                        await message.channel.send("added to list")
+                    else:
+                        await message.channel.send("already enabled")
+                    
+                except AssertionError:
+                    await message.channel.send("invalid param")
+                    
+                    
+            if splitstr[0]=='disableRankedRoles':
+                print('not working yet')
+                role=get(message.guild.roles, id=1016131254497845280)
+                await message.channel.send(len(role.members))
+
+

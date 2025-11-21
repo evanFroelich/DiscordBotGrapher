@@ -5,7 +5,7 @@ import sqlite3
 import asyncio
 import random
 from datetime import datetime
-from Helpers.Helpers import create_user_db_entry, numToGrade, delete_later, isAuthorized
+from Helpers.Helpers import create_user_db_entry, numToGrade, delete_later, isAuthorized, achievementTrigger
 
 
 class GradeReport(commands.Cog):
@@ -85,7 +85,8 @@ class Leaderboard(commands.Cog):
     @app_commands.choices(subtype=[
         app_commands.Choice(name="bonus-points", value="pip"),
         app_commands.Choice(name="coin-flip", value="flip"),
-        app_commands.Choice(name="balance", value="balance")
+        app_commands.Choice(name="balance", value="balance"),
+        app_commands.Choice(name="achievement-score", value="achievement-score")
     ])
     @app_commands.choices(visibility=[
         app_commands.Choice(name="public", value="public"),
@@ -156,6 +157,19 @@ class Leaderboard(commands.Cog):
                     outstr += f"User ID {row[0]}: {row[1]} points\n"
             embed.description=outstr
             await interaction.followup.send(embed=embed, ephemeral=privMsg)
+        if subtype.value == "achievement-score":
+            games_curs.execute('''SELECT UserID, TotalScore FROM UserAchievementScoresView WHERE GuildID = ? ORDER BY TotalScore DESC''', (interaction.guild.id,))
+            rows= games_curs.fetchall()
+            outstr=""
+            embed=discord.Embed(title="Achievement Score Leaderboard", color=0x228a65)
+            for row in rows:
+                user=interaction.guild.get_member(int(row[0]))
+                if user:
+                    outstr += f"{user.display_name}: {row[1]} points\n"
+                else:
+                    outstr += f"User ID {row[0]}: {row[1]} points\n"
+            embed.description=outstr
+            await interaction.followup.send(embed=embed, ephemeral=privMsg)
         games_curs.close()
         games_conn.close()
 
@@ -206,6 +220,9 @@ class FlipButton(discord.ui.Button):
         if result == 1:
             #modify to also pass in the current timestamp
             games_curs.execute('''UPDATE coinFlipLeaderboard SET CurrentStreak = CurrentStreak + 1, LastFlip=?, TimesFlipped = TimesFlipped + 1 WHERE UserID=?''', (datetime.now().strftime('%Y-%m-%d %H:%M:%S'), interaction.user.id))
+            games_conn.commit()
+            await achievementTrigger(interaction.guild.id, interaction.user.id, 'CurrentStreak')
+            await achievementTrigger(interaction.guild.id, interaction.user.id, 'TimesFlipped')
         else:
             games_curs.execute('''UPDATE coinFlipLeaderboard SET CurrentStreak = 0, LastFlip=?, TimesFlipped = TimesFlipped + 1 WHERE UserID=?''', (datetime.now().strftime('%Y-%m-%d %H:%M:%S'), interaction.user.id))
         games_conn.commit()

@@ -38,7 +38,8 @@ async def award_points(amount, guild_id, user_id):
     games_conn.commit()
     games_curs.close()
     games_conn.close()
-    #await achievementTrigger(guild_id, user_id, "LifetimeEarnings")
+    await achievementTrigger(guild_id, user_id, "LifetimeEarnings")
+    await achievementTrigger(guild_id, user_id, "CurrentBalance")
 
 async def delete_later(message,time):
     await asyncio.sleep(time)  # wait for the specified time
@@ -194,27 +195,34 @@ async def achievementTrigger(guildID: str, userID: str, eventType: str):
     #get all achievements for this event type
     games_curs.execute('''SELECT ID, Value, Name, Description, FlavorText from AchievementDefinitions WHERE TriggerType=? AND ID NOT IN (SELECT AchievementID FROM UserAchievements WHERE GuildID=? AND UserID=?)''', (eventType, guildID, userID))
     achievements = games_curs.fetchall()
-    view=discord.ui.View()
     embedList=[]
-    if eventType == "LifetimeEarnings":
-        #get the user's lifetime earnings
-        games_curs.execute('''SELECT LifetimeEarnings FROM GamblingUserStats WHERE GuildID=? AND UserID=?''', (guildID, userID))
+    if eventType == "LifetimeEarnings" or eventType == "CurrentBalance" or eventType == "TipsGiven" or eventType == "CoinFlipWins" or eventType == "CoinFlipEarnings" or eventType == "CoinFlipDoubleWins" or eventType == "AuctionHouseWinnings" or eventType == "AuctionHouseLosses" or eventType == "BlackjackWins" or eventType == "BlackjackEarnings" or eventType == "Blackjack21s":
+        games_curs.execute(f'''SELECT {eventType} FROM GamblingUserStats WHERE GuildID=? AND UserID=?''', (guildID, userID))
         row = games_curs.fetchone()
-        if row:
-            lifetimeEarnings = row[0]
-            for achievement in achievements:
-                achievementID = achievement[0]
-                targetValue = achievement[1]
-                if lifetimeEarnings >= targetValue:
-                    #award the achievement
-                    games_curs.execute('''INSERT INTO UserAchievements (GuildID, UserID, AchievementID) VALUES (?, ?, ?)''', (guildID, userID, achievementID))
-                    games_conn.commit()
-                    embed=discord.Embed(title=f"Achievement Unlocked: {achievement[2]}", description=f"{achievement[3]}\n*{achievement[4]}*", color=discord.Color.gold())
-                    embedList.append(embed)
+    elif eventType == "PingPongCount" or eventType == "PingSongCount" or eventType == "PingDongCount" or eventType == "PingLongCount" or eventType == "PingKongCount" or eventType == "PingGoldStarCount" or eventType == "HorseHitCount" or eventType == "CatHitCount" or eventType == "MarathonHitCount":
+        games_curs.execute(f'''SELECT {eventType} FROM UserStats WHERE GuildID=? AND UserID=?''', (guildID, userID))
+        row = games_curs.fetchone()
+    elif eventType == "CurrentStreak" or eventType == "TimesFlipped":
+        games_curs.execute(f'''SELECT {eventType} FROM CoinFlipLeaderboard WHERE UserID=?''', (userID,))
+        row = games_curs.fetchone()
+    elif eventType == "TriviaCount" or eventType == "TotalCommands":
+        games_curs.execute(f'''SELECT {eventType} FROM UserStatsGeneralView WHERE GuildID=? AND UserID=?''', (guildID, userID))
+        row = games_curs.fetchone()
+    if row:
+        print(f"user value for {eventType} is {row[0]}")
+        userValue = int(row[0])
+        for achievement in achievements:
+            achievementID = achievement[0]
+            targetValue = int(achievement[1])
+            flavor = achievement[4] if achievement[4] is not None else "-"
+            if userValue >= targetValue:
+                #award the achievement
+                games_curs.execute('''INSERT INTO UserAchievements (GuildID, UserID, AchievementID) VALUES (?, ?, ?)''', (guildID, userID, achievementID))
+                games_conn.commit()
+                embed=discord.Embed(title=f"Achievement Unlocked: {achievement[2]}", description=f"{achievement[3]}\n*{flavor}*", color=discord.Color.gold())
+                embedList.append(embed)
     #DM the user the achievement(s)
     if embedList:
-        # for embed in embedList:
-        #     view.add_item(embed)
         user = await context.bot.fetch_user(int(userID))
         print(f"bot is: {context.bot}")
         print(f"Sending achievement DM to user {user}")

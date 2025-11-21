@@ -12,7 +12,7 @@ import re
 import asyncio
 import zoneinfo
 
-from Helpers.Helpers import award_points, checkIgnoredChannels, smrtGame
+from Helpers.Helpers import award_points, checkIgnoredChannels, smrtGame, achievementTrigger
 import context
 from cogs.Trivia import questionSpawner
 
@@ -70,6 +70,8 @@ async def package_daily_gambling():
                 games_conn.commit()
                 await award_points(-row['CurrentPrice'], row['CurrentBidderGuildID'], row['CurrentBidderUserID'])
                 await award_points(int(row['AmountAuctioned']), row['CurrentBidderGuildID'], row['CurrentBidderUserID'])
+                await achievementTrigger(row['CurrentBidderGuildID'], row['CurrentBidderUserID'], 'AuctionHouseWinnings')
+                await achievementTrigger(row['CurrentBidderGuildID'], row['CurrentBidderUserID'], 'AuctionHouseLosses')
                 games_curs.execute('''UPDATE AuctionHousePrize SET HasBeenCleared=1, FinalBidderGuildId = ?, FinalBidderUserId = ? WHERE Date=? AND Zone=?''', (row['CurrentBidderGuildID'], row['CurrentBidderUserID'], today - timedelta(days=1), row['Zone']))
                 games_conn.commit()
                 #send the winner a dm about their win with the amount spent and the amount earned
@@ -262,7 +264,7 @@ class MyClient(commands.Bot):
         await self.load_extension('cogs.Core')
         await self.load_extension('cogs.Analytics')
 
-        #await self.tree.sync()
+        await self.tree.sync()
         print('synced')
 
     async def on_thread_create(self,thread):
@@ -339,43 +341,6 @@ class MyClient(commands.Bot):
         print(message.guild.name)
         splitstr=message.content.split()
         if len(message.content)>0:
-                    
-            if splitstr[0]=='top3':
-                tmp,extra=topChat('users','day',300,str(message.guild.id),3,'',curs)
-                for key in tmp:
-                    await message.channel.send(tmp[key])
-                    
-            if splitstr[0]=='enableRankedRoles':
-                print('trying')
-                try:
-                    f=open('RankedRoleConfig/config',"r")
-                    passing=True
-                    print("here")
-                    for line in f:
-                        print(line)
-                        splitLine=line.split()
-                        if splitLine[0]==str(message.guild.id):
-                            passing=False
-                    f.close()
-                    if passing:
-                        
-                        cfgFile=open('RankedRoleConfig/config',"a")
-                        cfgFile.write('\n'+str(message.guild.id)+' true '+splitstr[1]+' '+splitstr[2]+' '+splitstr[3]+' '+splitstr[4])
-                        cfgFile.close()
-                        await message.channel.send("added to list")
-                    else:
-                        await message.channel.send("already enabled")
-                    
-                except AssertionError:
-                    await message.channel.send("invalid param")
-                    
-                    
-            if splitstr[0]=='disableRankedRoles':
-                print('not working yet')
-                role=get(message.guild.roles, id=1016131254497845280)
-                await message.channel.send(len(role.members))
-
-
             games_path = "games.db"
             games_conn = sqlite3.connect(games_path)
             games_conn.row_factory = sqlite3.Row  # allows dict-like access
@@ -450,6 +415,7 @@ class MyClient(commands.Bot):
                         if statsFlag==1:
                             games_curs.execute('''UPDATE UserStats SET HorseTimestamp = ?, HorseMissCount = HorseMissCount + 1 WHERE GuildID = ? AND UserID = ?''', (currentDate, message.guild.id, message.author.id))
                     games_conn.commit()
+                    await achievementTrigger(message.guild.id, message.author.id, "HorseHitCount")
 
                 if splitstr[0].lower()=='cat' and FlagCat:
                     UserStatCatTimestamp = userStatsTimestamps["CatTimestamp"]
@@ -477,6 +443,7 @@ class MyClient(commands.Bot):
                                     if statsFlag==1:
                                         games_curs.execute('''UPDATE UserStats SET CatTimestamp = ?, CatMissCount = CatMissCount + 1 WHERE GuildID = ? AND UserID = ?''', (currentDate, message.guild.id, message.author.id))
                     games_conn.commit()
+                    await achievementTrigger(message.guild.id, message.author.id, "CatHitCount")
 
                 if "marathon" in message.content.lower() and FlagMarathon:
                     UserStatMarathonTimestamp = userStatsTimestamps["MarathonTimestamp"]
@@ -496,6 +463,7 @@ class MyClient(commands.Bot):
                         if statsFlag==1:
                             games_curs.execute('''UPDATE UserStats SET MarathonTimestamp = ?, MarathonMissCount = MarathonMissCount + 1 WHERE GuildID = ? AND UserID = ?''', (currentDate, message.guild.id, message.author.id))
                     games_conn.commit()
+                    await achievementTrigger(message.guild.id, message.author.id, "MarathonHitCount")
 
                 if (splitstr[0].lower()=='ping' and FlagPing):
                     # if message.author.id==100344687029665792:
@@ -535,6 +503,12 @@ class MyClient(commands.Bot):
                         if statsFlag==1:
                             games_curs.execute('''UPDATE UserStats SET PingTimestamp = ?, PingGoldStarCount = PingGoldStarCount + 1 WHERE GuildID = ? AND UserID = ?''', (currentDate, message.guild.id, message.author.id))
                     games_conn.commit()
+                    await achievementTrigger(message.guild.id, message.author.id, "PingPongCount")
+                    await achievementTrigger(message.guild.id, message.author.id, "PingSongCount")
+                    await achievementTrigger(message.guild.id, message.author.id, "PingDongCount")
+                    await achievementTrigger(message.guild.id, message.author.id, "PingLongCount")
+                    await achievementTrigger(message.guild.id, message.author.id, "PingKongCount")
+                    await achievementTrigger(message.guild.id, message.author.id, "PingGoldStarCount")
             games_curs.close()
             games_conn.close()
 

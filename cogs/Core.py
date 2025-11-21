@@ -119,7 +119,13 @@ class Stats(commands.Cog):
         black_jack_stats = games_curs.fetchone()
         games_curs.execute('''SELECT * FROM GamblingGamesUnlocked WHERE GuildID=? AND UserID=?''', (guild_id, user_id))
         unlocked_games = games_curs.fetchone()
+        games_curs.execute('''SELECT TotalScore FROM UserAchievementScoresView WHERE GuildID=? AND UserID=?''', (guild_id, user_id))
+        achievement_score = games_curs.fetchone()
+        games_curs.close()
+        games_conn.close()
         embed = discord.Embed(title=f"---WIP---\n{interaction.user.name}'s Stats", color=discord.Color.green())
+        if achievement_score:
+            embed.add_field(name="Achievement Score", value=achievement_score['TotalScore'], inline=False)
         if user_stats:
             embed.add_field(name="Ping Responses", value=f"Pong:{user_stats['PingPongCount']}\nSong: {user_stats['PingSongCount']}\nDong: {user_stats['PingDongCount']}\nLong: {user_stats['PingLongCount']}\nKong: {user_stats['PingKongCount']}\nGoldStar: {user_stats['PingGoldStarCount']}", inline=False)
             #divide hits and misses to get a percent rounded to the whole number. if miss is 0 then default to 100%
@@ -278,6 +284,106 @@ async def get_wiki_page(group: str= "General"):
     games_conn.close()
     return pages
 
+class Achievements(commands.Cog):
+    def __init__(self, client: commands.Bot):
+        self.client = client
+    @app_commands.command(name="achievements", description="Displays your achievements")
+    async def achievements(self, interaction: discord.Interaction):
+        user_id = interaction.user.id
+        guild_id = interaction.guild.id
+
+        # Fetch the user's achievements from the database
+        gamesDB="games.db"
+        games_conn = sqlite3.connect(gamesDB)   
+        games_conn.row_factory = sqlite3.Row
+        games_curs = games_conn.cursor()
+        games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName) VALUES (?, ?, ?)''', (interaction.guild.id, interaction.user.id, "achievements"))
+        games_conn.commit()
+        games_curs.execute("""
+            SELECT 
+                ad.ID,
+                ad.Name,
+                ad.Description,
+                ad.TriggerType,
+                ad.Value,
+                ad.FlavorText,
+                ua.Timestamp
+            FROM AchievementDefinitions AS ad
+            INNER JOIN UserAchievements AS ua
+                ON ad.ID = ua.AchievementID
+            WHERE ua.GuildID = ?
+            AND ua.UserID = ?
+            ORDER BY ad.ID
+        """, (interaction.guild.id, interaction.user.id))
+
+        rows = games_curs.fetchall()
+
+        games_curs.close()
+        games_conn.close()
+
+        if not rows:
+            await interaction.response.send_message("You haven't unlocked any achievements yet!", ephemeral=True)
+            return
+
+        # Build pages
+        pages = []
+        per_page = 5
+
+        for i in range(0, len(rows), per_page):
+            chunk = rows[i:i+per_page]
+
+            embed = discord.Embed(
+                title=f"Achievements ({i+1}-{min(i+5, len(rows))} of {len(rows)})",
+                color=discord.Color.gold()
+            )
+
+            for ach in chunk:
+                ach_id, name, desc, trigger, value, flavor, timestamp = ach
+                flavor = flavor if flavor is not None else "-"
+                embed.add_field(
+                    name=f"{ach_id}: {name}",
+                    value=f"**Description:** {desc}\n"
+                        f"*{flavor}*\n"
+                        f"**Unlocked:** {timestamp}\n"
+                        f"-----------------------------------",
+                    inline=False
+                )
+
+            pages.append(embed)
+
+        view = AchievementsPaginator(interaction, pages)
+
+        await interaction.response.send_message(embed=pages[0], view=view, ephemeral=True)
+
+class AchievementsPaginator(discord.ui.View):
+    def __init__(self, interaction, pages):
+        super().__init__(timeout=120)
+        self.interaction = interaction
+        self.pages = pages
+        self.current_page = 0
+
+        # Disable "Previous" on first page
+        self.children[0].disabled = True
+
+    async def update_page(self, interaction):
+        embed = self.pages[self.current_page]
+
+        # Update button states
+        self.children[0].disabled = (self.current_page == 0)
+        self.children[1].disabled = (self.current_page == len(self.pages) - 1)
+
+        await interaction.response.edit_message(embed=embed, view=self)
+
+    @discord.ui.button(label="Previous", style=discord.ButtonStyle.secondary)
+    async def previous(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.current_page -= 1
+        await self.update_page(interaction)
+
+    @discord.ui.button(label="Next", style=discord.ButtonStyle.secondary)
+    async def next(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.current_page += 1
+        await self.update_page(interaction)
+
 
 
 async def setup(client: commands.Bot):
@@ -286,3 +392,4 @@ async def setup(client: commands.Bot):
     await client.add_cog(Stats(client))
     await client.add_cog(AddAuthorizedUser(client))
     await client.add_cog(Wiki(client))
+    await client.add_cog(Achievements(client))

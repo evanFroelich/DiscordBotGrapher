@@ -262,6 +262,24 @@ CREATE TABLE if not exists UserCasinoPassPhrases (
 	PRIMARY KEY("UserID","GuildID")
 );
 
+CREATE TABLE  if not exists AchievementDefinitions (
+	"ID"	INTEGER NOT NULL UNIQUE,
+	"Name"	TEXT,
+	"Description"	TEXT,
+	"TriggerType"	TEXT,
+	"Value"	INTEGER,
+	"FlavorText"	TEXT,
+	PRIMARY KEY("ID" AUTOINCREMENT)
+);
+
+CREATE TABLE if not exists UserAchievements (
+	"GuildID"	INTEGER NOT NULL,
+	"UserID"	INTEGER NOT NULL,
+	"AchievementID"	INTEGER NOT NULL,
+	"Timestamp"	INTEGER NOT NULL DEFAULT (datetime('now', 'localtime')),
+	PRIMARY KEY("GuildID","UserID","AchievementID")
+);
+
 CREATE VIEW if not exists GamblingUnlockMetricsView AS
 SELECT
     GuildID,
@@ -328,3 +346,21 @@ LEFT JOIN CoinFlips c
     ON t.UserID = c.UserID
 LEFT JOIN Commands cmd
     ON t.GuildID = cmd.GuildID AND t.UserID = cmd.UserID;
+
+CREATE VIEW if not exists DynamicAchievementScoresView AS SELECT
+    ad.ID AS AchievementID,
+    COUNT(ua.UserID) AS Earners,
+
+    round(-1 * (150.0 / (1 + 2 * exp(-0.1 * COUNT(ua.UserID)))) + 170, 0) AS Score
+FROM AchievementDefinitions ad
+LEFT JOIN UserAchievements ua ON ad.ID = ua.AchievementID
+GROUP BY ad.ID, ua.GuildID;
+
+CREATE VIEW if not exists UserAchievementScoresView AS SELECT
+    ua.GuildID,
+    ua.UserID,
+    SUM(ascore.Score) AS TotalScore
+FROM UserAchievements ua
+JOIN DynamicAchievementScoresView ascore
+    ON ua.AchievementID = ascore.AchievementID
+GROUP BY ua.GuildID, ua.UserID;
