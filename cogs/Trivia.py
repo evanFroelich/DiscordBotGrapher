@@ -993,7 +993,7 @@ class StandButton(discord.ui.Button):
         #determine winner
         if dealerHandValue > 21 or userHandValue > dealerHandValue:
             #user wins
-            rewarded_points = round((3 * self.GAMEINFO["betAmount"])/2)
+            rewarded_points = round((6 * self.GAMEINFO["betAmount"])/5)
             await award_points(guild_id=self.guildID, user_id=self.userID, amount=rewarded_points)
             result = f"You win!\nYou are awarded {rewarded_points} points!"
             perfectScore=0
