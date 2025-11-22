@@ -899,11 +899,11 @@ class BlackjackBetModal(discord.ui.Modal, title="Place your bet"):
     async def on_submit(self, interaction: discord.Interaction):
         #edit the message passed in to show the bet amount
         #make sure its a valid number greater than 0
-        if not self.bet_input.value.isdigit() or int(self.bet_input.value) <= 0 or int(self.bet_input.value) > 500 or int(self.bet_input.value)>self.balance:
+        if not self.bet_input.value.isdigit() or int(self.bet_input.value) <= 0 or int(self.bet_input.value) > 1000 or int(self.bet_input.value)>self.balance:
             betButton=BlackjackBetButton(label="Place your bet", userID=self.userID, guildID=self.guildID, GAMEINFO=self.GAMEINFO)
             view = discord.ui.View()
             view.add_item(betButton)
-            await interaction.response.send_message(content="Please enter a valid bet amount greater than 0 and less than 500 or your current balance.", view=view,ephemeral=True)
+            await interaction.response.send_message(content="Please enter a valid bet amount greater than 0 and less than 1000 or your current balance.", view=view,ephemeral=True)
             return
         games_conn = sqlite3.connect("games.db")
         games_curs = games_conn.cursor()
