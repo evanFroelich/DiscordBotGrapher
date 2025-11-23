@@ -324,6 +324,25 @@ Commands AS (
     SELECT GuildID, UserID, COUNT(*) AS TotalCommands
     FROM CommandLog
     GROUP BY GuildID, UserID
+),
+Achievements AS (
+    SELECT
+        GuildID,
+        UserID,
+        SUM(CASE WHEN NumAs = 5 AND RowsInCategory = 5 THEN 1 ELSE 0 END) AS CountAllAs,
+        SUM(CASE WHEN NumFs = 5 AND RowsInCategory = 5 THEN 1 ELSE 0 END) AS CountAllFs,
+        SUM(CASE 
+                WHEN RowsInCategory = 5
+                 AND NumAs = 1
+                 AND NumBs = 1
+                 AND NumCs = 1
+                 AND NumDs = 1
+                 AND NumFs = 1 
+                THEN 1 
+                ELSE 0 
+            END) AS CountRainbow
+    FROM SubjectGradeSpreadView
+    GROUP BY GuildID, UserID
 )
 SELECT
     t.GuildID,
@@ -338,14 +357,19 @@ SELECT
     c.CurrentStreak,
     c.LastFlip,
     c.TimesFlipped,
-    cmd.TotalCommands
+    cmd.TotalCommands,
+	a.CountAllAs,
+	a.CountAllFs,
+	a.CountRainbow
 FROM Trivia t
 LEFT JOIN Gambling g
     ON t.GuildID = g.GuildID AND t.UserID = g.UserID
 LEFT JOIN CoinFlips c
     ON t.UserID = c.UserID
 LEFT JOIN Commands cmd
-    ON t.GuildID = cmd.GuildID AND t.UserID = cmd.UserID;
+    ON t.GuildID = cmd.GuildID AND t.UserID = cmd.UserID
+LEFT JOIN Achievements a 
+	ON t.GuildID = a.GuildID and t.UserID = a.UserID;
 
 CREATE VIEW if not exists DynamicAchievementScoresView AS SELECT
     ad.ID AS AchievementID,
@@ -364,3 +388,47 @@ FROM UserAchievements ua
 JOIN DynamicAchievementScoresView ascore
     ON ua.AchievementID = ascore.AchievementID
 GROUP BY ua.GuildID, ua.UserID;
+
+CREATE VIEW if not exists GradesPerScoreView AS
+SELECT 
+    GuildID,
+    UserID,
+    Category,
+    Difficulty,
+    Num_Correct,
+    Num_Incorrect,
+    CASE 
+        WHEN Num_Correct + Num_Incorrect = 0 THEN 'F'           -- no answers = F
+        WHEN 1.0 * Num_Correct / (Num_Correct + Num_Incorrect) >= 0.9 THEN 'A'
+        WHEN 1.0 * Num_Correct / (Num_Correct + Num_Incorrect) >= 0.8 THEN 'B'
+        WHEN 1.0 * Num_Correct / (Num_Correct + Num_Incorrect) >= 0.7 THEN 'C'
+        WHEN 1.0 * Num_Correct / (Num_Correct + Num_Incorrect) >= 0.6 THEN 'D'
+        ELSE 'F'
+    END AS Grade
+FROM Scores WHERE Category!="bonus";
+
+CREATE VIEW if not exists GradeTotalsView AS
+SELECT
+    GuildID,
+    UserID,
+    SUM(CASE WHEN Grade = 'A' THEN 1 ELSE 0 END) AS Total_As,
+    SUM(CASE WHEN Grade = 'B' THEN 1 ELSE 0 END) AS Total_Bs,
+    SUM(CASE WHEN Grade = 'C' THEN 1 ELSE 0 END) AS Total_Cs,
+    SUM(CASE WHEN Grade = 'D' THEN 1 ELSE 0 END) AS Total_Ds,
+    SUM(CASE WHEN Grade = 'F' THEN 1 ELSE 0 END) AS Total_Fs
+FROM GradesPerScoreView
+GROUP BY GuildID, UserID;
+
+CREATE VIEW if not exists SubjectGradeSpreadView AS
+SELECT
+    GuildID,
+    UserID,
+    Category,
+    COUNT(*) AS RowsInCategory,
+    SUM(CASE WHEN Grade = 'A' THEN 1 ELSE 0 END) AS NumAs,
+	SUM(CASE WHEN Grade = 'B' THEN 1 ELSE 0 END) AS NumBs,
+	SUM(CASE WHEN Grade = 'C' THEN 1 ELSE 0 END) AS NumCs,
+	SUM(CASE WHEN Grade = 'D' THEN 1 ELSE 0 END) AS NumDs,
+	SUM(CASE WHEN Grade = 'F' THEN 1 ELSE 0 END) AS NumFs
+FROM GradesPerScoreView
+GROUP BY GuildID, UserID, Category;

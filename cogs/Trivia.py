@@ -600,7 +600,10 @@ class QuestionModal(discord.ui.Modal):
         games_curs.close()
         games_conn.close()
         await achievementTrigger(interaction.guild.id, interaction.user.id, 'TriviaCount')
-
+        await achievementTrigger(interaction.guild.id, interaction.user.id, 'CountAllAs')
+        await achievementTrigger(interaction.guild.id, interaction.user.id, 'CountAllFs')
+        await achievementTrigger(interaction.guild.id, interaction.user.id, 'CountRainbow')
+        return
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~GAMBLING SETUP~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -726,6 +729,14 @@ class GamblingCoinFlipWagers(discord.ui.Button):
             else:
                 messageContent=f"So your luck ran out? Tough. Better luck next time pal."
                 await award_points(-self.wager, self.guild_id, self.user_id)
+                games_db = "games.db"
+                games_conn = sqlite3.connect(games_db)
+                games_curs = games_conn.cursor()
+                games_curs.execute('''UPDATE GamblingUserStats SET CoinFlipLosses = CoinFlipLosses + ? WHERE GuildID = ? AND UserID = ?''', (self.wager, self.guild_id, self.user_id))
+                games_conn.commit()
+                games_curs.close()
+                games_conn.close()
+                await achievementTrigger(self.guild_id, self.user_id, 'CoinFlipLosses')
             #await interaction.response.edit_message(content=messageContent, view=None)
             await interaction.followup.edit_message(message_id=interaction.message.id, content=messageContent, view=None)
             return
@@ -747,6 +758,14 @@ class GamblingCoinFlipWagers(discord.ui.Button):
             self.streak = 0
             messageContent=f"You lost the flip! Your wager of {int(self.wager)} has been subtracted from your balance.\nYou have {self.remainingFlips} flips remaining."
             await award_points(-self.wager, self.guild_id, self.user_id)
+            games_db = "games.db"
+            games_conn = sqlite3.connect(games_db)
+            games_curs = games_conn.cursor()
+            games_curs.execute('''UPDATE GamblingUserStats SET CoinFlipLosses = CoinFlipLosses + ? WHERE GuildID = ? AND UserID = ?''', (self.wager, self.guild_id, self.user_id))
+            games_conn.commit()
+            games_curs.close()
+            games_conn.close()
+            await achievementTrigger(self.guild_id, self.user_id, 'CoinFlipLosses')
         
         
         if self.remainingFlips <= 0:
@@ -950,6 +969,14 @@ class HitButton(discord.ui.Button):
         #if users hand value is over 21, they bust
         if userHandValue > 21:
             await award_points(guild_id=self.guildID, user_id=self.userID, amount=-self.GAMEINFO["betAmount"])
+            games_db = "games.db"
+            games_conn = sqlite3.connect(games_db)
+            games_curs = games_conn.cursor()
+            games_curs.execute('''UPDATE GamblingUserStats SET BlackjackLosses = BlackjackLosses + ? WHERE GuildID = ? AND UserID = ?''', (self.GAMEINFO["betAmount"], self.guildID, self.userID))
+            games_conn.commit()
+            games_curs.close()
+            games_conn.close()
+            await achievementTrigger(self.guildID, self.userID, 'BlackjackLosses')
             if self.GAMEINFO["roundsLeft"] <=0:
                 view = discord.ui.View()
                 await interaction.response.edit_message(content=f"{await game_state_display(self.GAMEINFO,hidden=False)}\nYou busted! You lose!\nNo rounds left. Game over.", view=view)
@@ -1012,6 +1039,14 @@ class StandButton(discord.ui.Button):
         elif userHandValue < dealerHandValue:
             #dealer wins
             await award_points(guild_id=self.guildID, user_id=self.userID, amount=-self.GAMEINFO["betAmount"])
+            games_db = "games.db"
+            games_conn = sqlite3.connect(games_db)
+            games_curs = games_conn.cursor()
+            games_curs.execute('''UPDATE GamblingUserStats SET BlackjackLosses = BlackjackLosses + ? WHERE GuildID = ? AND UserID = ?''', (self.GAMEINFO["betAmount"], self.guildID, self.userID))
+            games_conn.commit()
+            games_curs.close()
+            games_conn.close()
+            await achievementTrigger(self.guildID, self.userID, 'BlackjackLosses')
             result = f"You lose!\nYou lose {self.GAMEINFO['betAmount']} points!"
         else:
             result = "It's a tie!"

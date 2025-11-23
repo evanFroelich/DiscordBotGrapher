@@ -309,6 +309,7 @@ class MyClient(commands.Bot):
             game_curs.execute('''UPDATE FeatureTimers SET LastBonusPipMessage=? WHERE GuildID=?''', (None,reaction.message.guild.id))
             game_conn.commit()
             await award_points(1, reaction.message.guild.id, user.id)  # Award 5 points for bonus pip
+            await achievementTrigger(reaction.message.guild.id, user.id, "bonus")
         game_curs.close()
         game_conn.close()
 
