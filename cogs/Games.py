@@ -627,10 +627,10 @@ async def placeBid(interaction: discord.Interaction, bid_amount: int, is_simple_
             games_conn.close()
             return
         #check if the user won an auction yesterday and if so, prevent them from bidding today
-        games_curs.execute('''SELECT FinalBidderUserID FROM AuctionHousePrize WHERE Date = ?''', (datetime.now().date() - timedelta(days=1),))
+        games_curs.execute('''SELECT FinalBidderUserID, FinalBidderGuildID FROM AuctionHousePrize WHERE Date = ?''', (datetime.now().date() - timedelta(days=1),))
         won_auctions = games_curs.fetchall()
         for auction in won_auctions:
-            if auction['FinalBidderUserID'] == interaction.user.id:
+            if auction['FinalBidderUserID'] == interaction.user.id and auction['FinalBidderGuildID'] == interaction.guild.id:
                 await interaction.response.send_message("You won an auction yesterday and cannot bid today. Please wait until tomorrow to bid again.", ephemeral=True)
                 games_curs.close()
                 games_conn.close()
