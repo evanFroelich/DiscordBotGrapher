@@ -121,9 +121,16 @@ class Stats(commands.Cog):
         unlocked_games = games_curs.fetchone()
         games_curs.execute('''SELECT TotalScore FROM UserAchievementScoresView WHERE GuildID=? AND UserID=?''', (guild_id, user_id))
         achievement_score = games_curs.fetchone()
+        games_curs.execute('''with Names as (select ID, Name from AchievementDefinitions), OwnedAchievements as (select AchievementID, GuildID, UserID from UserAchievements), achievement_scores as (select AchievementID, Score, Earners from DynamicAchievementScoresView) select a.Name, c.Earners, c.Score from Names a left join OwnedAchievements b on a.ID = b.AchievementID left join achievement_scores c on c.AchievementID = b.AchievementID where b.UserID = ? and b.GuildID = ? order by c.Score DESC limit 3''', (user_id, guild_id))
+        top_achievements = games_curs.fetchall()
         games_curs.close()
         games_conn.close()
         embed = discord.Embed(title=f"---WIP---\n{interaction.user.name}'s Stats", color=discord.Color.green())
+        if top_achievements:
+            achievementStr=""
+            for achievement in top_achievements:
+                achievementStr += f"{achievement['Name']}\n"
+            embed.add_field(name="Top Achievements", value=achievementStr, inline=False)
         if achievement_score:
             embed.add_field(name="Achievement Score", value=achievement_score['TotalScore'], inline=False)
         if user_stats:
