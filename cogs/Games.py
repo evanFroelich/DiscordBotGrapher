@@ -636,7 +636,7 @@ async def placeBid(interaction: discord.Interaction, bid_amount: int, is_simple_
                 games_conn.close()
                 return
         #check if the user is the current highest bidder for other auctions today
-        games_curs.execute('''SELECT Zone FROM AuctionHousePrize WHERE Date = ? AND CurrentBidderUserID = ?''', (datetime.now().date(), interaction.user.id))
+        games_curs.execute('''SELECT Zone FROM AuctionHousePrize WHERE Date = ? AND CurrentBidderUserID = ? and CurrentBidderGuildID = ?''', (datetime.now().date(), interaction.user.id, interaction.guild.id))
         current_bids = games_curs.fetchall()
         for bid in current_bids:
             if bid['Zone'] != selected_auction:
