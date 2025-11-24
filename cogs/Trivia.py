@@ -618,7 +618,7 @@ class GamblingIntroModal(discord.ui.Modal):
         self.user_id = user_id
         self.guild_id = guild_id
         self.funds = funds
-        self.storyMessage=discord.ui.TextDisplay(content=f"*First things first, you need to decide how much to bring along. As much or as little as you want, as long as it's not more than the {self.funds} you have or more than 500.*")
+        self.storyMessage=discord.ui.TextDisplay(content=f"*First things first, you need to decide how much to bring along. As much or as little as you want, as long as it's not more than the {self.funds} you have or more than 1000.*")
         self.funds_input = discord.ui.TextInput(label=f"Funds brought:", max_length=10, required=True,placeholder="e.g. 1000", style=discord.TextStyle.short)
         self.add_item(self.storyMessage)
         self.add_item(self.funds_input) #i dont think i need this
