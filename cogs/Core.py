@@ -129,7 +129,7 @@ class Stats(commands.Cog):
         if top_achievements:
             achievementStr=""
             for achievement in top_achievements:
-                achievementStr += f"{achievement['Name']}\n"
+                achievementStr += f"({achievement['Earners']}) {achievement['Name']}\n"
             embed.add_field(name="Top Achievements", value=achievementStr, inline=False)
         if achievement_score:
             embed.add_field(name="Achievement Score", value=achievement_score['TotalScore'], inline=False)
