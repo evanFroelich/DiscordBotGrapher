@@ -3,6 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 import sqlite3
 import random
+import json
 
 
 
@@ -47,13 +48,67 @@ class DevOnly(commands.Cog):
 
     @app_commands.command(name="dev-only", description="developer only command")
     async def dev_only_command(self, interaction: discord.Interaction):
-        #sync command tree
-        if interaction.user.id == 100344687029665792:  # replace with your Discord user ID
-            await self.tree.sync()
-            await interaction.response.send_message("Command tree synced.")
-        else:
-            await interaction.response.send_message("not for you",ephemeral=True)
-        #await interaction.response.send_message("This is a developer only command.")
+        games_conn = sqlite3.connect("games.db")
+        games_conn.row_factory = sqlite3.Row
+        games_curs = games_conn.cursor()
+        games_curs.execute('''SELECT * FROM ShadowListQueue order by ID asc limit 1''')
+        row = games_curs.fetchone()
+        #print the contents of the row
+        printstr=""
+        for key in row.keys():
+            printstr += f"{key}: {row[key]}\n"
+        print(printstr)
+        if row:
+            if interaction.user.id != 100344687029665792:  #replace with your user id
+                await interaction.response.send_message("You are not authorized to use this command.", ephemeral=True)
+                return
+            shadowAnswers=[]
+            if row["ShadowAnswers"] is not None:
+                shadowAnswers = json.loads(row["ShadowAnswers"])
+            view = discord.ui.View()
+            approveButton=decisionButton(label="Approve", style=discord.ButtonStyle.green, ID=row["ID"], shadowAnswers=shadowAnswers)
+            denyButton=decisionButton(label="Deny", style=discord.ButtonStyle.red, ID=row["ID"], shadowAnswers=shadowAnswers)
+            view.add_item(approveButton)
+            view.add_item(denyButton)
+            await interaction.response.send_message(f"Question: {row['Question']}\nGiven answer: {row['GivenAnswer']}\nShadow answers: {row['ShadowAnswers']}\nUser answer: {row['UserAnswer']}\nLLMResponse: {row['LLMResponse']}", view=view)
+
+class decisionButton(discord.ui.Button):
+    def __init__(self, label: str, style: discord.ButtonStyle, ID: int, shadowAnswers: list[str]):
+        super().__init__(label=label, style=style)
+        self.ID = ID
+        self.shadowAnswers = shadowAnswers
+
+    async def callback(self, interaction: discord.Interaction):
+        #make sure only my user id can use this button
+        if interaction.user.id == 100344687029665792:  #replace with your user id
+            games_conn = sqlite3.connect("games.db")
+            games_conn.row_factory = sqlite3.Row
+            games_curs = games_conn.cursor()
+            #get the row from the ShadowListQueue table with the matching ID
+            games_curs.execute('''SELECT * FROM ShadowListQueue WHERE ID=?''', (self.ID,))
+            row = games_curs.fetchone()
+            if self.label == "Approve":
+                #get the ShadowAnswers from the database
+                self.shadowAnswers.append(row["UserAnswer"])
+                games_curs.execute('''UPDATE QuestionList SET ShadowAnswers=? WHERE ID=?''', (json.dumps(self.shadowAnswers), self.ID))
+                games_conn.commit()
+            games_curs.execute('''DELETE FROM ShadowListQueue WHERE ID=?''', (self.ID,))
+            games_conn.commit()
+            #grab the next entry from the ShadowListQueue
+            games_curs.execute('''SELECT * FROM ShadowListQueue order by ID asc limit 1''')
+            row = games_curs.fetchone()
+            if row:
+                view = discord.ui.View()
+                shadowAnswers=[]
+                if row["ShadowAnswers"] is not None:
+                    shadowAnswers = json.loads(row["ShadowAnswers"])
+                approveButton=decisionButton(label="Approve", style=discord.ButtonStyle.green, ID=row["ID"], shadowAnswers=shadowAnswers)
+                denyButton=decisionButton(label="Deny", style=discord.ButtonStyle.red, ID=row["ID"], shadowAnswers=shadowAnswers)
+                view.add_item(approveButton)
+                view.add_item(denyButton)
+                await interaction.response.edit_message(content=f"Question: {row['Question']}\nGiven answer: {row['GivenAnswer']}\nShadow answers: {row['ShadowAnswers']}\nUser answer: {row['UserAnswer']}\nLLMResponse: {row['LLMResponse']}", view=view)
+            games_curs.close()
+            games_conn.close()
 
 
 class Test(commands.Cog):

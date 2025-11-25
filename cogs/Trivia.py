@@ -66,7 +66,7 @@ async def createQuestion(interaction: discord.Interaction = None, channel: disco
     #print(f"list: {questionPickList}")
 
     CategorySelectQuery='''
-    SELECT ID, Question, Answers, Type, Difficulty
+    SELECT ID, Question, Answers, Type, Difficulty, ShadowAnswers
         FROM QuestionList
         WHERE Difficulty = ?
         ORDER BY random()
@@ -430,6 +430,11 @@ class QuestionModal(discord.ui.Modal):
         self.question_answers = eval(self.question_answers)  # Convert string representation of list to actual list
         self.question_type = Question[3]  # Question type
         self.question_difficulty = Question[4]  # Question difficulty
+        self.shadow_answers = Question[5]  # Shadow Answers
+        if self.shadow_answers:
+            self.shadow_answers = self.shadow_answers.replace("'", '"')  # Ensure answers are in JSON format
+            self.shadow_answers = eval(self.shadow_answers)  # Convert string representation of list to actual list
+            self.question_answers.extend(self.shadow_answers)
         self.isForced = isForced
         self.retries = retries
         self.guildID = guildID
@@ -460,6 +465,9 @@ class QuestionModal(discord.ui.Modal):
         #temp=""
         #print(f"User answer: {user_answer.lower()} | Correct answers: {temp} | is true: {user_answer.lower() in self.question_answers}")
         classicResponse = user_answer.lower() in [answer.lower() for answer in self.question_answers]
+        if not classicResponse and self.shadow_answers is not None:
+            #check if the answer matches any shadow answers
+            classicResponse = user_answer.lower() in [answer.lower() for answer in self.shadow_answers]
         LLMResponse = -1
         LLMText = "N/A"
         if not classicResponse:

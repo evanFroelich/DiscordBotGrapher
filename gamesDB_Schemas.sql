@@ -280,6 +280,16 @@ CREATE TABLE if not exists UserAchievements (
 	PRIMARY KEY("GuildID","UserID","AchievementID")
 );
 
+CREATE TABLE if not exists ShadowListQueue (
+	"ID"	INTEGER NOT NULL UNIQUE,
+	"Question"	TEXT,
+	"GivenAnswer"	TEXT,
+	"UserAnswer"	TEXT,
+	"LLMResponse"	TEXT,
+	"ShadowAnswers"	TEXT,
+	PRIMARY KEY("ID" AUTOINCREMENT)
+);
+
 CREATE VIEW if not exists GamblingUnlockMetricsView AS
 SELECT
     GuildID,
@@ -432,3 +442,17 @@ SELECT
 	SUM(CASE WHEN Grade = 'F' THEN 1 ELSE 0 END) AS NumFs
 FROM GradesPerScoreView
 GROUP BY GuildID, UserID, Category;
+
+CREATE TRIGGER if not exists trg_LLMEvaluations_to_ShadowListQueue
+AFTER INSERT ON LLMEvaluations
+BEGIN
+    INSERT INTO ShadowListQueue (Question, GivenAnswer, UserAnswer, LLMResponse, ShadowAnswers)
+    SELECT
+        NEW.Question,
+        ql.Answers,          -- <-- Pull full answer list from QuestionList
+        NEW.UserAnswer,
+        NEW.LLMResponse,
+		ql.ShadowAnswers
+    FROM QuestionList ql
+    WHERE ql.ID = NEW.QuestionID;
+END;
