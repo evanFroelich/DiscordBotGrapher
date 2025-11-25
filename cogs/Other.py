@@ -66,16 +66,17 @@ class DevOnly(commands.Cog):
             if row["ShadowAnswers"] is not None:
                 shadowAnswers = json.loads(row["ShadowAnswers"])
             view = discord.ui.View()
-            approveButton=decisionButton(label="Approve", style=discord.ButtonStyle.green, ID=row["ID"], shadowAnswers=shadowAnswers)
-            denyButton=decisionButton(label="Deny", style=discord.ButtonStyle.red, ID=row["ID"], shadowAnswers=shadowAnswers)
+            approveButton=decisionButton(label="Approve", style=discord.ButtonStyle.green, ID=row["ID"], shadowAnswers=shadowAnswers, QID=row["QID"])
+            denyButton=decisionButton(label="Deny", style=discord.ButtonStyle.red, ID=row["ID"], shadowAnswers=shadowAnswers, QID=row["QID"])
             view.add_item(approveButton)
             view.add_item(denyButton)
             await interaction.response.send_message(f"Question: {row['Question']}\nGiven answer: {row['GivenAnswer']}\nShadow answers: {row['ShadowAnswers']}\nUser answer: {row['UserAnswer']}\nLLMResponse: {row['LLMResponse']}", view=view)
 
 class decisionButton(discord.ui.Button):
-    def __init__(self, label: str, style: discord.ButtonStyle, ID: int, shadowAnswers: list[str]):
+    def __init__(self, label: str, style: discord.ButtonStyle, ID: int, shadowAnswers: list[str], QID: int):
         super().__init__(label=label, style=style)
         self.ID = ID
+        self.QID = QID
         self.shadowAnswers = shadowAnswers
 
     async def callback(self, interaction: discord.Interaction):
@@ -90,7 +91,7 @@ class decisionButton(discord.ui.Button):
             if self.label == "Approve":
                 #get the ShadowAnswers from the database
                 self.shadowAnswers.append(row["UserAnswer"])
-                games_curs.execute('''UPDATE QuestionList SET ShadowAnswers=? WHERE ID=?''', (json.dumps(self.shadowAnswers), self.ID))
+                games_curs.execute('''UPDATE QuestionList SET ShadowAnswers=? WHERE ID=?''', (json.dumps(self.shadowAnswers), self.QID))
                 games_conn.commit()
             games_curs.execute('''DELETE FROM ShadowListQueue WHERE ID=?''', (self.ID,))
             games_conn.commit()
@@ -102,8 +103,8 @@ class decisionButton(discord.ui.Button):
                 shadowAnswers=[]
                 if row["ShadowAnswers"] is not None:
                     shadowAnswers = json.loads(row["ShadowAnswers"])
-                approveButton=decisionButton(label="Approve", style=discord.ButtonStyle.green, ID=row["ID"], shadowAnswers=shadowAnswers)
-                denyButton=decisionButton(label="Deny", style=discord.ButtonStyle.red, ID=row["ID"], shadowAnswers=shadowAnswers)
+                approveButton=decisionButton(label="Approve", style=discord.ButtonStyle.green, ID=row["ID"], shadowAnswers=shadowAnswers, QID=row["QID"])
+                denyButton=decisionButton(label="Deny", style=discord.ButtonStyle.red, ID=row["ID"], shadowAnswers=shadowAnswers, QID=row["QID"])
                 view.add_item(approveButton)
                 view.add_item(denyButton)
                 await interaction.response.edit_message(content=f"Question: {row['Question']}\nGiven answer: {row['GivenAnswer']}\nShadow answers: {row['ShadowAnswers']}\nUser answer: {row['UserAnswer']}\nLLMResponse: {row['LLMResponse']}", view=view)
