@@ -243,3 +243,22 @@ async def achievementTrigger(guildID: str, userID: str, eventType: str):
         await user.send("Congratulations! You've unlocked the following achievement(s):", embeds=embedList)
     games_curs.close()
     games_conn.close()
+
+async def achievement_leaderboard_generator(guildID: str):
+    gamesDB = "games.db"
+    games_conn = sqlite3.connect(gamesDB)
+    games_curs = games_conn.cursor()
+    games_curs.execute('''SELECT UserID, TotalScore FROM UserAchievementScoresView WHERE GuildID = ? ORDER BY TotalScore DESC''', (guildID,))
+    rows= games_curs.fetchall()
+    outstr=""
+    embed=discord.Embed(title="Achievement Score Leaderboard", color=0x228a65)
+    for row in rows:
+        user=context.bot.get_guild(guildID).get_member(int(row[0]))
+        if user:
+            outstr += f"{user.display_name}: {row[1]} points\n"
+        else:
+            outstr += f"User ID {row[0]}: {row[1]} points\n"
+    embed.description=outstr
+    games_curs.close()
+    games_conn.close()
+    return embed

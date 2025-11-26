@@ -5,7 +5,7 @@ import sqlite3
 import asyncio
 import random
 from datetime import datetime, timedelta
-from Helpers.Helpers import create_user_db_entry, numToGrade, delete_later, isAuthorized, achievementTrigger
+from Helpers.Helpers import create_user_db_entry, numToGrade, delete_later, isAuthorized, achievementTrigger, achievement_leaderboard_generator
 
 
 class GradeReport(commands.Cog):
@@ -158,17 +158,7 @@ class Leaderboard(commands.Cog):
             embed.description=outstr
             await interaction.followup.send(embed=embed, ephemeral=privMsg)
         if subtype.value == "achievement-score":
-            games_curs.execute('''SELECT UserID, TotalScore FROM UserAchievementScoresView WHERE GuildID = ? ORDER BY TotalScore DESC''', (interaction.guild.id,))
-            rows= games_curs.fetchall()
-            outstr=""
-            embed=discord.Embed(title="Achievement Score Leaderboard", color=0x228a65)
-            for row in rows:
-                user=interaction.guild.get_member(int(row[0]))
-                if user:
-                    outstr += f"{user.display_name}: {row[1]} points\n"
-                else:
-                    outstr += f"User ID {row[0]}: {row[1]} points\n"
-            embed.description=outstr
+            embed = await achievement_leaderboard_generator(interaction.guild.id)
             await interaction.followup.send(embed=embed, ephemeral=privMsg)
         games_curs.close()
         games_conn.close()

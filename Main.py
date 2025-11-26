@@ -12,7 +12,7 @@ import re
 import asyncio
 import zoneinfo
 
-from Helpers.Helpers import award_points, checkIgnoredChannels, smrtGame, achievementTrigger
+from Helpers.Helpers import award_points, checkIgnoredChannels, smrtGame, achievementTrigger, achievement_leaderboard_generator
 import context
 from cogs.Trivia import questionSpawner
 
@@ -101,6 +101,21 @@ async def package_daily_gambling():
     games_curs.close()
     games_conn.close()
     return
+
+@tasks.loop(time=time(hour=0, minute=2, second=15, tzinfo=zoneinfo.ZoneInfo("America/Los_Angeles")))
+async def daily_achievement_leaderboard_post():
+    print("Posting daily achievement leaderboard...")
+    games_conn=sqlite3.connect("games.db",timeout=10)
+    games_curs=games_conn.cursor()
+    games_curs.execute('''SELECT GuildID, FlagShameChannel, ShameChannel from ServerSettings''')
+    guilds=games_curs.fetchall()
+    for guild in guilds:
+        guildID, flagShameChannel, shameChannel = guild
+        if flagShameChannel==1 and shameChannel:
+            embed = await achievement_leaderboard_generator(guildID=guildID)
+            channel = client.get_channel(shameChannel)
+            if channel:
+                await channel.send(embed=embed)
 
 @tasks.loop(minutes=5)
 async def cleanup_abandoned_trivia_loop():
@@ -249,6 +264,8 @@ class MyClient(commands.Bot):
             daily_question_leaderboard.start()
         if not clear_steals_loop.is_running():
             clear_steals_loop.start()
+        if not daily_achievement_leaderboard_post.is_running():
+            daily_achievement_leaderboard_post.start()
         #sched.start()
         #await checkAnswer(question="test",userAnswer="test",correctAnswer="test")
         await client.tree.sync()
