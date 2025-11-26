@@ -114,7 +114,7 @@ class Leaderboard(commands.Cog):
             for row in rows:
                 user=interaction.guild.get_member(int(row[0]))
                 if user:
-                    outstr += f"{user.display_name}: {row[1]} hits\n"
+                    outstr += f"<@{user.id}>: {row[1]} hits\n"
                 else:
                     outstr += f"User ID {row[0]}: {row[1]} hits\n"
             if outstr == "":
@@ -139,7 +139,7 @@ class Leaderboard(commands.Cog):
                     if quitQ==0 and CurrentStreak == 0:
                         outstr+=f"---Quitters---\n"
                         quitQ=1
-                    outstr += f"{user.display_name}: {CurrentStreak}\n"
+                    outstr += f"<@{user.id}>: {CurrentStreak}\n"
             embed.description=outstr
             msg=await interaction.followup.send(embed=embed,ephemeral=privMsg)
             asyncio.create_task(delete_later(message=msg,time=60))
@@ -152,7 +152,7 @@ class Leaderboard(commands.Cog):
             for row in rows:
                 user=interaction.guild.get_member(int(row[0]))
                 if user:
-                    outstr += f"{user.display_name}: {row[1]} points\n"
+                    outstr += f"<@{user.id}>: {row[1]} points\n"
                 else:
                     outstr += f"User ID {row[0]}: {row[1]} points\n"
             embed.description=outstr
