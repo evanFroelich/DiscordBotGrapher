@@ -6,7 +6,7 @@ import sqlite3
 import random
 import asyncio
 import aiohttp
-from Helpers.Helpers import ButtonLockout, award_points, delete_later, createTimers, sigmoid, create_user_db_entry, achievementTrigger
+from Helpers.Helpers import ButtonLockout, award_points, delete_later, createTimers, sigmoid, create_user_db_entry, achievementTrigger, AuctionHouseButton
 from datetime import timedelta, datetime
 import logging
 
@@ -746,7 +746,10 @@ class GamblingCoinFlipWagers(discord.ui.Button):
                 games_conn.close()
                 await achievementTrigger(self.guild_id, self.user_id, 'CoinFlipLosses')
             #await interaction.response.edit_message(content=messageContent, view=None)
-            await interaction.followup.edit_message(message_id=interaction.message.id, content=messageContent, view=None)
+            view = discord.ui.View()
+            auctionButton=AuctionHouseButton(label="AuctionHouse", style=discord.ButtonStyle.primary)
+            view.add_item(auctionButton)
+            await interaction.followup.edit_message(message_id=interaction.message.id, content=messageContent, view=view)
             return
         elif result == 1:
             messageContent=f"You won the flip! Your wager of {int(self.wager)} has been added to your balance.\nYou have {self.remainingFlips} flips remaining."
@@ -778,7 +781,10 @@ class GamblingCoinFlipWagers(discord.ui.Button):
         
         if self.remainingFlips <= 0:
             messageContent+=f"\nYou have run out of flips. Thanks for playing and I will see you again."
-            await interaction.followup.edit_message(message_id=interaction.message.id, content=messageContent, view=None)
+            view = discord.ui.View()
+            auctionButton=AuctionHouseButton(label="Auction House", style=discord.ButtonStyle.primary)
+            view.add_item(auctionButton)
+            await interaction.followup.edit_message(message_id=interaction.message.id, content=messageContent, view=view)
             return
         #start here for triple down+
         view = discord.ui.View()
@@ -987,6 +993,8 @@ class HitButton(discord.ui.Button):
             await achievementTrigger(self.guildID, self.userID, 'BlackjackLosses')
             if self.GAMEINFO["roundsLeft"] <=0:
                 view = discord.ui.View()
+                auctionButton=AuctionHouseButton(label="Auction House", style=discord.ButtonStyle.primary)
+                view.add_item(auctionButton)
                 await interaction.response.edit_message(content=f"{await game_state_display(self.GAMEINFO,hidden=False)}\nYou busted! You lose!\nNo rounds left. Game over.", view=view)
                 return
             #newGameButton=BlackJackIntroButton(label="Start a new game", userID=self.userID, guildID=self.guildID)
@@ -1070,7 +1078,10 @@ class StandButton(discord.ui.Button):
             result = "It's a tie!"
 
         if self.GAMEINFO["roundsLeft"] <=0:
-            await msg.edit(content=f"{await game_state_display(self.GAMEINFO, hidden=False)}\n{result}\nNo rounds left. Game over.")
+            view = discord.ui.View()
+            auctionButton=AuctionHouseButton(label="Auction House", style=discord.ButtonStyle.primary)
+            view.add_item(auctionButton)
+            await msg.edit(content=f"{await game_state_display(self.GAMEINFO, hidden=False)}\n{result}\nNo rounds left. Game over.", view=view)
             return
         newGameButton=BlackjackBetButton(label="Place your next bet", userID=self.userID, guildID=self.guildID, GAMEINFO={"deck": ["A❤️", "2❤️", "3❤️", "4❤️", "5❤️", "6❤️", "7❤️", "8❤️", "9❤️", "10❤️", "J❤️", "Q❤️", "K❤️","A♦️", "2♦️", "3♦️", "4♦️", "5♦️", "6♦️", "7♦️", "8♦️", "9♦️", "10♦️", "J♦️", "Q♦️", "K♦️","A♣️", "2♣️", "3♣️", "4♣️", "5♣️", "6♣️", "7♣️", "8♣️", "9♣️", "10♣️", "J♣️", "Q♣️", "K♣️","A♠️", "2♠️", "3♠️", "4♠️", "5♠️", "6♠️", "7♠️", "8♠️", "9♠️", "10♠️", "J♠️", "Q♠️", "K♠️"],"userHand": [], "dealerHand": [], "betAmount": 0, "roundsLeft": self.GAMEINFO["roundsLeft"]-1})
         view = discord.ui.View()
