@@ -169,7 +169,9 @@ async def create_guild_db_entry(guildID):
 async def isAuthorized(userID: str, guildID: str, bot=None) -> bool:
     #check if the user has admin privileges in this guild
     guild = bot.get_guild(int(guildID))
-    if userID == "100344687029665792":
+    print(f"Checking authorization for userID: {userID} in guildID: {guildID}")
+    if int(userID) == 100344687029665792:
+        print("User is the bot owner, authorized.")
         return True
     if not guild:
         return False
