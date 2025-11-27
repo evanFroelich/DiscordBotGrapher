@@ -1057,6 +1057,16 @@ class StandButton(discord.ui.Button):
             await achievementTrigger(self.guildID, self.userID, 'BlackjackLosses')
             result = f"You lose!\nYou lose {self.GAMEINFO['betAmount']} points!"
         else:
+            perfectTie=0
+            if userHandValue == 21:
+                perfectTie=1
+            games_db = "games.db"
+            games_conn = sqlite3.connect(games_db)
+            games_curs = games_conn.cursor()
+            games_curs.execute('''UPDATE GamblingUserStats SET BlackjackTies = BlackjackTies + 1, Blackjack21Ties = Blackjack21Ties + ? WHERE GuildID = ? AND UserID = ?''', (perfectTie, self.guildID, self.userID))
+            games_conn.commit()
+            games_curs.close()
+            games_conn.close()
             result = "It's a tie!"
 
         if self.GAMEINFO["roundsLeft"] <=0:

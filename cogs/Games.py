@@ -209,12 +209,12 @@ class FlipButton(discord.ui.Button):
         games_curs = games_conn.cursor()
         if result == 1:
             #modify to also pass in the current timestamp
-            games_curs.execute('''UPDATE coinFlipLeaderboard SET CurrentStreak = CurrentStreak + 1, LastFlip=?, TimesFlipped = TimesFlipped + 1 WHERE UserID=?''', (datetime.now().strftime('%Y-%m-%d %H:%M:%S'), interaction.user.id))
+            games_curs.execute('''UPDATE coinFlipLeaderboard SET CurrentStreak = CurrentStreak + 1, LastFlip=?, TimesFlipped = TimesFlipped + 1, TotalHeads = TotalHeads + 1, CurrentTailsStreak = 0 WHERE UserID=?''', (datetime.now().strftime('%Y-%m-%d %H:%M:%S'), interaction.user.id))
             games_conn.commit()
             await achievementTrigger(interaction.guild.id, interaction.user.id, 'CurrentStreak')
             await achievementTrigger(interaction.guild.id, interaction.user.id, 'TimesFlipped')
         else:
-            games_curs.execute('''UPDATE coinFlipLeaderboard SET CurrentStreak = 0, LastFlip=?, TimesFlipped = TimesFlipped + 1 WHERE UserID=?''', (datetime.now().strftime('%Y-%m-%d %H:%M:%S'), interaction.user.id))
+            games_curs.execute('''UPDATE coinFlipLeaderboard SET CurrentStreak = 0, LastFlip=?, TimesFlipped = TimesFlipped + 1, CurrentTailsStreak = CurrentTailsStreak + 1, TotalTails = TotalTails + 1 WHERE UserID=?''', (datetime.now().strftime('%Y-%m-%d %H:%M:%S'), interaction.user.id))
         games_conn.commit()
         games_curs.execute('''SELECT * FROM coinFlipLeaderboard WHERE UserID=?''', (interaction.user.id,))
         row = games_curs.fetchone()
