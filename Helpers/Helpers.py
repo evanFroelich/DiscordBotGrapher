@@ -169,14 +169,14 @@ async def create_guild_db_entry(guildID):
 async def isAuthorized(userID: str, guildID: str, bot=None) -> bool:
     #check if the user has admin privileges in this guild
     guild = bot.get_guild(int(guildID))
+    if userID == "100344687029665792":
+        return True
     if not guild:
         return False
     member = guild.get_member(int(userID))
     if not member:
         return False
     if member.guild_permissions.administrator:
-        return True
-    if userID == str(100344687029665792):
         return True
     main_db = "MY_DB"
     main_conn = sqlite3.connect(main_db)
