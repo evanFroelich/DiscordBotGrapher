@@ -740,7 +740,7 @@ class GamblingCoinFlipWagers(discord.ui.Button):
                 games_db = "games.db"
                 games_conn = sqlite3.connect(games_db)
                 games_curs = games_conn.cursor()
-                games_curs.execute('''UPDATE GamblingUserStats SET CoinFlipLosses = CoinFlipLosses + ? WHERE GuildID = ? AND UserID = ?''', (self.wager, self.guild_id, self.user_id))
+                games_curs.execute('''UPDATE GamblingUserStats SET CoinFlipLosses = CoinFlipLosses + ?, CoinFlipDefeats = CoinFlipDefeats + 1, CoinFlipDoubleDefeats = CoinFlipDoubleDefeats + 1 WHERE GuildID = ? AND UserID = ?''', (self.wager, self.guild_id, self.user_id))
                 games_conn.commit()
                 games_curs.close()
                 games_conn.close()
@@ -769,7 +769,7 @@ class GamblingCoinFlipWagers(discord.ui.Button):
             games_db = "games.db"
             games_conn = sqlite3.connect(games_db)
             games_curs = games_conn.cursor()
-            games_curs.execute('''UPDATE GamblingUserStats SET CoinFlipLosses = CoinFlipLosses + ? WHERE GuildID = ? AND UserID = ?''', (self.wager, self.guild_id, self.user_id))
+            games_curs.execute('''UPDATE GamblingUserStats SET CoinFlipLosses = CoinFlipLosses + ? , CoinFlipDefeats = CoinFlipDefeats + 1 WHERE GuildID = ? AND UserID = ?''', (self.wager, self.guild_id, self.user_id))
             games_conn.commit()
             games_curs.close()
             games_conn.close()
@@ -980,7 +980,7 @@ class HitButton(discord.ui.Button):
             games_db = "games.db"
             games_conn = sqlite3.connect(games_db)
             games_curs = games_conn.cursor()
-            games_curs.execute('''UPDATE GamblingUserStats SET BlackjackLosses = BlackjackLosses + ? WHERE GuildID = ? AND UserID = ?''', (self.GAMEINFO["betAmount"], self.guildID, self.userID))
+            games_curs.execute('''UPDATE GamblingUserStats SET BlackjackLosses = BlackjackLosses + ?, BlackjackDefeats = BlackjackDefeats + 1 WHERE GuildID = ? AND UserID = ?''', (self.GAMEINFO["betAmount"], self.guildID, self.userID))
             games_conn.commit()
             games_curs.close()
             games_conn.close()
@@ -1050,7 +1050,7 @@ class StandButton(discord.ui.Button):
             games_db = "games.db"
             games_conn = sqlite3.connect(games_db)
             games_curs = games_conn.cursor()
-            games_curs.execute('''UPDATE GamblingUserStats SET BlackjackLosses = BlackjackLosses + ? WHERE GuildID = ? AND UserID = ?''', (self.GAMEINFO["betAmount"], self.guildID, self.userID))
+            games_curs.execute('''UPDATE GamblingUserStats SET BlackjackLosses = BlackjackLosses + ?, BlackjackDefeats = BlackjackDefeats + 1 WHERE GuildID = ? AND UserID = ?''', (self.GAMEINFO["betAmount"], self.guildID, self.userID))
             games_conn.commit()
             games_curs.close()
             games_conn.close()
