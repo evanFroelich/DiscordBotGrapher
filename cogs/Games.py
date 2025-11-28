@@ -6,6 +6,7 @@ import asyncio
 import random
 from datetime import datetime, timedelta
 import json
+import re
 from Helpers.Helpers import create_user_db_entry, numToGrade, delete_later, isAuthorized, achievementTrigger, achievement_leaderboard_generator, auction_house_command
 
 
@@ -241,6 +242,7 @@ class GameSettingsGet(commands.Cog):
             return
         columns= [desc[0] for desc in games_curs.description]
         settings = "\n".join([f"{col}: {val}" for col, val in zip(columns, rows[0])])
+        settings = re.sub(r'\b(\d{17,19})\b', r'<#\1>', settings)
         await interaction.response.send_message(f"Server settings for {interaction.guild.name}:\n{settings}")
 
         games_curs.close()
@@ -263,6 +265,7 @@ class GoofsSettingsGet(commands.Cog):
             return
         columns= [desc[0] for desc in games_curs.description]
         settings = "\n".join([f"{col}: {val}" for col, val in zip(columns, rows[0])])
+        settings = re.sub(r'\b(\d{17,19})\b', r'<#\1>', settings)
         await interaction.response.send_message(f"Goofs and Gaffs settings for {interaction.guild.name}:\n{settings}")
 
         games_curs.close()

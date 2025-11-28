@@ -259,9 +259,9 @@ async def achievement_leaderboard_generator(guildID: str):
     for row in rows:
         user=context.bot.get_guild(guildID).get_member(int(row[0]))
         if user:
-            outstr += f"<@{user.id}>: {row[1]} points\n"
+            outstr += f"<@{user.id}>: {int(row[1])} points\n"
         else:
-            outstr += f"User ID {row[0]}: {row[1]} points\n"
+            outstr += f"User ID {row[0]}: {int(row[1])} points\n"
     embed.description=outstr
     games_curs.close()
     games_conn.close()

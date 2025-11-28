@@ -443,24 +443,36 @@ class MyClient(commands.Bot):
                     if currentDate != UserStatCatTimestamp:
                         statsFlag=1
                     await asyncio.sleep(1)  # wait a bit for reactions to register
+                    r= random.random()
+                    if r<CatChance:
+                        if statsFlag==1:
+                            games_curs.execute('''UPDATE UserStats SET CatTimestamp = ?, CatHitCount = CatHitCount + 1 WHERE GuildID = ? AND UserID = ?''', (currentDate, message.guild.id, message.author.id))
+                            games_conn.commit()
+                        await asyncio.sleep(.5)  # give it a second to make it more dramatic
+                        resposneImage=discord.File("images/cats/cat_laugh.gif", filename="cat_laugh.gif")
+                        await message.reply(file=resposneImage)
+                    else:
+                        if statsFlag==1:
+                            games_curs.execute('''UPDATE UserStats SET CatTimestamp = ?, CatMissCount = CatMissCount + 1 WHERE GuildID = ? AND UserID = ?''', (currentDate, message.guild.id, message.author.id))
+                            games_conn.commit()
 
-                    newMessage= await message.channel.fetch_message(message.id)
-                    reactions = newMessage.reactions
-                    for reaction in reactions:
-                        userList=[user async for user in reaction.users()]
-                        for user in userList:
-                            if user.id == 966695034340663367:
-                                r= random.random()
-                                if r<CatChance:
-                                    if statsFlag==1:
-                                        games_curs.execute('''UPDATE UserStats SET CatTimestamp = ?, CatHitCount = CatHitCount + 1 WHERE GuildID = ? AND UserID = ?''', (currentDate, message.guild.id, message.author.id))
-                                    await asyncio.sleep(.5)  # give it a second to make it more dramatic
-                                    resposneImage=discord.File("images/cat_laugh.gif", filename="cat_laugh.gif")
-                                    await message.reply(file=resposneImage)
-                                else:
-                                    if statsFlag==1:
-                                        games_curs.execute('''UPDATE UserStats SET CatTimestamp = ?, CatMissCount = CatMissCount + 1 WHERE GuildID = ? AND UserID = ?''', (currentDate, message.guild.id, message.author.id))
-                    games_conn.commit()
+                    # newMessage= await message.channel.fetch_message(message.id)
+                    # reactions = newMessage.reactions
+                    # for reaction in reactions:
+                    #     userList=[user async for user in reaction.users()]
+                    #     for user in userList:
+                    #         if user.id == 966695034340663367:
+                    #             r= random.random()
+                    #             if r<CatChance:
+                    #                 if statsFlag==1:
+                    #                     games_curs.execute('''UPDATE UserStats SET CatTimestamp = ?, CatHitCount = CatHitCount + 1 WHERE GuildID = ? AND UserID = ?''', (currentDate, message.guild.id, message.author.id))
+                    #                 await asyncio.sleep(.5)  # give it a second to make it more dramatic
+                    #                 resposneImage=discord.File("images/cat_laugh.gif", filename="cat_laugh.gif")
+                    #                 await message.reply(file=resposneImage)
+                    #             else:
+                    #                 if statsFlag==1:
+                    #                     games_curs.execute('''UPDATE UserStats SET CatTimestamp = ?, CatMissCount = CatMissCount + 1 WHERE GuildID = ? AND UserID = ?''', (currentDate, message.guild.id, message.author.id))
+                    #games_conn.commit()
                     await achievementTrigger(message.guild.id, message.author.id, "CatHitCount")
 
                 if "marathon" in message.content.lower() and FlagMarathon:
