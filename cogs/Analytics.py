@@ -5,14 +5,14 @@ import sqlite3
 import time
 import pandas as pd
 import matplotlib.pyplot as plt
-import logging
+import logging as Errorlogging
 from datetime import datetime
 
 from Helpers.Helpers import isAuthorized
 
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Errorlogging.basicConfig(level=Errorlogging.INFO)
+# logger = Errorlogging.getLogger(__name__)
 
 
 class ServerGraph(commands.Cog):
@@ -69,14 +69,20 @@ class ServerGraph(commands.Cog):
         DB_NAME = "My_DB"
         conn = sqlite3.connect(DB_NAME)
         curs = conn.cursor()
-
-        guildID=str(interaction.guild.id)
-        guildName=interaction.guild.name
-        time2=time.perf_counter()
-        t1=time2-time1
-        t2,t3,t4,t5,t6,t3a,t3b=Graph(subtype.value, xaxislabel.value, numberofmessages, guildID, numberoflines, drilldowntarget, curs)
-        time3=time.perf_counter()
-        t7=time3-time2
+        try:
+            guildID=str(interaction.guild.id)
+            guildName=interaction.guild.name
+            time2=time.perf_counter()
+            t1=time2-time1
+            t2,t3,t4,t5,t6,t3a,t3b=Graph(subtype.value, xaxislabel.value, numberofmessages, guildID, numberoflines, drilldowntarget, curs)
+            time3=time.perf_counter()
+            t7=time3-time2
+        except Exception as e:
+            await interaction.followup.send(f"An error occurred while generating the graph: {e}")
+            Errorlogging.error(f"Error generating graph for guild {interaction.guild.id}: {e}")
+            curs.close()
+            conn.close()
+            return
         graphFile=discord.File("images/"+str(guildID)+".png", filename="graph.png")
         embed=discord.Embed(title="Activity Graph",color=0x228a65)
         embed.set_image(url="attachment://graph.png")
