@@ -4,6 +4,8 @@ from discord.ext import commands
 import sqlite3
 import random
 import json
+import logging
+from Helpers.Helpers import delete_later
 
 
 
@@ -108,6 +110,9 @@ class decisionButton(discord.ui.Button):
                 view.add_item(approveButton)
                 view.add_item(denyButton)
                 await interaction.response.edit_message(content=f"Question: {row['Question']}\nGiven answer: {row['GivenAnswer']}\nShadow answers: {row['ShadowAnswers']}\nUser answer: {row['UserAnswer']}\nLLMResponse: {row['LLMResponse']}", view=view)
+            else:
+                msg = await interaction.response.edit_message(content="No more entries in the shadow list queue.", view=None)
+                await delete_later(msg, 5)
             games_curs.close()
             games_conn.close()
 

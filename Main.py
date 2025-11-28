@@ -332,6 +332,7 @@ class MyClient(commands.Bot):
                 print(f"Failed to clear reaction or update DB: {e}")
                 msg = await reaction.message.channel.send("I do not have permissions to remove reactions in this channel. Please grant me the 'Manage Messages' permission to use this feature, or add this channel to the ignored channels list using /game-settings-set command to disable all interactions in this channel.", allowed_mentions=discord.AllowedMentions.none())
                 await delete_later(msg, 5)
+                logging.warning(f"Failed to clear reaction or update DB: {e} in guild {reaction.message.guild.id}, channel {reaction.message.channel.id}")
         game_curs.close()
         game_conn.close()
 

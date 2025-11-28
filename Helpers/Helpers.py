@@ -6,6 +6,7 @@ import random
 from datetime import datetime, timedelta
 import json
 import context
+import logging
 
 async def ButtonLockout(interaction: discord.Interaction):
     gamesDB = "games.db"
@@ -250,6 +251,7 @@ async def achievementTrigger(guildID: str, userID: str, eventType: str):
             await user.send("Congratulations! You've unlocked the following achievement(s):", embeds=embedList)
         except Exception as e:
             print(f"Failed to send DM to user {user}: {e}")
+            logging.warning(f"Failed to send DM to user {user}: {e}")
     games_curs.close()
     games_conn.close()
 
