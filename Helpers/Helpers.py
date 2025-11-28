@@ -256,14 +256,17 @@ async def achievement_leaderboard_generator(guildID: str):
     games_curs = games_conn.cursor()
     games_curs.execute('''SELECT UserID, TotalScore FROM UserAchievementScoresView WHERE GuildID = ? ORDER BY TotalScore DESC''', (guildID,))
     rows= games_curs.fetchall()
+    #and get the total acheivement count for each user
+    games_curs.execute('''SELECT UserID, COUNT(*) FROM UserAchievements group by UserID, GuildID HAVING GuildID = ?''', (guildID,))
+    user_achievement_counts = dict(games_curs.fetchall())
     outstr=""
     embed=discord.Embed(title="Achievement Score Leaderboard", color=0x228a65)
     for row in rows:
         user=context.bot.get_guild(guildID).get_member(int(row[0]))
         if user:
-            outstr += f"<@{user.id}>: {int(row[1])} points\n"
+            outstr += f"<@{user.id}>: {int(row[1])} points\t{user_achievement_counts.get(user.id, 0)} achievements\n"
         else:
-            outstr += f"User ID {row[0]}: {int(row[1])} points\n"
+            outstr += f"User ID {row[0]}: {int(row[1])} points\t{user_achievement_counts.get(row[0], 0)} achievements\n"
     embed.description=outstr
     games_curs.close()
     games_conn.close()
