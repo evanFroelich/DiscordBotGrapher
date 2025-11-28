@@ -246,7 +246,10 @@ async def achievementTrigger(guildID: str, userID: str, eventType: str):
         user = await context.bot.fetch_user(int(userID))
         print(f"bot is: {context.bot}")
         print(f"Sending achievement DM to user {user}")
-        await user.send("Congratulations! You've unlocked the following achievement(s):", embeds=embedList)
+        try:
+            await user.send("Congratulations! You've unlocked the following achievement(s):", embeds=embedList)
+        except Exception as e:
+            print(f"Failed to send DM to user {user}: {e}")
     games_curs.close()
     games_conn.close()
 
