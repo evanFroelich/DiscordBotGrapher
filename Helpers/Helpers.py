@@ -59,8 +59,10 @@ async def createTimers(GuildID):
     gameDB = "games.db"
     games_conn = sqlite3.connect(gameDB)
     games_curs = games_conn.cursor()
-    # Create a table to store timers if it doesn't exist
-    games_curs.execute('''INSERT OR IGNORE INTO FeatureTimers(GuildID) VALUES (?)''', (GuildID,))
+    #run a select to see if the row exists already
+    games_curs.execute('''SELECT * FROM FeatureTimers WHERE GuildID=?''', (GuildID,))
+    if not games_curs.fetchone():
+        games_curs.execute('''INSERT OR IGNORE INTO FeatureTimers(GuildID) VALUES (?)''', (GuildID,))
     games_conn.commit()
     games_conn.close()
 

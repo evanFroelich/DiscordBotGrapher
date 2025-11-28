@@ -12,7 +12,7 @@ import re
 import asyncio
 import zoneinfo
 
-from Helpers.Helpers import award_points, checkIgnoredChannels, smrtGame, achievementTrigger, achievement_leaderboard_generator
+from Helpers.Helpers import award_points, checkIgnoredChannels, smrtGame, achievementTrigger, achievement_leaderboard_generator, delete_later
 import context
 from cogs.Trivia import questionSpawner
 
@@ -322,11 +322,16 @@ class MyClient(commands.Bot):
         if reaction.emoji=='✅' and lastBonusPipMessage is not None and lastBonusPipMessage[0] == reaction.message.id:
             game_curs.execute('''INSERT INTO Scores ( GuildID, UserID, Category, Difficulty, Num_Correct, Num_Incorrect) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(GuildID, UserID, Category, Difficulty) DO UPDATE SET Num_Correct = Num_Correct + 1;''', (reaction.message.guild.id,user.id, 'bonus', 1, 1, 0))
             game_conn.commit()
-            await reaction.message.clear_reaction(reaction.emoji)
-            game_curs.execute('''UPDATE FeatureTimers SET LastBonusPipMessage=? WHERE GuildID=?''', (None,reaction.message.guild.id))
-            game_conn.commit()
-            await award_points(1, reaction.message.guild.id, user.id)  # Award 5 points for bonus pip
-            await achievementTrigger(reaction.message.guild.id, user.id, "bonus")
+            try:
+                await reaction.message.clear_reaction(reaction.emoji)
+                game_curs.execute('''UPDATE FeatureTimers SET LastBonusPipMessage=? WHERE GuildID=?''', (None,reaction.message.guild.id))
+                game_conn.commit()
+                await award_points(1, reaction.message.guild.id, user.id)  # Award 5 points for bonus pip
+                await achievementTrigger(reaction.message.guild.id, user.id, "bonus")
+            except Exception as e:
+                print(f"Failed to clear reaction or update DB: {e}")
+                msg = await reaction.message.channel.send("I do not have permissions to remove reactions in this channel. Please grant me the 'Manage Messages' permission to use this feature, or add this channel to the ignored channels list using /game-settings-set command to disable all interactions in this channel.", allowed_mentions=discord.AllowedMentions.none())
+                await delete_later(msg, 5)
         game_curs.close()
         game_conn.close()
 
