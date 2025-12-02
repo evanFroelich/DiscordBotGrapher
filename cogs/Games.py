@@ -7,7 +7,8 @@ import random
 from datetime import datetime, timedelta
 import json
 import re
-from Helpers.Helpers import create_user_db_entry, numToGrade, delete_later, isAuthorized, achievementTrigger, achievement_leaderboard_generator, auction_house_command
+import time
+from Helpers.Helpers import create_user_db_entry, numToGrade, delete_later, isAuthorized, achievementTrigger, achievement_leaderboard_generator, auction_house_command, ButtonLockout
 
 
 class GradeReport(commands.Cog):
@@ -490,7 +491,203 @@ class AuctionHouse(commands.Cog):
         await auction_house_command(interaction)
 
 
+class RankedLobby(commands.Cog):
+    def __init__(self, client: commands.Bot):
+        self.client = client
+    @app_commands.command(name="ranked-lobby", description="PVP gambling")
+    async def ranked_lobby(self, interaction: discord.Interaction):
+        await interaction.response.send_message("stage 0")
+        msg = await interaction.original_response()
+        games_conn=sqlite3.connect("games.db",timeout=10)
+        games_conn.row_factory = sqlite3.Row
+        games_curs = games_conn.cursor()
+        games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName) VALUES (?, ?, ?)''', (interaction.guild.id, interaction.user.id, "ranked-lobby"))
+        games_conn.commit()
+        games_curs.execute('''select GameState, ChannelID, MessageID from LiveRankedDiceMatches where GuildID = ? and (GameState = 0 or GameState = 1 or GameState = 2)''', (interaction.guild.id,))
+        row = games_curs.fetchone()
+        if row is not None:
+            #edit msg to say a ranked match lobby is already active and where it is instead of sending a followup
+            message_link = f"https://discord.com/channels/{interaction.guild.id}/{row['ChannelID']}/{row['MessageID']}"
+            await msg.edit(content=f"A ranked match lobby is already active in this server located at {message_link}")
+            games_curs.close()
+            games_conn.close()
+            return
+        games_curs.execute('''INSERT INTO LiveRankedDiceMatches (GuildID, ChannelID, MessageID) VALUES (?, ?, ?)''', (interaction.guild.id, msg.channel.id, msg.id))
+        games_conn.commit()
+        games_curs.execute('''SELECT * FROM LiveRankedDiceMatches WHERE GuildID = ? AND ChannelID = ? AND MessageID = ?''', (interaction.guild.id, msg.channel.id, msg.id))
+        myMatch= games_curs.fetchone()
+        await asyncio.sleep(3)
+        games_curs.execute('''SELECT * FROM LiveRankedDiceMatches WHERE GuildID = ? and (GameState = 0 or GameState = 1 or GameState = 2) order by TimeInitiated asc limit 1''', (interaction.guild.id,))
+        topMatch= games_curs.fetchone()
+        if myMatch['ID'] != topMatch['ID']:
+            message_link = f"https://discord.com/channels/{interaction.guild.id}/{topMatch['ChannelID']}/{topMatch['MessageID']}"
+            await msg.edit(content=f"A ranked match lobby is already active in this server located at {message_link}")
+            await delete_later(message=msg,time=10)
+            #delete the row i just created since another match is already active
+            games_curs.execute('''DELETE FROM LiveRankedDiceMatches WHERE ID = ?''', (myMatch['ID'],))
+            games_conn.commit()
+            games_curs.close()
+            games_conn.close()
+            return
+        view = discord.ui.View()
+        view.add_item(JoinLobbyButton(match_id=myMatch['ID']))
+        end_ts = int(time.time()) + 30   # 30 seconds from now
+        countdown_tag = f"<t:{end_ts}:R>"
+        await msg.edit(content=f"stage 1. Lobby closes {countdown_tag}", view=view)
+        games_curs.execute('''UPDATE LiveRankedDiceMatches SET GameState = 1 WHERE ID = ?''', (myMatch['ID'],))
+        games_conn.commit()
+        #await asyncio.sleep(30)
+        # RIGHT BEFORE "return"
+        self.client.loop.create_task(lobby_countdown_task(
+        client=self.client,
+        match_id=myMatch["ID"],
+        message=msg,
+        guild_id=interaction.guild.id
+        ))
 
+        return
+
+class JoinLobbyButton(discord.ui.Button):
+    def __init__(self, match_id: int):
+        super().__init__(label="Join Ranked Lobby", style=discord.ButtonStyle.primary)
+        self.match_id = match_id
+
+    async def callback(self, interaction: discord.Interaction):
+        if await ButtonLockout(interaction):
+            view = discord.ui.View()
+            view.add_item(ModifierSelectMenu(match_id=self.match_id))
+            await interaction.response.send_message("Select your lobby modifier!", ephemeral=True, view=view)
+            return
+
+class ModifierSelectMenu(discord.ui.Select):
+    def __init__(self,  match_id: int):
+        self.match_id = match_id
+        options = [
+            discord.SelectOption(label="♠️Call a spade a spade♠️", description="Roll 1 D20 and add 5 to the final value", value="spade"),
+            discord.SelectOption(label="♦️Diamond in the rough♦️", description="Roll 2 D20 and take the higher result", value="diamond"),
+            discord.SelectOption(label="♣️Math club♣️", description="Roll 2 D20, average them out, and add 5 to the total", value="club"),
+            discord.SelectOption(label="♥️Heart of the cards♥️", description="Roll 1 D20. (Grants enhanced results when calculating MMR and rank changes)", value="heart"),
+            
+        ]
+        super().__init__(placeholder="Choose a modifier...", min_values=1, max_values=1, options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        for child in self.view.children:
+            child.disabled = True
+        games_conn=sqlite3.connect("games.db",timeout=10)
+        games_conn.row_factory = sqlite3.Row
+        games_curs = games_conn.cursor()
+        games_curs.execute('''SELECT GameState from LiveRankedDiceMatches WHERE ID = ?''', (self.match_id,))
+        game_state = games_curs.fetchone()
+        if game_state:
+            if game_state['GameState'] != 1:
+                await interaction.response.edit_message(content=f"Cannot join lobby. ",view=None)
+                #await interaction.response.send_message(f"Lobby is already closed.", ephemeral=True)
+                games_curs.close()
+                games_conn.close()
+                return
+        else:
+            await interaction.response.send_message("No game found with that ID.", ephemeral=True)
+        games_curs.execute('''SELECT * FROM PlayerSkills WHERE UserID = ? and GuildID = ?''', (interaction.user.id, interaction.guild.id))
+        player_skills = games_curs.fetchone()
+        if not player_skills:
+            games_curs.execute('''INSERT INTO PlayerSkills (UserID, GuildID) VALUES (?, ?)''', (interaction.user.id, interaction.guild.id))
+            games_conn.commit()
+            games_curs.execute('''SELECT * FROM PlayerSkills WHERE UserID = ? and GuildID = ?''', (interaction.user.id, interaction.guild.id))
+            player_skills = games_curs.fetchone()
+        games_curs.execute('''INSERT INTO LiveRankedDicePlayers (MatchID, UserID, Modifier, StartingSkillMu, StartingSkillSigma, StartingRank) VALUES (?, ?, ?, ?, ?)''', (self.match_id, interaction.user.id, self.values[0], player_skills['SkillMu'], player_skills['SkillSigma'], player_skills['StartingRank']))
+        games_conn.commit()
+        games_curs.close()
+        games_conn.close()
+        await interaction.response.edit_message(content=f"You have joined the lobby and selected {self.values[0]}!",view=self.view)
+
+async def lobby_countdown_task(client, match_id, message, guild_id):
+    """Runs in background: updates player list + closes lobby after timeout."""
+    import sqlite3
+    start_time = time.time()
+    timeout = 30  # seconds
+
+    while True:
+        elapsed = time.time() - start_time
+        if elapsed >= timeout:
+            break  # stop updating
+
+        # Pull player list
+        games_conn = sqlite3.connect("games.db")
+        games_conn.row_factory = sqlite3.Row
+        games_curs = games_conn.cursor()
+
+        games_curs.execute(
+            '''SELECT UserID, Modifier FROM LiveRankedDicePlayers WHERE MatchID = ?''',
+            (match_id,)
+        )
+        players = games_curs.fetchall()
+
+        games_curs.close()
+        games_conn.close()
+
+        # Format lobby text
+        names = []
+        for p in players:
+            user = message.guild.get_member(int(p["UserID"]))
+            if user:
+                names.append(f"• {user.display_name} — `{p['Modifier']}`")
+
+        player_block = "\n".join(names) if names else "*No players yet*"
+
+        remaining = int(timeout - elapsed)
+        timestamp = f"<t:{int(time.time()) + remaining}:R>"
+
+        await message.edit(
+            content=f"**Ranked Lobby**\nPlayers:\n{player_block}\n\nLobby closes {timestamp}",
+        )
+
+        await asyncio.sleep(2)  # update every 2 seconds
+
+    # After timeout → close lobby
+    games_conn = sqlite3.connect("games.db")
+    games_conn.row_factory = sqlite3.Row
+    games_curs = games_conn.cursor()
+
+    games_curs.execute(
+        '''UPDATE LiveRankedDiceMatches SET GameState = 2 WHERE ID = ?''',
+        (match_id,)
+    )
+    
+
+    await message.edit(content="⏳ Lobby closed! Rolling soon…", view=None)
+    await asyncio.sleep(2)
+    games_curs.execute('''SELECT UserID, Modifier FROM LiveRankedDicePlayers WHERE MatchID = ? order by random()''', (match_id,))
+    players = games_curs.fetchall()
+    names = []
+    for p in players:
+        user = message.guild.get_member(int(p["UserID"]))
+        if user:
+            roll = await user_rolls(p['Modifier'])
+            names.append(f"• {user.display_name} — `{p['Modifier']}` — `{roll}`")
+
+    player_block = "\n".join(names) if names else "*No players yet*"
+    await message.edit(
+        content=f"**Ranked Match Players**\n{player_block}\n\nRolling now…",
+    )
+
+    games_curs.execute('''UPDATE LiveRankedDiceMatches SET GameState = 3 WHERE ID = ?''', (match_id,))
+    games_conn.commit()
+    games_conn.close()
+
+async def user_rolls(modifier:str):
+    roll = random.randint(1, 20)
+    if modifier == "spade":
+        roll += 5
+    elif modifier == "diamond":
+        roll2 = random.randint(1, 20)
+        roll = max(roll, roll2)
+    elif modifier == "club":
+        roll2 = random.randint(1, 20)
+        roll = int(((roll + roll2) / 2) + 5)
+    elif modifier == "heart":
+        pass  # no change to roll, but may affect MMR later
+    return roll
 
 
 
@@ -503,3 +700,4 @@ async def setup(client: commands.Bot):
     await client.add_cog(GoofsSettingsGet(client))
     await client.add_cog(GoofsSettingsSet(client))
     await client.add_cog(AuctionHouse(client))
+    await client.add_cog(RankedLobby(client))

@@ -290,6 +290,51 @@ CREATE TABLE if not exists ShadowListQueue (
 	PRIMARY KEY("ID" AUTOINCREMENT)
 );
 
+CREATE TABLE if not exists PlayerSkill (
+    "GuildID"              TEXT NOT NULL,
+    "UserID"               TEXT NOT NULL,
+    "Mu"                   REAL NOT NULL DEFAULT 25.0,
+    "Sigma"                REAL NOT NULL DEFAULT 8.333,
+    "LastPlayed"           TEXT,
+    "GamesPlayed"          INTEGER NOT NULL DEFAULT 0,
+    "WinCount"             INTEGER NOT NULL DEFAULT 0,
+    "LossCount"            INTEGER NOT NULL DEFAULT 0,
+    "ProvisionalGames"     INTEGER NOT NULL DEFAULT 10,
+    "Rank"                 REAL NOT NULL DEFAULT 1,
+    "SeasonalGamesPlayed"  INTEGER NOT NULL DEFAULT 0,
+    "SeasonalWinCount"     INTEGER NOT NULL DEFAULT 0,
+    "SeasonalLossCount"    INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY ("GuildID", "UserID")
+);
+
+CREATE TABLE if not exists LiveRankedDiceMatches (
+    "ID"             INTEGER PRIMARY KEY AUTOINCREMENT,
+    "GuildID"        INTEGER NOT NULL,
+	"ChannelID"      INTEGER NOT NULL,
+    "MessageID"      INTEGER NOT NULL,
+    "TimeInitiated"  TEXT DEFAULT (datetime('now', 'localtime')),
+    "GameState"      INTEGER DEFAULT 0
+);
+
+CREATE TABLE if not exists LiveRankedDicePlayers (
+    "ID"        INTEGER PRIMARY KEY AUTOINCREMENT,
+    "MatchID"   INTEGER NOT NULL,
+    "UserID"    INTEGER NOT NULL,
+    "Modifier"  TEXT,
+    "JoinedAt"  TEXT DEFAULT (datetime('now', 'localtime')),
+	"RollResult" INTEGER,
+	"FinalPosition" INTEGER,
+	"StartingSkillMu" REAL,
+	"StartingSkillSigma" REAL,
+	"StartingRank" REAL,
+	"endSkillMu" REAL,
+	"endSkillSigma" REAL,
+	"endRank" REAL,
+    FOREIGN KEY ("MatchID") REFERENCES LiveRankedDiceMatches("ID")
+);
+
+
+
 CREATE VIEW if not exists GamblingUnlockMetricsView AS
 SELECT
     GuildID,

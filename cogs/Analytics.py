@@ -144,7 +144,7 @@ def Graph(graphType, graphXaxis, numMessages, guildID, numLines, drillDownTarget
     dayList = []
     
     et1 = time.perf_counter()
-    logging.info("pre sql call time: " + str(et1 - st1))
+    #Errorlogging.info("pre sql call time: " + str(et1 - st1))
     ret1=et1-st1
     st1 = time.perf_counter()
     
@@ -198,7 +198,7 @@ def Graph(graphType, graphXaxis, numMessages, guildID, numLines, drillDownTarget
         dataDict[row[lineLabel]][-1] += 1
     
     et1 = time.perf_counter()
-    logging.info("sql loop time:" + str(et1 - st1))
+    #Errorlogging.info("sql loop time:" + str(et1 - st1))
     ret3=et1-st1
     st1 = time.perf_counter()
     
@@ -206,7 +206,7 @@ def Graph(graphType, graphXaxis, numMessages, guildID, numLines, drillDownTarget
     nameDict = {k: nameDict[k] for k in dataDict}
     
     et1 = time.perf_counter()
-    logging.info("data trimming time: " + str(et1 - st1))
+    #Errorlogging.info("data trimming time: " + str(et1 - st1))
     ret4=et1-st1
     st1 = time.perf_counter()
     
@@ -228,7 +228,7 @@ def Graph(graphType, graphXaxis, numMessages, guildID, numLines, drillDownTarget
     plt.savefig("images/" + guildID + ".png")
     
     et1 = time.perf_counter()
-    logging.info("data frame construction time: " + str(et1 - st1))
+    #Errorlogging.info("data frame construction time: " + str(et1 - st1))
     ret5=et1-st1
     
     return ret1, ret2, ret3, ret4, ret5, ret2a, ret2b
