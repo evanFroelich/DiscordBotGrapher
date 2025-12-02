@@ -426,13 +426,13 @@ class QuestionModal(discord.ui.Modal):
         self.question_id = Question[0]  # Question ID
         self.question_text = Question[1]  # Question text
         self.question_answers = Question[2]  # Answers
-        self.question_answers = self.question_answers.replace("'", '"')  # Ensure answers are in JSON format
+        #self.question_answers = self.question_answers.replace("'", '"')  # Ensure answers are in JSON format
         self.question_answers = eval(self.question_answers)  # Convert string representation of list to actual list
         self.question_type = Question[3]  # Question type
         self.question_difficulty = Question[4]  # Question difficulty
         self.shadow_answers = Question[5]  # Shadow Answers
         if self.shadow_answers:
-            self.shadow_answers = self.shadow_answers.replace("'", '"')  # Ensure answers are in JSON format
+            #self.shadow_answers = self.shadow_answers.replace("'", '"')  # Ensure answers are in JSON format
             self.shadow_answers = eval(self.shadow_answers)  # Convert string representation of list to actual list
             self.question_answers.extend(self.shadow_answers)
         self.isForced = isForced
@@ -998,7 +998,7 @@ class HitButton(discord.ui.Button):
                 await interaction.response.edit_message(content=f"{await game_state_display(self.GAMEINFO,hidden=False)}\nYou busted! You lose!\nNo rounds left. Game over.", view=view)
                 return
             #newGameButton=BlackJackIntroButton(label="Start a new game", userID=self.userID, guildID=self.guildID)
-            newGameButton=BlackjackBetButton(label="Place your bet", userID=self.userID, guildID=self.guildID, GAMEINFO={"deck": ["A❤️", "2❤️", "3❤️", "4❤️", "5❤️", "6❤️", "7❤️", "8❤️", "9❤️", "10❤️", "J❤️", "Q❤️", "K❤️","A♦️", "2♦️", "3♦️", "4♦️", "5♦️", "6♦️", "7♦️", "8♦️", "9♦️", "10♦️", "J♦️", "Q♦️", "K♦️","A♣️", "2♣️", "3♣️", "4♣️", "5♣️", "6♣️", "7♣️", "8♣️", "9♣️", "10♣️", "J♣️", "Q♣️", "K♣️","A♠️", "2♠️", "3♠️", "4♠️", "5♠️", "6♠️", "7♠️", "8♠️", "9♠️", "10♠️", "J♠️", "Q♠️", "K♠️"],"userHand": [], "dealerHand": [], "betAmount": 0, "roundsLeft": self.GAMEINFO["roundsLeft"]-1})
+            newGameButton=BlackjackBetButton(label="Place your bet", userID=self.userID, guildID=self.guildID, GAMEINFO={"deck": self.GAMEINFO["deck"],"userHand": [], "dealerHand": [], "betAmount": 0, "roundsLeft": self.GAMEINFO["roundsLeft"]-1})
             view = discord.ui.View()
             view.add_item(newGameButton)
             #use game state display
@@ -1083,7 +1083,7 @@ class StandButton(discord.ui.Button):
             view.add_item(auctionButton)
             await msg.edit(content=f"{await game_state_display(self.GAMEINFO, hidden=False)}\n{result}\nNo rounds left. Game over.", view=view)
             return
-        newGameButton=BlackjackBetButton(label="Place your next bet", userID=self.userID, guildID=self.guildID, GAMEINFO={"deck": ["A❤️", "2❤️", "3❤️", "4❤️", "5❤️", "6❤️", "7❤️", "8❤️", "9❤️", "10❤️", "J❤️", "Q❤️", "K❤️","A♦️", "2♦️", "3♦️", "4♦️", "5♦️", "6♦️", "7♦️", "8♦️", "9♦️", "10♦️", "J♦️", "Q♦️", "K♦️","A♣️", "2♣️", "3♣️", "4♣️", "5♣️", "6♣️", "7♣️", "8♣️", "9♣️", "10♣️", "J♣️", "Q♣️", "K♣️","A♠️", "2♠️", "3♠️", "4♠️", "5♠️", "6♠️", "7♠️", "8♠️", "9♠️", "10♠️", "J♠️", "Q♠️", "K♠️"],"userHand": [], "dealerHand": [], "betAmount": 0, "roundsLeft": self.GAMEINFO["roundsLeft"]-1})
+        newGameButton=BlackjackBetButton(label="Place your next bet", userID=self.userID, guildID=self.guildID, GAMEINFO={"deck": self.GAMEINFO["deck"],"userHand": [], "dealerHand": [], "betAmount": 0, "roundsLeft": self.GAMEINFO["roundsLeft"]-1})
         view = discord.ui.View()
         view.add_item(newGameButton)
         await msg.edit(content=f"{await game_state_display(self.GAMEINFO, hidden=False)}\n\n{result}", view=view)
