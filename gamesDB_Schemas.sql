@@ -334,7 +334,6 @@ CREATE TABLE if not exists LiveRankedDicePlayers (
 );
 
 
-
 CREATE VIEW if not exists GamblingUnlockMetricsView AS
 SELECT
     GuildID,
