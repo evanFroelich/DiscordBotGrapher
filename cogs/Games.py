@@ -612,7 +612,7 @@ class ModifierSelectMenu(discord.ui.Select):
 
 async def lobby_countdown_task(interaction, match_id, message, guild_id):
     start_time = time.time()
-    timeout = 15  # seconds
+    timeout = 20  # seconds
 
     while True:
         elapsed = time.time() - start_time
@@ -852,7 +852,7 @@ async def lobby_countdown_task(interaction, match_id, message, guild_id):
     print("done")
     games_curs.execute('''UPDATE LiveRankedDiceMatches SET GameState = 3 WHERE ID = ?''', (match_id,))
     games_conn.commit()
-    #await delete_later(message=message,time=30)
+    await delete_later(message=message,time=30)
     games_curs.close()
     games_conn.close()
 
