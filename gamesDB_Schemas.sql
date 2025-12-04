@@ -333,7 +333,6 @@ CREATE TABLE if not exists LiveRankedDicePlayers (
     FOREIGN KEY ("MatchID") REFERENCES LiveRankedDiceMatches("ID")
 );
 
-
 CREATE VIEW if not exists GamblingUnlockMetricsView AS
 SELECT
     GuildID,
