@@ -530,11 +530,11 @@ class QuestionModal(discord.ui.Modal):
             if lastDailyQuestionTime[0] is not None:
                 lastDailyQuestionTime = datetime.strptime(lastDailyQuestionTime[0], '%Y-%m-%d %H:%M:%S')
                 if lastDailyQuestionTime and lastDailyQuestionTime.date() != datetime.now().date():
-                    await interaction.followup.send(f"Correct! You have been awarded {gamblingPoints} gambling points.\n\nYou still have a daily trivia question available! /daily-trivia", ephemeral=True, view=questionAnsweredView)
+                    await interaction.followup.send(f"Correct! You have been awarded {gamblingPoints} gambling points and 1 ranked dice token.\n\nYou still have a daily trivia question available! /daily-trivia", ephemeral=True, view=questionAnsweredView)
                 else:
-                    await interaction.followup.send(f"Correct! You have been awarded {gamblingPoints} gambling points.", ephemeral=True, view=questionAnsweredView)
+                    await interaction.followup.send(f"Correct! You have been awarded {gamblingPoints} gambling points and 1 ranked dice token.", ephemeral=True, view=questionAnsweredView)
             else:
-               await interaction.followup.send(f"Correct! You have been awarded {gamblingPoints} gambling points.\n\nYou still have a daily trivia question available! /daily-trivia", ephemeral=True, view=questionAnsweredView)
+               await interaction.followup.send(f"Correct! You have been awarded {gamblingPoints} gambling points and one ranked dice token.\n\nYou still have a daily trivia question available! /daily-trivia", ephemeral=True, view=questionAnsweredView)
         else:
             games_curs.execute('''INSERT INTO Scores (GuildID, UserID, Category, Difficulty, Num_Correct, Num_Incorrect) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(GuildID, UserID, Category, Difficulty) DO UPDATE SET Num_Incorrect = Num_Incorrect + 1;''', (interaction.guild.id, interaction.user.id, self.question_type, self.question_difficulty, 0, 1))
             games_conn.commit()

@@ -612,7 +612,7 @@ class ModifierSelectMenu(discord.ui.Select):
 
 async def lobby_countdown_task(interaction, match_id, message, guild_id):
     start_time = time.time()
-    timeout = 20  # seconds
+    timeout = 30  # seconds
 
     while True:
         elapsed = time.time() - start_time
@@ -742,7 +742,7 @@ async def lobby_countdown_task(interaction, match_id, message, guild_id):
     print("e")
     #~~~~~~~~~~~~~~~~~~~~~~TRUESKILL CALCULATION~~~~~~~~~~~~~~~~~~~~~#
     result_entries = [dict(row) for row in final_players]
-    ts_env = trueskill.TrueSkill(mu=25.0, sigma=8.33, beta=8.333, tau=8.333/10)
+    ts_env = trueskill.TrueSkill(mu=25.0, sigma=8.33, beta=4, tau=1.0)
     ratings = [ts_env.Rating(mu=player['Mu'], sigma=player['Sigma']) for player in result_entries]
     teams = [[rating] for rating in ratings]
     ranks = [player['FinalPosition']-1 for player in result_entries]
@@ -779,16 +779,16 @@ async def lobby_countdown_task(interaction, match_id, message, guild_id):
         muDiff= player['EndSkillMu'] - player['Mu']
         if player['Modifier'] == 'heart':
             if muDiff > 0:
-                muDiff *= 1.1  # Increase MMR gain by 10%
+                muDiff *= 1.25  # Increase MMR gain by 25%
             else:
-                muDiff *= 0.9  # Decrease MMR loss by 10%
+                muDiff *= 0.75  # Decrease MMR loss by 25%
             player['EndSkillMu'] = player['Mu'] + muDiff
         print("i")
         if player['Rank'] < 20:
             if muDiff > 0:
-                muDiff *= 1.05  # Increase MMR gain by 5%
+                muDiff *= 1.1  # Increase MMR gain by 10%
             else:
-                muDiff *= 0.95  # Decrease MMR loss by 5%
+                muDiff *= 0.9  # Decrease MMR loss by 10%
             player['EndSkillMu'] = player['Mu'] + muDiff
         print("j")
         if muDiff > 0:
@@ -815,9 +815,6 @@ async def lobby_countdown_task(interaction, match_id, message, guild_id):
     try:
         games_curs.execute('''SELECT UserID, FinalPosition, StartingSkillMu, EndSkillMu, StartingRank, EndRank, RollResult FROM LiveRankedDicePlayers WHERE MatchID = ? ORDER BY FinalPosition ASC''', (match_id,))
         final_players_2 = games_curs.fetchall()
-        games_curs.execute('''SELECT ProvisionalGames FROM PlayerSkill WHERE UserID = ? AND GuildID = ?''', (player['UserID'], guild_id))
-        row = games_curs.fetchone()
-        provisional_games_left = row['ProvisionalGames'] if row else 0
         result_entries_2 = [dict(row) for row in final_players_2]
         result_lines = []
         print(f"result_entries: {result_entries_2}")
@@ -831,6 +828,9 @@ async def lobby_countdown_task(interaction, match_id, message, guild_id):
                 rank_change_str = f"{rank_change:+.2f}"
                 oldRankName = await rank_number_to_rank_name(player['StartingRank'])
                 newRankName = await rank_number_to_rank_name(player['EndRank'])
+                games_curs.execute('''SELECT ProvisionalGames FROM PlayerSkill WHERE UserID = ? AND GuildID = ?''', (player['UserID'], guild_id))
+                row = games_curs.fetchone()
+                provisional_games_left = row['ProvisionalGames'] if row else 0
                 if provisional_games_left > 0:
                     rank_change_str = f"Provisional Games {10-provisional_games_left}/10 completed"
                     result_lines.append(f"• {user.display_name} — Roll: {player['RollResult']} Position: **{player['FinalPosition']}** — Rank: ({rank_change_str})")
@@ -906,18 +906,18 @@ async def rank_number_to_rank_name(rank_number):
 def mu_to_target_rank(mu):
     # Example: scale MMR into your 1–60 rank system (20 bronze→plat + 40 diamond)
     # Adjust min/max as needed
-    min_mu = 10
-    max_mu = 50  # pick appropriate scaling
+    min_mu = 15
+    max_mu = 40  # pick appropriate scaling
     max_rank = 40
     min_rank = 1
     # linear scaling
     rank = (mu - min_mu) / (max_mu - min_mu) * (max_rank - min_rank) + min_rank
     return max(min(rank, max_rank), min_rank)
 
-def update_visible_rank(current_rank, target_rank, smoothing=0.2):
+def update_visible_rank(current_rank, target_rank, smoothing=0.3):
     """
     Move the shown rank fractionally toward the target.
-    smoothing=0.2 → moves 20% of the gap each update
+    smoothing=0.3 → moves 30% of the gap each update
     """
     return current_rank + (target_rank - current_rank) * smoothing
 

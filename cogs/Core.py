@@ -72,13 +72,14 @@ class Inventory(commands.Cog):
         games_curs = games_conn.cursor()
         games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName) VALUES (?, ?, ?)''', (interaction.guild.id, interaction.user.id, "inventory"))
         games_conn.commit()
-        games_curs.execute('''SELECT CurrentBalance FROM GamblingUserStats WHERE GuildID=? AND UserID=?''', (guild_id, user_id))
+        games_curs.execute('''SELECT CurrentBalance, RankedDiceTokens FROM GamblingUserStats WHERE GuildID=? AND UserID=?''', (guild_id, user_id))
         current_balance = games_curs.fetchone()
         games_curs.execute('''SELECT Phrase from UserCasinoPassPhrases WHERE GuildID=? AND UserID=?''', (guild_id, user_id))
         passphrase = games_curs.fetchone()
         embed = discord.Embed(title=f"---WIP---\n{interaction.user.name}'s Inventory", color=discord.Color.green())
         if current_balance:
             embed.add_field(name="Current Balance", value=current_balance[0], inline=False)
+            embed.add_field(name="Ranked Dice Tokens", value=current_balance[1], inline=False)
         else:
             embed.add_field(name="Current Balance", value="No balance information available.", inline=False)
         if passphrase:

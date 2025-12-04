@@ -40,6 +40,15 @@ async def daily_question_leaderboard():
             channel = client.get_channel(guildID[2])
             await channel.send(content=printstr, embed=embed, allowed_mentions=discord.AllowedMentions.none())
 
+@tasks.loop(time=time(hour=0, minute=0, second=0, tzinfo=zoneinfo.ZoneInfo("America/Los_Angeles")))
+async def grant_ranked_token():
+    games_conn=sqlite3.connect("games.db",timeout=10)
+    games_curs=games_conn.cursor()
+    games_curs.execute('''UPDATE GamblingUserStats SET RankedDiceTokens = min(RankedDiceTokens + 1, 3)''')
+    games_conn.commit()
+    games_curs.close()
+    games_conn.close()
+
 @tasks.loop(time=time(hour=0, minute=2, second=0, tzinfo=zoneinfo.ZoneInfo("America/Los_Angeles")))
 async def package_daily_gambling():
     print("Packaging daily gambling totals for auction house...")
@@ -266,6 +275,8 @@ class MyClient(commands.Bot):
             clear_steals_loop.start()
         if not daily_achievement_leaderboard_post.is_running():
             daily_achievement_leaderboard_post.start()
+        if not grant_ranked_token.is_running():
+            grant_ranked_token.start()
         #sched.start()
         #await checkAnswer(question="test",userAnswer="test",correctAnswer="test")
         await client.tree.sync()
@@ -281,7 +292,7 @@ class MyClient(commands.Bot):
         await self.load_extension('cogs.Core')
         await self.load_extension('cogs.Analytics')
 
-        await self.tree.sync()
+        #await self.tree.sync()
         print('synced')
 
     async def on_thread_create(self,thread):
