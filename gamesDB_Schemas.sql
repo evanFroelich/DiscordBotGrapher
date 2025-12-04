@@ -333,6 +333,19 @@ CREATE TABLE if not exists LiveRankedDicePlayers (
     FOREIGN KEY ("MatchID") REFERENCES LiveRankedDiceMatches("ID")
 );
 
+CREATE TABLE if not exists RankedDiceGlobals (
+	"Name"	TEXT NOT NULL,
+	"Mu"	REAL NOT NULL,
+	"Sigma"	REAL NOT NULL,
+	"Beta"	REAL NOT NULL,
+	"Tau"	REAL NOT NULL,
+	"SubDiamondBoostWin"	REAL NOT NULL,
+	"SubDiamondBoostLose"	REAL NOT NULL,
+	"HeartBoostWin"	REAL NOT NULL,
+	"HeartBoostLose"	REAL NOT NULL,
+	PRIMARY KEY("Name")
+);
+
 CREATE VIEW if not exists GamblingUnlockMetricsView AS
 SELECT
     GuildID,

@@ -741,8 +741,10 @@ async def lobby_countdown_task(interaction, match_id, message, guild_id):
     final_players = games_curs.fetchall()
     print("e")
     #~~~~~~~~~~~~~~~~~~~~~~TRUESKILL CALCULATION~~~~~~~~~~~~~~~~~~~~~#
+    games_curs.execute('''SELECT * FROM RankedDiceGlobals''')
+    ranked_globals = games_curs.fetchone()
     result_entries = [dict(row) for row in final_players]
-    ts_env = trueskill.TrueSkill(mu=25.0, sigma=8.33, beta=4, tau=1.0)
+    ts_env = trueskill.TrueSkill(mu=ranked_globals['Mu'], sigma=ranked_globals['Sigma'], beta=ranked_globals['Beta'], tau=ranked_globals['Tau'])
     ratings = [ts_env.Rating(mu=player['Mu'], sigma=player['Sigma']) for player in result_entries]
     teams = [[rating] for rating in ratings]
     ranks = [player['FinalPosition']-1 for player in result_entries]
@@ -779,20 +781,23 @@ async def lobby_countdown_task(interaction, match_id, message, guild_id):
         muDiff= player['EndSkillMu'] - player['Mu']
         if player['Modifier'] == 'heart':
             if muDiff > 0:
-                muDiff *= 1.25  # Increase MMR gain by 25%
+                muDiff *= 1+float(ranked_globals['HeartBoostWin'])  # Increase MMR gain by 25%
             else:
-                muDiff *= 0.75  # Decrease MMR loss by 25%
+                muDiff *= 1-float(ranked_globals['HeartBoostLose'])  # Decrease MMR loss by 25%
             player['EndSkillMu'] = player['Mu'] + muDiff
         print("i")
         if player['Rank'] < 20:
             if muDiff > 0:
-                muDiff *= 1.1  # Increase MMR gain by 10%
+                muDiff *= 1+float(ranked_globals['SubDiamondBoostWin'])  # Increase MMR gain by 5%
             else:
-                muDiff *= 0.9  # Decrease MMR loss by 10%
+                muDiff *= 1-float(ranked_globals['SubDiamondBoostLose'])  # Decrease MMR loss by 5%
             player['EndSkillMu'] = player['Mu'] + muDiff
         print("j")
         if muDiff > 0:
             winCount=1
+            rankDiff= newRank - player['Rank']
+            if rankDiff < 0:
+                newRank= player['Rank']
         else:
             lossCount=1
         try:
