@@ -490,7 +490,9 @@ class QuestionModal(discord.ui.Modal):
                 logging.info(f"Error occurred in LLM: {e}")
         if classicResponse or int(LLMResponse)==1:
             games_curs.execute('''INSERT INTO Scores (GuildID, UserID, Category, Difficulty, Num_Correct, Num_Incorrect) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(GuildID, UserID, Category, Difficulty) DO UPDATE SET Num_Correct = Num_Correct + 1;''', (interaction.guild.id, interaction.user.id, self.question_type, self.question_difficulty, 1, 0))
-            games_curs.execute('''UPDATE GamblingUserStats SET QuestionsAnsweredTodayCorrect = QuestionsAnsweredTodayCorrect + 1 WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
+            games_conn.commit()
+            games_curs.execute('''UPDATE GamblingUserStats SET QuestionsAnsweredTodayCorrect = QuestionsAnsweredTodayCorrect + 1, RankedDiceTokens = min(3, RankedDiceTokens+1) WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
+            games_conn.commit()
             games_curs.execute('''UPDATE QuestionList SET GlobalCorrect = GlobalCorrect + 1 WHERE ID=?''', (self.question_id,))
             games_conn.commit()
             gamblingPoints=self.question_difficulty*3+7

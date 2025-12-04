@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 import json
 import re
 import time
+import trueskill
 from Helpers.Helpers import create_user_db_entry, numToGrade, delete_later, isAuthorized, achievementTrigger, achievement_leaderboard_generator, auction_house_command, ButtonLockout
 
 
@@ -496,11 +497,18 @@ class RankedLobby(commands.Cog):
         self.client = client
     @app_commands.command(name="ranked-lobby", description="PVP gambling")
     async def ranked_lobby(self, interaction: discord.Interaction):
-        await interaction.response.send_message("stage 0")
-        msg = await interaction.original_response()
         games_conn=sqlite3.connect("games.db",timeout=10)
         games_conn.row_factory = sqlite3.Row
         games_curs = games_conn.cursor()
+        games_curs.execute('''SELECT RankedDiceTokens FROM GamblingUserStats WHERE GuildID = ? AND UserID = ?''', (interaction.guild.id, interaction.user.id))
+        row = games_curs.fetchone()
+        if row is None or row['RankedDiceTokens'] < 1:
+            await interaction.response.send_message("You do not have enough Ranked Dice Tokens to start a ranked lobby. You can earn Ranked Dice Tokens once a day automatically, or by answering a trivia question correctly.", ephemeral=True)
+            games_curs.close()
+            games_conn.close()
+            return
+        await interaction.response.send_message("Initializing Lobby...")
+        msg = await interaction.original_response()
         games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName) VALUES (?, ?, ?)''', (interaction.guild.id, interaction.user.id, "ranked-lobby"))
         games_conn.commit()
         games_curs.execute('''select GameState, ChannelID, MessageID from LiveRankedDiceMatches where GuildID = ? and (GameState = 0 or GameState = 1 or GameState = 2)''', (interaction.guild.id,))
@@ -516,7 +524,7 @@ class RankedLobby(commands.Cog):
         games_conn.commit()
         games_curs.execute('''SELECT * FROM LiveRankedDiceMatches WHERE GuildID = ? AND ChannelID = ? AND MessageID = ?''', (interaction.guild.id, msg.channel.id, msg.id))
         myMatch= games_curs.fetchone()
-        await asyncio.sleep(3)
+        await asyncio.sleep(1)
         games_curs.execute('''SELECT * FROM LiveRankedDiceMatches WHERE GuildID = ? and (GameState = 0 or GameState = 1 or GameState = 2) order by TimeInitiated asc limit 1''', (interaction.guild.id,))
         topMatch= games_curs.fetchone()
         if myMatch['ID'] != topMatch['ID']:
@@ -533,13 +541,14 @@ class RankedLobby(commands.Cog):
         view.add_item(JoinLobbyButton(match_id=myMatch['ID']))
         end_ts = int(time.time()) + 30   # 30 seconds from now
         countdown_tag = f"<t:{end_ts}:R>"
-        await msg.edit(content=f"stage 1. Lobby closes {countdown_tag}", view=view)
+        await msg.edit(content=f"Lobby initialized.", view=view)
+        await asyncio.sleep(.5)
         games_curs.execute('''UPDATE LiveRankedDiceMatches SET GameState = 1 WHERE ID = ?''', (myMatch['ID'],))
         games_conn.commit()
         #await asyncio.sleep(30)
         # RIGHT BEFORE "return"
         self.client.loop.create_task(lobby_countdown_task(
-        client=self.client,
+        interaction=interaction,
         match_id=myMatch["ID"],
         message=msg,
         guild_id=interaction.guild.id
@@ -588,24 +597,22 @@ class ModifierSelectMenu(discord.ui.Select):
                 return
         else:
             await interaction.response.send_message("No game found with that ID.", ephemeral=True)
-        games_curs.execute('''SELECT * FROM PlayerSkills WHERE UserID = ? and GuildID = ?''', (interaction.user.id, interaction.guild.id))
+        games_curs.execute('''SELECT * FROM PlayerSkill WHERE UserID = ? and GuildID = ?''', (interaction.user.id, interaction.guild.id))
         player_skills = games_curs.fetchone()
         if not player_skills:
-            games_curs.execute('''INSERT INTO PlayerSkills (UserID, GuildID) VALUES (?, ?)''', (interaction.user.id, interaction.guild.id))
+            games_curs.execute('''INSERT INTO PlayerSkill (UserID, GuildID) VALUES (?, ?)''', (interaction.user.id, interaction.guild.id))
             games_conn.commit()
-            games_curs.execute('''SELECT * FROM PlayerSkills WHERE UserID = ? and GuildID = ?''', (interaction.user.id, interaction.guild.id))
+            games_curs.execute('''SELECT * FROM PlayerSkill WHERE UserID = ? and GuildID = ?''', (interaction.user.id, interaction.guild.id))
             player_skills = games_curs.fetchone()
-        games_curs.execute('''INSERT INTO LiveRankedDicePlayers (MatchID, UserID, Modifier, StartingSkillMu, StartingSkillSigma, StartingRank) VALUES (?, ?, ?, ?, ?)''', (self.match_id, interaction.user.id, self.values[0], player_skills['SkillMu'], player_skills['SkillSigma'], player_skills['StartingRank']))
+        games_curs.execute('''INSERT INTO LiveRankedDicePlayers (MatchID, UserID, Modifier, StartingSkillMu, StartingSkillSigma, StartingRank) VALUES (?, ?, ?, ?, ?, ?)''', (self.match_id, interaction.user.id, self.values[0], player_skills['Mu'], player_skills['Sigma'], player_skills['Rank']))
         games_conn.commit()
         games_curs.close()
         games_conn.close()
         await interaction.response.edit_message(content=f"You have joined the lobby and selected {self.values[0]}!",view=self.view)
 
-async def lobby_countdown_task(client, match_id, message, guild_id):
-    """Runs in background: updates player list + closes lobby after timeout."""
-    import sqlite3
+async def lobby_countdown_task(interaction, match_id, message, guild_id):
     start_time = time.time()
-    timeout = 30  # seconds
+    timeout = 15  # seconds
 
     while True:
         elapsed = time.time() - start_time
@@ -617,63 +624,304 @@ async def lobby_countdown_task(client, match_id, message, guild_id):
         games_conn.row_factory = sqlite3.Row
         games_curs = games_conn.cursor()
 
-        games_curs.execute(
-            '''SELECT UserID, Modifier FROM LiveRankedDicePlayers WHERE MatchID = ?''',
-            (match_id,)
-        )
+        games_curs.execute('''SELECT UserID, Modifier FROM LiveRankedDicePlayers WHERE MatchID = ?''',(match_id,))
         players = games_curs.fetchall()
 
-        games_curs.close()
-        games_conn.close()
+        
 
+        try:
         # Format lobby text
-        names = []
-        for p in players:
-            user = message.guild.get_member(int(p["UserID"]))
-            if user:
-                names.append(f"• {user.display_name} — `{p['Modifier']}`")
+            names = []
+            for p in players:
+                user = message.guild.get_member(int(p["UserID"]))
+                if user:
+                    games_curs.execute('''SELECT Rank, ProvisionalGames FROM PlayerSkill WHERE GuildID = ? AND UserID = ?''',(guild_id, p['UserID']))
+                    player_skill = games_curs.fetchone()
+                    if player_skill['ProvisionalGames'] > 0:
+                        names.append(f"• {user.display_name}")# — `{p['Modifier']}`
+                    else:
+                        rankStr= await rank_number_to_rank_name(player_skill['Rank'])
+                        names.append(f"• {user.display_name} (Rank: {rankStr})")# — `{p['Modifier']}`
 
-        player_block = "\n".join(names) if names else "*No players yet*"
+            player_block = "\n".join(names) if names else "*No players yet*"
 
-        remaining = int(timeout - elapsed)
-        timestamp = f"<t:{int(time.time()) + remaining}:R>"
+            remaining = int(timeout - elapsed)
+            timestamp = f"<t:{int(time.time()) + remaining}:R>"
 
-        await message.edit(
-            content=f"**Ranked Lobby**\nPlayers:\n{player_block}\n\nLobby closes {timestamp}",
-        )
+            await message.edit(content=f"**Ranked Lobby**\nPlayers:\n{player_block}\n\nLobby closes {timestamp}",)
 
-        await asyncio.sleep(2)  # update every 2 seconds
+            await asyncio.sleep(2)  # update every 2 seconds
+        except Exception as e:
+            print(f"Error updating lobby message: {e}")
+            #set gamestate to -1
+            games_curs.execute('''UPDATE LiveRankedDiceMatches SET GameState = -1 WHERE ID = ?''',(match_id,))
+            games_conn.commit()
+            games_curs.close()
+            games_conn.close()
+            return
 
-    # After timeout → close lobby
-    games_conn = sqlite3.connect("games.db")
-    games_conn.row_factory = sqlite3.Row
-    games_curs = games_conn.cursor()
 
-    games_curs.execute(
-        '''UPDATE LiveRankedDiceMatches SET GameState = 2 WHERE ID = ?''',
-        (match_id,)
-    )
+    games_curs.execute('''UPDATE LiveRankedDiceMatches SET GameState = 2 WHERE ID = ?''',(match_id,))
+    games_conn.commit()
     
 
     await message.edit(content="⏳ Lobby closed! Rolling soon…", view=None)
     await asyncio.sleep(2)
+
+#~~~~~~~~~~~~~~~~~~~~~~LOBBY CLOSED START ROLLING~~~~~~~~~~~~~~~~~~~~~#
+
+#~~~~~~~~~~~~~~~~~~~~~~NAME SETUP~~~~~~~~~~~~~~~~~~~~~#
+
     games_curs.execute('''SELECT UserID, Modifier FROM LiveRankedDicePlayers WHERE MatchID = ? order by random()''', (match_id,))
     players = games_curs.fetchall()
-    names = []
+    entries = []
+    rolls = {}
+    for p in players:
+        roll = await user_rolls(p['Modifier'])
+        rolls[p['UserID']] = roll
+        games_curs.execute('''UPDATE LiveRankedDicePlayers SET RollResult = ? WHERE MatchID = ? AND UserID = ?''', (roll, match_id, p['UserID']))
+        games_conn.commit()
     for p in players:
         user = message.guild.get_member(int(p["UserID"]))
         if user:
-            roll = await user_rolls(p['Modifier'])
-            names.append(f"• {user.display_name} — `{p['Modifier']}` — `{roll}`")
+            entries.append(f"• {user.display_name} —")#— `{p['Modifier']}` 
 
-    player_block = "\n".join(names) if names else "*No players yet*"
-    await message.edit(
-        content=f"**Ranked Match Players**\n{player_block}\n\nRolling now…",
-    )
-
+    player_block = "\n".join(entries) if entries else "*No players yet*"
+    await message.edit(content=f"**Ranked Match Players**\n{player_block}\n\nRolling now…",)
+    await asyncio.sleep(1)
+    print("a")
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~REVEAL ROLLS ONE AT A TIME~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+    for i, p in enumerate(players):
+        await asyncio.sleep(1)
+        user = message.guild.get_member(int(p["UserID"]))
+        if not user:
+            continue
+        roll = rolls.get(p['UserID'])
+        entries[i] = f"• {user.display_name} — **{roll}**"#— `{p['Modifier']}` 
+        updated_player_block = "\n".join(entries)
+        await message.edit(content=f"**Ranked Match Players**\n{updated_player_block}\n\nRolling now…")
+    await asyncio.sleep(3)
+    print("b")
+    #check to see if the lobby is empty
+    games_curs.execute('''SELECT COUNT(*) as PlayerCount FROM LiveRankedDicePlayers WHERE MatchID = ?''', (match_id,))
+    row = games_curs.fetchone()
+    if row['PlayerCount'] == 0 or row['PlayerCount'] == 1:
+        await message.edit(content="Not enough entrants in lobby. Cancelling match...")
+        await delete_later(message=message,time=10)
+        games_curs.execute('''DELETE FROM LiveRankedDiceMatches WHERE ID = ?''', (match_id,))
+        games_conn.commit()
+        games_curs.close()
+        games_conn.close()
+        return
+    #Take the token
+    print("c")
+    games_curs.execute('''UPDATE GamblingUserStats SET RankedDiceTokens = RankedDiceTokens - 1 WHERE UserID = ? AND GuildID = ?''', (interaction.user.id, guild_id))
+    games_conn.commit()
+    #order the players by their roll result descending
+    games_curs.execute('''SELECT UserID, Modifier, RollResult FROM LiveRankedDicePlayers WHERE MatchID = ? ORDER BY RollResult DESC''', (match_id,))
+    ordered_players = games_curs.fetchall()
+    print("d")
+    currentPlacement=1
+    lastRoll=None
+    placementDict={}
+    for p in ordered_players:
+        if lastRoll is None:
+            placementDict[p['UserID']] = currentPlacement
+            lastRoll = p['RollResult']
+        else:
+            if p['RollResult'] == lastRoll:
+                placementDict[p['UserID']] = currentPlacement
+            else:
+                currentPlacement += 1
+                placementDict[p['UserID']] = currentPlacement
+                lastRoll = p['RollResult']
+        games_curs.execute('''UPDATE LiveRankedDicePlayers SET FinalPosition = ? WHERE MatchID = ? AND UserID = ?''', (placementDict[p['UserID']], match_id, p['UserID']))
+        games_conn.commit()
+    games_curs.execute('''SELECT ID, UserID, Modifier, FinalPosition, StartingSkillMu as Mu, StartingSkillSigma as Sigma, StartingRank as Rank FROM LiveRankedDicePlayers WHERE MatchID = ? ORDER BY FinalPosition ASC''', (match_id,))
+    final_players = games_curs.fetchall()
+    print("e")
+    #~~~~~~~~~~~~~~~~~~~~~~TRUESKILL CALCULATION~~~~~~~~~~~~~~~~~~~~~#
+    result_entries = [dict(row) for row in final_players]
+    ts_env = trueskill.TrueSkill(mu=25.0, sigma=8.33, beta=8.333, tau=8.333/10)
+    ratings = [ts_env.Rating(mu=player['Mu'], sigma=player['Sigma']) for player in result_entries]
+    teams = [[rating] for rating in ratings]
+    ranks = [player['FinalPosition']-1 for player in result_entries]
+    print("f")
+    try:
+        new_ratings = trueskill.rate(rating_groups=teams, ranks=ranks)
+    except Exception as e:
+        print(f"Error initializing TrueSkill environment: {e}")
+        await message.edit(content="An error occurred while calculating rankings. Please try again later.")
+        #change the gamestate to -1
+        games_curs.execute('''UPDATE LiveRankedDiceMatches SET GameState = -1 WHERE ID = ?''', (match_id,))
+        games_conn.commit()
+        games_curs.close()
+        games_conn.close()
+        return
+    print("g")
+    for i, player in enumerate(result_entries):
+        player['EndSkillMu'] = new_ratings[i][0].mu
+        player['EndSkillSigma'] = new_ratings[i][0].sigma
+    for player in result_entries:
+        games_curs.execute('''SELECT ProvisionalGames FROM PlayerSkill WHERE UserID = ? AND GuildID = ?''', (player['UserID'], guild_id))
+        row = games_curs.fetchone()
+        provisional_games_left = row['ProvisionalGames'] if row else 0
+        targetRank= mu_to_target_rank(player['EndSkillMu'])
+        if provisional_games_left > 0:
+            # If there are provisional games left, use the target rank
+            newRank= targetRank
+        else:
+            # If no provisional games left, use the end rank
+            newRank= update_visible_rank(player['Rank'], targetRank)
+        winCount=0
+        lossCount=0
+        print("h")
+        muDiff= player['EndSkillMu'] - player['Mu']
+        if player['Modifier'] == 'heart':
+            if muDiff > 0:
+                muDiff *= 1.1  # Increase MMR gain by 10%
+            else:
+                muDiff *= 0.9  # Decrease MMR loss by 10%
+            player['EndSkillMu'] = player['Mu'] + muDiff
+        print("i")
+        if player['Rank'] < 20:
+            if muDiff > 0:
+                muDiff *= 1.05  # Increase MMR gain by 5%
+            else:
+                muDiff *= 0.95  # Decrease MMR loss by 5%
+            player['EndSkillMu'] = player['Mu'] + muDiff
+        print("j")
+        if muDiff > 0:
+            winCount=1
+        else:
+            lossCount=1
+        try:
+            games_curs.execute('''UPDATE PlayerSkill SET Mu = ?, Sigma = max(?, 4), Rank = ?, ProvisionalGames = max(0, ProvisionalGames - 1), GamesPlayed = GamesPlayed + 1, WinCount = WinCount + ?, LossCount = LossCount + ?, SeasonalGamesPlayed = SeasonalGamesPlayed + 1, SeasonalWinCount = SeasonalWinCount + ?, SeasonalLossCount = SeasonalLossCount + ?, LastPlayed = ? WHERE UserID = ? AND GuildID = ?''', (player['EndSkillMu'], player['EndSkillSigma'], newRank, winCount, lossCount, winCount, lossCount, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), player['UserID'], guild_id))
+            games_conn.commit()
+        except Exception as e:
+            print(f"Error updating PlayerSkill for UserID {player['UserID']}: {e}")
+            await message.edit(content="An error occurred while updating player skills. Please try again later.")
+            #change the gamestate to -1
+            games_curs.execute('''UPDATE LiveRankedDiceMatches SET GameState = -1 WHERE ID = ?''', (match_id,))
+            games_conn.commit()
+            games_curs.close()
+            games_conn.close()
+            return
+        print("k")
+        games_curs.execute('''UPDATE LiveRankedDicePlayers SET EndSkillMu = ?, EndSkillSigma = max(?, 3), EndRank = ? WHERE MatchID = ? AND UserID = ?''', (player['EndSkillMu'], player['EndSkillSigma'], newRank, match_id, player['UserID']))
+        games_conn.commit()
+        #edit the message to show the final results with MMR and rank changes
+    print("Final Results:")
+    try:
+        games_curs.execute('''SELECT UserID, FinalPosition, StartingSkillMu, EndSkillMu, StartingRank, EndRank, RollResult FROM LiveRankedDicePlayers WHERE MatchID = ? ORDER BY FinalPosition ASC''', (match_id,))
+        final_players_2 = games_curs.fetchall()
+        games_curs.execute('''SELECT ProvisionalGames FROM PlayerSkill WHERE UserID = ? AND GuildID = ?''', (player['UserID'], guild_id))
+        row = games_curs.fetchone()
+        provisional_games_left = row['ProvisionalGames'] if row else 0
+        result_entries_2 = [dict(row) for row in final_players_2]
+        result_lines = []
+        print(f"result_entries: {result_entries_2}")
+    
+        for player in result_entries_2:
+            user = message.guild.get_member(int(player["UserID"]))
+            if user:
+                mmr_change = player['EndSkillMu'] - player['StartingSkillMu']
+                rank_change = player['EndRank'] - player['StartingRank']
+                mmr_change_str = f"{mmr_change:+.2f}"
+                rank_change_str = f"{rank_change:+.2f}"
+                oldRankName = await rank_number_to_rank_name(player['StartingRank'])
+                newRankName = await rank_number_to_rank_name(player['EndRank'])
+                if provisional_games_left > 0:
+                    rank_change_str = f"Provisional Games {10-provisional_games_left}/10 completed"
+                    result_lines.append(f"• {user.display_name} — Roll: {player['RollResult']} Position: **{player['FinalPosition']}** — Rank: ({rank_change_str})")
+                else:
+                    result_lines.append(f"• {user.display_name} — Roll: {player['RollResult']} — Position: **{player['FinalPosition']}** — Rank: {oldRankName} → {newRankName} ({rank_change_str})")
+                #result_lines.append(f"• {user.display_name} — Final Roll: **{player['FinalPosition']}** — MMR: {player['StartingSkillMu']:.2f} → {player['EndSkillMu']:.2f} ({mmr_change_str}) — Rank: {player['StartingRank']:.2f} → {player['EndRank']:.2f} ({rank_change_str})")
+    except Exception as e:
+        print(f"Error generating final results: {e}")
+        await message.edit(content="An error occurred while generating final results. Please try again later.")
+        #change the gamestate to -1
+        games_curs.execute('''UPDATE LiveRankedDiceMatches SET GameState = -1 WHERE ID = ?''', (match_id,))
+        games_conn.commit()
+        games_curs.close()
+        games_conn.close()
+        return
+    print("sas")
+    final_result_block = "\n".join(result_lines)
+    await message.edit(content=f"**Ranked Match Results**\n{final_result_block}",)
+    print("done")
     games_curs.execute('''UPDATE LiveRankedDiceMatches SET GameState = 3 WHERE ID = ?''', (match_id,))
     games_conn.commit()
+    #await delete_later(message=message,time=30)
+    games_curs.close()
     games_conn.close()
+
+async def rank_number_to_rank_name(rank_number):
+    # Example mapping, adjust as needed
+    rank_names = {
+        1: "B1",
+        2: "B2",
+        3: "B3",
+        4: "B4",
+        5: "B5",
+        6: "S1",
+        7: "S2",
+        8: "S3",
+        9: "S4",
+        10: "S5",
+        11: "G1",
+        12: "G2",
+        13: "G3",
+        14: "G4",
+        15: "G5",
+        16: "P1",
+        17: "P2",
+        18: "P3",
+        19: "P4",
+        20: "P5",
+        21: "D1",
+        22: "D2",
+        23: "D3",
+        24: "D4",
+        25: "D5",
+        26: "D6",
+        27: "D7",
+        28: "D8",
+        29: "D9",
+        30: "D10",
+        31: "D11",
+        32: "D12",
+        33: "D13",
+        34: "D14",
+        35: "D15",
+        36: "D16",
+        37: "D17",
+        38: "D18",
+        39: "D19",
+        40: "D20",
+        # Add more ranks as needed
+    }
+    return rank_names.get(int(rank_number), "Unranked")
+
+def mu_to_target_rank(mu):
+    # Example: scale MMR into your 1–60 rank system (20 bronze→plat + 40 diamond)
+    # Adjust min/max as needed
+    min_mu = 10
+    max_mu = 50  # pick appropriate scaling
+    max_rank = 40
+    min_rank = 1
+    # linear scaling
+    rank = (mu - min_mu) / (max_mu - min_mu) * (max_rank - min_rank) + min_rank
+    return max(min(rank, max_rank), min_rank)
+
+def update_visible_rank(current_rank, target_rank, smoothing=0.2):
+    """
+    Move the shown rank fractionally toward the target.
+    smoothing=0.2 → moves 20% of the gap each update
+    """
+    return current_rank + (target_rank - current_rank) * smoothing
+
+
 
 async def user_rolls(modifier:str):
     roll = random.randint(1, 20)
