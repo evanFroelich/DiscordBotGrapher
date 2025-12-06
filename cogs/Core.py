@@ -124,6 +124,21 @@ class Stats(commands.Cog):
         achievement_score = games_curs.fetchone()
         games_curs.execute('''with Names as (select ID, Name from AchievementDefinitions), OwnedAchievements as (select AchievementID, GuildID, UserID from UserAchievements), achievement_scores as (select AchievementID, Score, Earners from DynamicAchievementScoresView) select a.Name, c.Earners, c.Score from Names a left join OwnedAchievements b on a.ID = b.AchievementID left join achievement_scores c on c.AchievementID = b.AchievementID where b.UserID = ? and b.GuildID = ? order by c.Score DESC limit 3''', (user_id, guild_id))
         top_achievements = games_curs.fetchall()
+        games_curs.execute('''SELECT GamesPlayed, WinCount, LossCount, CAST(WinCount AS FLOAT) / (WinCount + LossCount) * 100 as WinRate, Rank, ProvisionalGames FROM PlayerSkill WHERE GuildID=? AND UserID=?''', (guild_id, user_id))
+        player_skill = games_curs.fetchone()
+        games_curs.execute('''SELECT
+            a.Modifier,
+            SUM(CASE WHEN a.EndSkillMu > a.StartingSkillMu THEN 1 ELSE 0 END) AS Wins,
+            SUM(CASE WHEN a.EndSkillMu < a.StartingSkillMu THEN 1 ELSE 0 END) AS Losses,
+            CAST(SUM(CASE WHEN a.EndSkillMu > a.StartingSkillMu THEN 1 ELSE 0 END) AS FLOAT) / CAST(COUNT(*)  AS FLOAT) * 100 AS WinRate
+        FROM LiveRankedDicePlayers a
+        INNER JOIN LiveRankedDiceMatches m
+            ON a.MatchID = m.ID
+        WHERE a.UserID = ?
+        AND m.GuildID = ?
+        GROUP BY a.Modifier
+        ORDER BY WinRate DESC;''', (user_id, guild_id))
+        modifier_stats = games_curs.fetchall()
         games_curs.close()
         games_conn.close()
         embed = discord.Embed(title=f"---WIP---\n{interaction.user.name}'s Stats", color=discord.Color.green())
@@ -134,6 +149,18 @@ class Stats(commands.Cog):
             embed.add_field(name="Top Achievements", value=achievementStr, inline=False)
         if achievement_score:
             embed.add_field(name="Achievement Score", value=achievement_score['TotalScore'], inline=False)
+        if player_skill:
+            rankText=""
+            if player_skill['ProvisionalGames'] == 0:
+                rankText = f"{player_skill['Rank']}"
+            else:
+                rankText = f"{10-player_skill['ProvisionalGames']}/10 placements"
+            embed.add_field(name="Ranked Dice Stats", value=f"Rank: {rankText}\nGames Played: {player_skill['GamesPlayed']}\nWins: {player_skill['WinCount']}\nLosses: {player_skill['LossCount']}\nWin Rate: {round(player_skill['WinRate'],2)}%", inline=False)
+        if modifier_stats and visibility.value == "private":
+            modifierStr=""
+            for modifier in modifier_stats:
+                modifierStr += f"{modifier['Modifier']}:\tW: {modifier['Wins']}\tL: {modifier['Losses']}\tWR: {int(modifier['WinRate'])}%\n"
+            embed.add_field(name="Ranked Dice Modifier Stats", value=modifierStr, inline=False)
         if user_stats:
             embed.add_field(name="Ping Responses", value=f"Pong:{user_stats['PingPongCount']}\nSong: {user_stats['PingSongCount']}\nDong: {user_stats['PingDongCount']}\nLong: {user_stats['PingLongCount']}\nKong: {user_stats['PingKongCount']}\nGoldStar: {user_stats['PingGoldStarCount']}", inline=False)
             #divide hits and misses to get a percent rounded to the whole number. if miss is 0 then default to 100%
@@ -169,7 +196,8 @@ class Stats(commands.Cog):
                     hitRate = 100
             else:
                 hitRate = round(user_stats['TwitterAltHitCount'] / (user_stats['TwitterAltHitCount'] + user_stats['TwitterAltMissCount']) * 100)
-            embed.add_field(name="Twitter Alt Stats", value=f"Times hit: {user_stats['TwitterAltHitCount']}\tHit Rate: {hitRate}%", inline=False)
+            if user_stats['TwitterAltHitCount'] != 0 or user_stats['TwitterAltMissCount'] != 0:
+                embed.add_field(name="Twitter Alt Stats", value=f"Times hit: {user_stats['TwitterAltHitCount']}\tHit Rate: {hitRate}%", inline=False)
             if general_stats:
                 embed.add_field(name="Trivia stats", value=f"Questions Answered: {general_stats['TriviaCount']}\nLifetime Earnings: {general_stats['LifetimeEarnings']}\nCurrent Balance: {general_stats['CurrentBalance']}\nTips Given: {general_stats['TipsGiven']}", inline=False)
                 if coin_flip_stats and visibility.value == "private":
