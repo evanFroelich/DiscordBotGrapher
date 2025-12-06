@@ -166,13 +166,16 @@ class Leaderboard(commands.Cog):
             embed = await achievement_leaderboard_generator(interaction.guild.id)
             await interaction.followup.send(embed=embed, ephemeral=privMsg)
         if subtype.value == "ranked-dice":
-            games_curs.execute('''SELECT UserID, Rank, Mu FROM PlayerSkill WHERE GuildID = ? ORDER BY Rank DESC, Mu DESC''', (interaction.guild.id,))
+            games_curs.execute('''SELECT UserID, Rank, Mu, ProvisionalGames FROM PlayerSkill WHERE GuildID = ? ORDER BY ProvisionalGames ASC, Rank DESC, Mu DESC''', (interaction.guild.id,))
             rows= games_curs.fetchall()
             outstr=""
             embed=discord.Embed(title="Ranked Dice Leaderboard", color=0x228a65)
             for row in rows:
                 user=interaction.guild.get_member(int(row[0]))
-                rank_name = await rank_number_to_rank_name(row[1])
+                if row[3] > 0:
+                    rank_name = f"Provisional games {10 - row[3]}/10"
+                else:
+                    rank_name = await rank_number_to_rank_name(row[1])
                 if user:
                     outstr += f"<@{user.id}>: {rank_name}\n"
                 else:
