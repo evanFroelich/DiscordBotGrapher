@@ -9,7 +9,7 @@ import json
 import re
 import time
 import trueskill
-from Helpers.Helpers import create_user_db_entry, numToGrade, delete_later, isAuthorized, achievementTrigger, achievement_leaderboard_generator, auction_house_command, ButtonLockout
+from Helpers.Helpers import create_user_db_entry, numToGrade, delete_later, isAuthorized, achievementTrigger, achievement_leaderboard_generator, auction_house_command, ButtonLockout, rank_number_to_rank_name
 
 
 class GradeReport(commands.Cog):
@@ -90,7 +90,8 @@ class Leaderboard(commands.Cog):
         app_commands.Choice(name="bonus-points", value="pip"),
         app_commands.Choice(name="coin-flip", value="flip"),
         app_commands.Choice(name="balance", value="balance"),
-        app_commands.Choice(name="achievement-score", value="achievement-score")
+        app_commands.Choice(name="achievement-score", value="achievement-score"),
+        app_commands.Choice(name="ranked-dice", value="ranked-dice")
     ])
     @app_commands.choices(visibility=[
         app_commands.Choice(name="public", value="public"),
@@ -163,6 +164,20 @@ class Leaderboard(commands.Cog):
             await interaction.followup.send(embed=embed, ephemeral=privMsg)
         if subtype.value == "achievement-score":
             embed = await achievement_leaderboard_generator(interaction.guild.id)
+            await interaction.followup.send(embed=embed, ephemeral=privMsg)
+        if subtype.value == "ranked-dice":
+            games_curs.execute('''SELECT UserID, Rank, Mu FROM PlayerSkill WHERE GuildID = ? ORDER BY Rank DESC, Mu DESC''', (interaction.guild.id,))
+            rows= games_curs.fetchall()
+            outstr=""
+            embed=discord.Embed(title="Ranked Dice Leaderboard", color=0x228a65)
+            for row in rows:
+                user=interaction.guild.get_member(int(row[0]))
+                rank_name = await rank_number_to_rank_name(row[1])
+                if user:
+                    outstr += f"<@{user.id}>: {rank_name}\n"
+                else:
+                    outstr += f"User ID {row[0]}: {rank_name}\n"
+            embed.description=outstr
             await interaction.followup.send(embed=embed, ephemeral=privMsg)
         games_curs.close()
         games_conn.close()
@@ -861,52 +876,7 @@ async def lobby_countdown_task(interaction, match_id, message, guild_id):
     games_curs.close()
     games_conn.close()
 
-async def rank_number_to_rank_name(rank_number):
-    # Example mapping, adjust as needed
-    rank_names = {
-        1: "B1",
-        2: "B2",
-        3: "B3",
-        4: "B4",
-        5: "B5",
-        6: "S1",
-        7: "S2",
-        8: "S3",
-        9: "S4",
-        10: "S5",
-        11: "G1",
-        12: "G2",
-        13: "G3",
-        14: "G4",
-        15: "G5",
-        16: "P1",
-        17: "P2",
-        18: "P3",
-        19: "P4",
-        20: "P5",
-        21: "D1",
-        22: "D2",
-        23: "D3",
-        24: "D4",
-        25: "D5",
-        26: "D6",
-        27: "D7",
-        28: "D8",
-        29: "D9",
-        30: "D10",
-        31: "D11",
-        32: "D12",
-        33: "D13",
-        34: "D14",
-        35: "D15",
-        36: "D16",
-        37: "D17",
-        38: "D18",
-        39: "D19",
-        40: "D20",
-        # Add more ranks as needed
-    }
-    return rank_names.get(int(rank_number), "Unranked")
+
 
 def mu_to_target_rank(mu):
     # Example: scale MMR into your 1–60 rank system (20 bronze→plat + 40 diamond)

@@ -509,3 +509,50 @@ class AuctionHouseButton(discord.ui.Button):
 
     async def callback(self, interaction: discord.Interaction):
         await auction_house_command(interaction)
+
+async def rank_number_to_rank_name(rank_number):
+    # Example mapping, adjust as needed
+    rank_names = {
+        1: "B1",
+        2: "B2",
+        3: "B3",
+        4: "B4",
+        5: "B5",
+        6: "S1",
+        7: "S2",
+        8: "S3",
+        9: "S4",
+        10: "S5",
+        11: "G1",
+        12: "G2",
+        13: "G3",
+        14: "G4",
+        15: "G5",
+        16: "P1",
+        17: "P2",
+        18: "P3",
+        19: "P4",
+        20: "P5",
+        21: "D1",
+        22: "D2",
+        23: "D3",
+        24: "D4",
+        25: "D5",
+        26: "D6",
+        27: "D7",
+        28: "D8",
+        29: "D9",
+        30: "D10",
+        31: "D11",
+        32: "D12",
+        33: "D13",
+        34: "D14",
+        35: "D15",
+        36: "D16",
+        37: "D17",
+        38: "D18",
+        39: "D19",
+        40: "D20",
+        # Add more ranks as needed
+    }
+    return rank_names.get(int(rank_number), "Unranked")
