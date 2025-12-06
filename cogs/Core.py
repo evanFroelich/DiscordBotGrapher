@@ -4,7 +4,7 @@ from discord.ext import commands
 import sqlite3
 import json
 
-from Helpers.Helpers import isAuthorized
+from Helpers.Helpers import isAuthorized, rank_number_to_rank_name
 
 class News(commands.Cog):
     def __init__(self, client: commands.Bot):
@@ -152,7 +152,8 @@ class Stats(commands.Cog):
         if player_skill:
             rankText=""
             if player_skill['ProvisionalGames'] == 0:
-                rankText = f"{player_skill['Rank']}"
+                textRank = await rank_number_to_rank_name(player_skill['Rank'])
+                rankText = f"{textRank}"
             else:
                 rankText = f"{10-player_skill['ProvisionalGames']}/10 placements"
             embed.add_field(name="Ranked Dice Stats", value=f"Rank: {rankText}\nGames Played: {player_skill['GamesPlayed']}\nWins: {player_skill['WinCount']}\nLosses: {player_skill['LossCount']}\nWin Rate: {round(player_skill['WinRate'],2)}%", inline=False)
