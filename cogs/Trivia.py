@@ -1036,6 +1036,18 @@ class StandButton(discord.ui.Button):
             await asyncio.sleep(1.5)
         userHandValue = await calculate_hand_value(self.GAMEINFO["userHand"])
         #determine winner
+        nat21=0
+        if userHandValue == 21 and len(self.GAMEINFO["userHand"])==2:
+            nat21=1
+        longWin=0
+        if len(self.GAMEINFO["userHand"])>=5:
+            longWin=1
+        longLoss=0
+        if len(self.GAMEINFO["dealerHand"])>=5:
+            longLoss=1
+        longTie=0
+        if longWin == 1 and longLoss == 1:
+            longTie=1
         if dealerHandValue > 21 or userHandValue > dealerHandValue:
             #user wins
             rewarded_points = round((5 * self.GAMEINFO["betAmount"])/4)
@@ -1046,21 +1058,22 @@ class StandButton(discord.ui.Button):
                 perfectScore=1
             games_conn = sqlite3.connect("games.db")
             games_curs = games_conn.cursor()
-            games_curs.execute('''UPDATE GamblingUserStats SET BlackjackWins=BlackjackWins+1, BlackjackEarnings=BlackjackEarnings+?, Blackjack21s=Blackjack21s+? WHERE GuildID=? AND UserID=?''', (rewarded_points, perfectScore, self.guildID, self.userID))
+            games_curs.execute('''UPDATE GamblingUserStats SET BlackjackWins=BlackjackWins+1, BlackjackEarnings=BlackjackEarnings+?, Blackjack21s=Blackjack21s+?, BlackjackLongWins=BlackjackLongWins+?, BlackjackNat21s=BlackjackNat21s+? WHERE GuildID=? AND UserID=?''', (rewarded_points, perfectScore, longWin, nat21, self.guildID, self.userID))
             games_curs.execute('''INSERT INTO DailyGamblingTotals (GuildID, Date, Category, Funds) Values (?, ?, ?, ?) ON CONFLICT(GuildID, Date, Category) DO UPDATE SET Funds=Funds+?''', (self.guildID, datetime.now().strftime("%Y-%m-%d"), "Casino", rewarded_points, rewarded_points))
             games_conn.commit()
             games_curs.close()
             games_conn.close()
             await achievementTrigger(self.guildID, self.userID, 'BlackjackWins')
             await achievementTrigger(self.guildID, self.userID, 'BlackjackEarnings')
-            await achievementTrigger(self.guildID, self.userID, 'Blackjack21s')
+            if perfectScore==1:
+                await achievementTrigger(self.guildID, self.userID, 'Blackjack21s')
         elif userHandValue < dealerHandValue:
             #dealer wins
             await award_points(guild_id=self.guildID, user_id=self.userID, amount=-self.GAMEINFO["betAmount"])
             games_db = "games.db"
             games_conn = sqlite3.connect(games_db)
             games_curs = games_conn.cursor()
-            games_curs.execute('''UPDATE GamblingUserStats SET BlackjackLosses = BlackjackLosses + ?, BlackjackDefeats = BlackjackDefeats + 1 WHERE GuildID = ? AND UserID = ?''', (self.GAMEINFO["betAmount"], self.guildID, self.userID))
+            games_curs.execute('''UPDATE GamblingUserStats SET BlackjackLosses = BlackjackLosses + ?, BlackjackDefeats = BlackjackDefeats + 1, BlackjackLongLosses = BlackjackLongLosses + ? WHERE GuildID = ? AND UserID = ?''', (self.GAMEINFO["betAmount"], longLoss, self.guildID, self.userID))
             games_conn.commit()
             games_curs.close()
             games_conn.close()
@@ -1073,7 +1086,7 @@ class StandButton(discord.ui.Button):
             games_db = "games.db"
             games_conn = sqlite3.connect(games_db)
             games_curs = games_conn.cursor()
-            games_curs.execute('''UPDATE GamblingUserStats SET BlackjackTies = BlackjackTies + 1, Blackjack21Ties = Blackjack21Ties + ? WHERE GuildID = ? AND UserID = ?''', (perfectTie, self.guildID, self.userID))
+            games_curs.execute('''UPDATE GamblingUserStats SET BlackjackTies = BlackjackTies + 1, Blackjack21Ties = Blackjack21Ties + ?, BlackjackLongTies = BlackjackLongTies + ? WHERE GuildID = ? AND UserID = ?''', (perfectTie, longTie, self.guildID, self.userID))
             games_conn.commit()
             games_curs.close()
             games_conn.close()

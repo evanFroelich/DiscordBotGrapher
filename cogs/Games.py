@@ -515,8 +515,8 @@ class RankedLobby(commands.Cog):
         self.client = client
     @app_commands.command(name="ranked-lobby", description="PVP gambling")
     @app_commands.choices(duration=[
-        app_commands.Choice(name="normal", value=30),
-        app_commands.Choice(name="long", value=60)
+        app_commands.Choice(name="long", value=60),
+        app_commands.Choice(name="normal", value=30)
     ])
     async def ranked_lobby(self, interaction: discord.Interaction, duration: app_commands.Choice[int]=None):
         games_conn=sqlite3.connect("games.db",timeout=10)
