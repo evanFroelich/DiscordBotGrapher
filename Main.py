@@ -247,6 +247,7 @@ class MyClient(commands.Bot):
             game_curs.execute('''INSERT OR IGNORE INTO GamblingUnlockConditions (GuildID) VALUES (?);''',(guild,))
             game_curs.execute('''INSERT OR IGNORE INTO FeatureTimers (GuildID) VALUES (?);''',(guild,))
             game_curs.execute('''INSERT OR IGNORE INTO ServerSettings (GuildID) VALUES (?);''',(guild,))
+            game_conn.commit()
 
         conn.commit()  
         curs.execute('''CREATE INDEX IF NOT EXISTS idx_guild_time ON Master (GuildID, UTCTime)''')
@@ -292,7 +293,7 @@ class MyClient(commands.Bot):
         await self.load_extension('cogs.Core')
         await self.load_extension('cogs.Analytics')
 
-        #await self.tree.sync()
+        await self.tree.sync()
         print('synced')
 
     async def on_thread_create(self,thread):

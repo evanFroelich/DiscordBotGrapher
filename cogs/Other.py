@@ -155,7 +155,6 @@ class TestSelectMenu(discord.ui.Select):
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.send_message(f"You selected {self.values[0]}")
 
-
 async def setup(client: commands.Bot):
     await client.add_cog(Ping(client))
     await client.add_cog(Test(client))

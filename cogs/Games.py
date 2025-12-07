@@ -514,7 +514,11 @@ class RankedLobby(commands.Cog):
     def __init__(self, client: commands.Bot):
         self.client = client
     @app_commands.command(name="ranked-lobby", description="PVP gambling")
-    async def ranked_lobby(self, interaction: discord.Interaction):
+    @app_commands.choices(duration=[
+        app_commands.Choice(name="normal", value=30),
+        app_commands.Choice(name="long", value=60)
+    ])
+    async def ranked_lobby(self, interaction: discord.Interaction, duration: app_commands.Choice[int]=None):
         games_conn=sqlite3.connect("games.db",timeout=10)
         games_conn.row_factory = sqlite3.Row
         games_curs = games_conn.cursor()
@@ -566,11 +570,16 @@ class RankedLobby(commands.Cog):
         games_conn.commit()
         #await asyncio.sleep(30)
         # RIGHT BEFORE "return"
+        if duration is None:
+            duration = 30
+        else:
+            duration = duration.value
         self.client.loop.create_task(lobby_countdown_task(
         interaction=interaction,
         match_id=myMatch["ID"],
         message=msg,
-        guild_id=interaction.guild.id
+        guild_id=interaction.guild.id,
+        duration=duration
         ))
 
         return
@@ -629,9 +638,9 @@ class ModifierSelectMenu(discord.ui.Select):
         games_conn.close()
         await interaction.response.edit_message(content=f"You have joined the lobby and selected {self.values[0]}!",view=self.view)
 
-async def lobby_countdown_task(interaction, match_id, message, guild_id):
+async def lobby_countdown_task(interaction, match_id, message, guild_id, duration=30):
     start_time = time.time()
-    timeout = 30  # seconds
+    timeout = duration  # seconds
 
     while True:
         elapsed = time.time() - start_time
