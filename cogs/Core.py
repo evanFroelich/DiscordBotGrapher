@@ -146,9 +146,8 @@ class Stats(commands.Cog):
             achievementStr=""
             for achievement in top_achievements:
                 achievementStr += f"({achievement['Earners']}) {achievement['Name']}\n"
-            embed.add_field(name="Top Achievements", value=achievementStr, inline=False)
-        if achievement_score:
-            embed.add_field(name="Achievement Score", value=achievement_score['TotalScore'], inline=False)
+            embed.add_field(name="Top Achievements", value=achievementStr, inline=True)
+        
         if player_skill:
             rankText=""
             if player_skill['ProvisionalGames'] == 0:
@@ -156,12 +155,14 @@ class Stats(commands.Cog):
                 rankText = f"{textRank}"
             else:
                 rankText = f"{10-player_skill['ProvisionalGames']}/10 placements"
-            embed.add_field(name="Ranked Dice Stats", value=f"Rank: {rankText}\nGames Played: {player_skill['GamesPlayed']}\nWins: {player_skill['WinCount']}\nLosses: {player_skill['LossCount']}\nWin Rate: {round(player_skill['WinRate'],2)}%", inline=False)
+            embed.add_field(name="Ranked Dice Stats", value=f"Rank: {rankText}\nGames Played: {player_skill['GamesPlayed']}\nWins: {player_skill['WinCount']}\nLosses: {player_skill['LossCount']}\nWin Rate: {round(player_skill['WinRate'],2)}%", inline=True)
         if modifier_stats and visibility.value == "private":
             modifierStr=""
             for modifier in modifier_stats:
                 modifierStr += f"{modifier['Modifier']}:\tW: {modifier['Wins']}\tL: {modifier['Losses']}\tWR: {int(modifier['WinRate'])}%\n"
-            embed.add_field(name="Ranked Dice Modifier Stats", value=modifierStr, inline=False)
+            embed.add_field(name="Ranked Dice Modifier Stats", value=modifierStr, inline=True)
+        if achievement_score:
+            embed.add_field(name="Achievement Score", value=achievement_score['TotalScore'], inline=False)
         if user_stats:
             embed.add_field(name="Ping Responses", value=f"Pong:{user_stats['PingPongCount']}\nSong: {user_stats['PingSongCount']}\nDong: {user_stats['PingDongCount']}\nLong: {user_stats['PingLongCount']}\nKong: {user_stats['PingKongCount']}\nGoldStar: {user_stats['PingGoldStarCount']}", inline=False)
             #divide hits and misses to get a percent rounded to the whole number. if miss is 0 then default to 100%
@@ -173,7 +174,7 @@ class Stats(commands.Cog):
                     hitRate = 100
             else:
                 hitRate = round(user_stats['HorseHitCount'] / (user_stats['HorseHitCount'] + user_stats['HorseMissCount']) * 100)
-            embed.add_field(name="Horse Stats", value=f"Times hit: {user_stats['HorseHitCount']}\tHit Rate: {hitRate}%", inline=False)
+            embed.add_field(name="Horse Stats", value=f"Times hit: {user_stats['HorseHitCount']}\tHit Rate: {hitRate}%", inline=True)
             if user_stats['CatMissCount'] == 0:
                 if user_stats['CatHitCount'] == 0:
                     hitRate = "N/A"
@@ -181,7 +182,7 @@ class Stats(commands.Cog):
                     hitRate = 100
             else:
                 hitRate = round(user_stats['CatHitCount'] / (user_stats['CatHitCount'] + user_stats['CatMissCount']) * 100)
-            embed.add_field(name="Cat Stats", value=f"Times hit: {user_stats['CatHitCount']}\tHit Rate: {hitRate}%", inline=False)
+            embed.add_field(name="Cat Stats", value=f"Times hit: {user_stats['CatHitCount']}\tHit Rate: {hitRate}%", inline=True)
             if user_stats['MarathonMissCount'] == 0:
                 if user_stats['MarathonHitCount'] == 0:
                     hitRate = "N/A"
@@ -189,7 +190,7 @@ class Stats(commands.Cog):
                     hitRate = 100
             else:
                 hitRate = round(user_stats['MarathonHitCount'] / (user_stats['MarathonHitCount'] + user_stats['MarathonMissCount']) * 100)
-            embed.add_field(name="Marathon Stats", value=f"Times hit: {user_stats['MarathonHitCount']}\tHit Rate: {hitRate}%", inline=False)
+            embed.add_field(name="Marathon Stats", value=f"Times hit: {user_stats['MarathonHitCount']}\tHit Rate: {hitRate}%", inline=True)
             if user_stats['TwitterAltMissCount'] == 0:
                 if user_stats['TwitterAltHitCount'] == 0:
                     hitRate = "N/A"
@@ -200,25 +201,29 @@ class Stats(commands.Cog):
             if user_stats['TwitterAltHitCount'] != 0 or user_stats['TwitterAltMissCount'] != 0:
                 embed.add_field(name="Twitter Alt Stats", value=f"Times hit: {user_stats['TwitterAltHitCount']}\tHit Rate: {hitRate}%", inline=False)
             if general_stats:
-                embed.add_field(name="Trivia stats", value=f"Questions Answered: {general_stats['TriviaCount']}\nLifetime Earnings: {general_stats['LifetimeEarnings']}\nCurrent Balance: {general_stats['CurrentBalance']}\nTips Given: {general_stats['TipsGiven']}", inline=False)
+                embed.add_field(name="Trivia stats", value=f"Questions Answered: {general_stats['TriviaCount']}\nLifetime Earnings: {general_stats['LifetimeEarnings']}\nCurrent Balance: {general_stats['CurrentBalance']}\nTips Given: {general_stats['TipsGiven']}", inline=True)
                 if coin_flip_stats and visibility.value == "private":
                     if unlocked_games:
                         if int(unlocked_games['Game1'])==1:
-                            embed.add_field(name="Gambling Coin Flip Stats", value=f"Wins: {coin_flip_stats['CoinFlipWins']}\nEarnings: {coin_flip_stats['CoinFlipEarnings']}\nDouble Wins: {coin_flip_stats['CoinFlipDoubleWins']}", inline=False)
+                            embed.add_field(name="Gambling Coin Flip Stats", value=f"Wins: {coin_flip_stats['CoinFlipWins']}\nEarnings: {coin_flip_stats['CoinFlipEarnings']}\nDouble Wins: {coin_flip_stats['CoinFlipDoubleWins']}", inline=True)
+                else:
+                    embed.add_field(name="\u200b", value="\u200b", inline=True)
                 if black_jack_stats and visibility.value == "private":
                     if unlocked_games:
                         if int(unlocked_games['Game2'])==1:
-                            embed.add_field(name="Gambling Black Jack Stats", value=f"Wins: {black_jack_stats['BlackJackWins']}\nEarnings: {black_jack_stats['BlackJackEarnings']}\n21's hit: {black_jack_stats['Blackjack21s']}", inline=False)
+                            embed.add_field(name="Gambling Black Jack Stats", value=f"Wins: {black_jack_stats['BlackJackWins']}\nEarnings: {black_jack_stats['BlackJackEarnings']}\n21's hit: {black_jack_stats['Blackjack21s']}", inline=True)
+                else:
+                    embed.add_field(name="\u200b", value="\u200b", inline=True)
+                commandStr=""
+                for command in command_stats:
+                    commandStr += f"{command['CommandName']}: {command['CommandCount']}\n"
+                embed.add_field(name=f"Total Commands Used: {general_stats['TotalCommands']}",value=f"{commandStr}", inline=True)
                 if auction_stats:
                     if unlocked_games:
                         if int(unlocked_games['Game1'])==1:
-                            embed.add_field(name="Auction House Stats", value=f"Winnings: {auction_stats['AuctionHouseWinnings']}\nLosses: {auction_stats['AuctionHouseLosses']}", inline=False)
-                embed.add_field(name="Coin Flip Stats", value=f"Times Flipped: {general_stats['TimesFlipped']}\nCurrent Streak: {general_stats['CurrentStreak']}\nLast Flipped: {general_stats['LastFlip']}", inline=False)
-                commandStr=""
-                #go through the results of command_stats and add them all into the string
-                for command in command_stats:
-                    commandStr += f"{command['CommandName']}: {command['CommandCount']}\n"
-                embed.add_field(name=f"Total Commands Used: {general_stats['TotalCommands']}",value=f"{commandStr}", inline=False)
+                            embed.add_field(name="Auction House Stats", value=f"Winnings: {auction_stats['AuctionHouseWinnings']}\nLosses: {auction_stats['AuctionHouseLosses']}", inline=True)
+                embed.add_field(name="Coin Flip Stats", value=f"Times Flipped: {general_stats['TimesFlipped']}\nCurrent Streak: {general_stats['CurrentStreak']}\nLast Flipped: {general_stats['LastFlip']}", inline=True)
+                
 
         else:
             embed.add_field(name="Stats", value="No stats information available.", inline=False)

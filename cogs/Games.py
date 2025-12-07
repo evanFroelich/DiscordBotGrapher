@@ -535,6 +535,7 @@ class RankedLobby(commands.Cog):
             #edit msg to say a ranked match lobby is already active and where it is instead of sending a followup
             message_link = f"https://discord.com/channels/{interaction.guild.id}/{row['ChannelID']}/{row['MessageID']}"
             await msg.edit(content=f"A ranked match lobby is already active in this server located at {message_link}")
+            await delete_later(message=msg,time=10)
             games_curs.close()
             games_conn.close()
             return
