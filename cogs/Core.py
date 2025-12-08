@@ -159,7 +159,7 @@ class Stats(commands.Cog):
         if modifier_stats and visibility.value == "private":
             modifierStr=""
             for modifier in modifier_stats:
-                modifierStr += f"{modifier['Modifier']}:\tW: {modifier['Wins']}\tL: {modifier['Losses']}\tWR: {int(modifier['WinRate'])}%\n"
+                modifierStr += f"{modifier['Modifier']}: W: {modifier['Wins']} L: {modifier['Losses']} WR: {int(modifier['WinRate'])}%\n"
             embed.add_field(name="Ranked Dice Modifier Stats", value=modifierStr, inline=True)
         if achievement_score:
             embed.add_field(name="Achievement Score", value=achievement_score['TotalScore'], inline=False)
