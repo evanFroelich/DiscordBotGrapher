@@ -1073,7 +1073,7 @@ class StandButton(discord.ui.Button):
             games_db = "games.db"
             games_conn = sqlite3.connect(games_db)
             games_curs = games_conn.cursor()
-            games_curs.execute('''UPDATE GamblingUserStats SET BlackjackLosses = BlackjackLosses + ?, BlackjackDefeats = BlackjackDefeats + 1, BlackjackLongLosses = BlackjackLongLosses + ? WHERE GuildID = ? AND UserID = ?''', (self.GAMEINFO["betAmount"], longLoss, self.guildID, self.userID))
+            games_curs.execute('''UPDATE GamblingUserStats SET BlackjackLosses = BlackjackLosses + ?, BlackjackDefeats = BlackjackDefeats + 1, BlackjackLongDefeats = BlackjackLongDefeats + ? WHERE GuildID = ? AND UserID = ?''', (self.GAMEINFO["betAmount"], longLoss, self.guildID, self.userID))
             games_conn.commit()
             games_curs.close()
             games_conn.close()
