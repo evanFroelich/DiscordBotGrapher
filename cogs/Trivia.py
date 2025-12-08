@@ -747,6 +747,7 @@ class GamblingCoinFlipWagers(discord.ui.Button):
                 games_curs.close()
                 games_conn.close()
                 await achievementTrigger(self.guild_id, self.user_id, 'CoinFlipLosses')
+                await achievementTrigger(self.guild_id, self.user_id, 'CoinFlipDoubleDefeats')
             #await interaction.response.edit_message(content=messageContent, view=None)
             view = discord.ui.View()
             auctionButton=AuctionHouseButton(label="AuctionHouse", style=discord.ButtonStyle.primary)
@@ -1065,8 +1066,12 @@ class StandButton(discord.ui.Button):
             games_conn.close()
             await achievementTrigger(self.guildID, self.userID, 'BlackjackWins')
             await achievementTrigger(self.guildID, self.userID, 'BlackjackEarnings')
+            if longWin==1:
+                await achievementTrigger(self.guildID, self.userID, 'BlackjackLongWins')
             if perfectScore==1:
                 await achievementTrigger(self.guildID, self.userID, 'Blackjack21s')
+            if nat21==1:
+                await achievementTrigger(self.guildID, self.userID, 'BlackjackNat21s')
         elif userHandValue < dealerHandValue:
             #dealer wins
             await award_points(guild_id=self.guildID, user_id=self.userID, amount=-self.GAMEINFO["betAmount"])
@@ -1078,6 +1083,8 @@ class StandButton(discord.ui.Button):
             games_curs.close()
             games_conn.close()
             await achievementTrigger(self.guildID, self.userID, 'BlackjackLosses')
+            if longLoss==1:
+                await achievementTrigger(self.guildID, self.userID, 'BlackjackLongDefeats')
             result = f"You lose!\nYou lose {self.GAMEINFO['betAmount']} points!"
         else:
             perfectTie=0
@@ -1090,6 +1097,11 @@ class StandButton(discord.ui.Button):
             games_conn.commit()
             games_curs.close()
             games_conn.close()
+            await achievementTrigger(self.guildID, self.userID, 'BlackjackTies')
+            if perfectTie==1:
+                await achievementTrigger(self.guildID, self.userID, 'Blackjack21Ties')
+            if longTie==1:
+                await achievementTrigger(self.guildID, self.userID, 'BlackjackLongTies')
             result = "It's a tie!"
 
         if self.GAMEINFO["roundsLeft"] <=0:
