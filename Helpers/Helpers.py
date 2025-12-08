@@ -246,6 +246,9 @@ async def achievementTrigger(guildID: str, userID: str, eventType: str):
                 games_curs.execute('''INSERT INTO UserAchievements (GuildID, UserID, AchievementID) VALUES (?, ?, ?)''', (guildID, userID, achievementID))
                 games_conn.commit()
                 embed=discord.Embed(title=f"Achievement Unlocked: {achievement[2]}", description=f"{achievement[3]}\n*{flavor}*", color=discord.Color.gold())
+                #add the guild name to the embed footer
+                guildName=context.bot.get_guild(int(guildID)).name if context.bot.get_guild(int(guildID)) else "Unknown Guild"
+                embed.set_footer(text=f"Guild: {guildName} | ID: {guildID}")
                 embedList.append(embed)
 
             
