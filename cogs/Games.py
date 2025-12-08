@@ -304,10 +304,11 @@ class GameSettingsSet(commands.Cog):
     @app_commands.describe(flagignoredchannels=" 1 is on 0 is off")
     @app_commands.describe(ignoredchannels="Channel ID for the ignored channels to add or remove")
     @app_commands.describe(flaggoofsgaffs="Flag to enable chat response goofs and gaffs. 1 is on 0 is off")
-    async def gamesettingscommandset(self, interaction: discord.Interaction, numberofquestionsperday: int = None, questiontimeout: int = None, pipchance: float = None, questionchance: float = None, flagshamechannel: int = None, shamechannel: str = None, flagignoredchannels: int = None, ignoredchannels: str = None, flaggoofsgaffs: int = None):
+    @app_commands.describe(flagachievements="Flag to enable or disable achievements. 1 is on 0 is off")
+    async def gamesettingscommandset(self, interaction: discord.Interaction, numberofquestionsperday: int = None, questiontimeout: int = None, pipchance: float = None, questionchance: float = None, flagshamechannel: int = None, shamechannel: str = None, flagignoredchannels: int = None, ignoredchannels: str = None, flaggoofsgaffs: int = None, flagachievements: int = None):
         games_conn=sqlite3.connect("games.db",timeout=10)
         games_curs = games_conn.cursor()
-        games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName, CommandParameters) VALUES (?, ?, ?, ?)''', (interaction.guild.id, interaction.user.id, "game-settings-set", f"'numberofquestionsperday': {numberofquestionsperday}, 'questiontimeout': {questiontimeout}, 'pipchance': {pipchance}, 'questionchance': {questionchance}, 'flagshamechannel': {flagshamechannel}, 'shamechannel': {shamechannel}, 'flagignoredchannels': {flagignoredchannels}, 'ignoredchannels': {ignoredchannels}, 'flaggoofsgaffs': {flaggoofsgaffs}"))
+        games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName, CommandParameters) VALUES (?, ?, ?, ?)''', (interaction.guild.id, interaction.user.id, "game-settings-set", f"'numberofquestionsperday': {numberofquestionsperday}, 'questiontimeout': {questiontimeout}, 'pipchance': {pipchance}, 'questionchance': {questionchance}, 'flagshamechannel': {flagshamechannel}, 'shamechannel': {shamechannel}, 'flagignoredchannels': {flagignoredchannels}, 'ignoredchannels': {ignoredchannels}, 'flaggoofsgaffs': {flaggoofsgaffs}", f"'flagachievements': {flagachievements}'"))
         games_conn.commit()
         games_curs.close()
         games_conn.close()
@@ -394,6 +395,12 @@ class GameSettingsSet(commands.Cog):
             else:
                 games_curs.execute("UPDATE ServerSettings SET FlagGoofsGaffs = ? WHERE GuildID = ?", (flaggoofsgaffs, interaction.guild.id))
                 changedSettings+=f"Goofs and gaffs flag updated to {flaggoofsgaffs}\n"
+        if flagachievements is not None:
+            if flagachievements not in [0, 1]:
+                errorString+=f"Flag achievements must be 0 or 1 to represent off or on.\n"
+            else:
+                games_curs.execute("UPDATE ServerSettings SET FlagAchievements = ? WHERE GuildID = ?", (flagachievements, interaction.guild.id))
+                changedSettings+=f"Achievements flag updated to {flagachievements}\n"
         games_conn.commit()
         games_curs.close()
         games_conn.close()

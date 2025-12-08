@@ -199,6 +199,13 @@ async def achievementTrigger(guildID: str, userID: str, eventType: str):
     gamesDB = "games.db"
     games_conn = sqlite3.connect(gamesDB)
     games_curs = games_conn.cursor()
+    #check this servers achievement flag
+    games_curs.execute('''SELECT FlagAchievements FROM ServerSettings WHERE GuildID=?''', (guildID,))
+    row = games_curs.fetchone()
+    if row is None or row[0] == 0:
+        games_curs.close()
+        games_conn.close()
+        return
     #get all achievements for this event type
     games_curs.execute('''SELECT ID, Value, Name, Description, FlavorText, CompareType from AchievementDefinitions WHERE TriggerType=? AND ID NOT IN (SELECT AchievementID FROM UserAchievements WHERE GuildID=? AND UserID=?)''', (eventType, guildID, userID))
     achievements = games_curs.fetchall()
