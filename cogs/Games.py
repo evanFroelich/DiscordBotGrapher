@@ -738,6 +738,8 @@ async def lobby_countdown_task(interaction, match_id, message, guild_id, duratio
         await delete_later(message=message,time=10)
         games_curs.execute('''DELETE FROM LiveRankedDiceMatches WHERE ID = ?''', (match_id,))
         games_conn.commit()
+        games_curs.execute('''DELETE FROM LiveRankedDicePlayers WHERE MatchID = ?''', (match_id,))
+        games_conn.commit()
         games_curs.close()
         games_conn.close()
         return
