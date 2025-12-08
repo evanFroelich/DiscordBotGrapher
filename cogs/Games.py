@@ -718,18 +718,6 @@ async def lobby_countdown_task(interaction, match_id, message, guild_id, duratio
     await message.edit(content=f"**Ranked Match Players**\n{player_block}\n\nRolling now…",)
     await asyncio.sleep(1)
     print("a")
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~REVEAL ROLLS ONE AT A TIME~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-    for i, p in enumerate(players):
-        await asyncio.sleep(1)
-        user = message.guild.get_member(int(p["UserID"]))
-        if not user:
-            continue
-        roll = rolls.get(p['UserID'])
-        entries[i] = f"• {user.display_name} — **{roll}**"#— `{p['Modifier']}` 
-        updated_player_block = "\n".join(entries)
-        await message.edit(content=f"**Ranked Match Players**\n{updated_player_block}\n\nRolling now…")
-    await asyncio.sleep(3)
-    print("b")
     #check to see if the lobby is empty
     games_curs.execute('''SELECT COUNT(*) as PlayerCount FROM LiveRankedDicePlayers WHERE MatchID = ?''', (match_id,))
     row = games_curs.fetchone()
@@ -743,6 +731,19 @@ async def lobby_countdown_task(interaction, match_id, message, guild_id, duratio
         games_curs.close()
         games_conn.close()
         return
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~REVEAL ROLLS ONE AT A TIME~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+    for i, p in enumerate(players):
+        await asyncio.sleep(1)
+        user = message.guild.get_member(int(p["UserID"]))
+        if not user:
+            continue
+        roll = rolls.get(p['UserID'])
+        entries[i] = f"• {user.display_name} — **{roll}**"#— `{p['Modifier']}` 
+        updated_player_block = "\n".join(entries)
+        await message.edit(content=f"**Ranked Match Players**\n{updated_player_block}\n\nRolling now…")
+    await asyncio.sleep(3)
+    print("b")
+    
     #Take the token
     print("c")
     games_curs.execute('''UPDATE GamblingUserStats SET RankedDiceTokens = RankedDiceTokens - 1 WHERE UserID = ? AND GuildID = ?''', (interaction.user.id, guild_id))
