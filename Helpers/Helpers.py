@@ -79,9 +79,17 @@ async def smrtGame(message):
     curTime = datetime.now()
     delta = 0
     #get the time from the FeatureTimers table
-    games_curs.execute('''SELECT LastBonusPipTime FROM FeatureTimers WHERE GuildID=?''', (message.guild.id,))
+    games_curs.execute('''SELECT LastBonusPipTime, LastBonusPipMessage, LastBonusPipChannel FROM FeatureTimers WHERE GuildID=?''', (message.guild.id,))
     lastPipTime = games_curs.fetchone()
     if lastPipTime:
+        if lastPipTime[1] is not None:
+            #remove the reaction from the last bonus pip message
+            try:
+                lastChannel = message.guild.get_channel(lastPipTime[2])
+                lastMessage = await lastChannel.fetch_message(lastPipTime[1])
+                await lastMessage.clear_reaction('✅')
+            except Exception:
+                pass
         LQT=datetime.strptime(lastPipTime[0], "%Y-%m-%d %H:%M:%S")
         curTime=curTime.replace(microsecond=0)
         #print("last bonus pip time: "+str(LQT))
@@ -101,7 +109,7 @@ async def smrtGame(message):
     if r < pipChance * multiplier:
         await message.add_reaction('✅')
         # Update the last bonus pip time in the database
-        games_curs.execute('''UPDATE FeatureTimers SET LastBonusPipTime=?, LastBonusPipMessage=? WHERE GuildID=?''', (curTime, message.id, message.guild.id))
+        games_curs.execute('''UPDATE FeatureTimers SET LastBonusPipTime=?, LastBonusPipMessage=?, LastBonusPipChannel = ? WHERE GuildID=?''', (curTime, message.id, message.channel.id, message.guild.id))
         games_conn.commit()
     games_curs.close()
     games_conn.close()
