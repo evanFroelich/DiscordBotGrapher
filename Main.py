@@ -12,9 +12,9 @@ import re
 import asyncio
 import zoneinfo
 
-from Helpers.Helpers import award_points, checkIgnoredChannels, smrtGame, achievementTrigger, achievement_leaderboard_generator, delete_later
+from Helpers.Helpers import award_points, checkIgnoredChannels, smrtGame, achievementTrigger, achievement_leaderboard_generator, delete_later, rank_number_to_rank_name
 import context
-from cogs.Trivia import questionSpawner
+from cogs.Trivia import questionSpawner, QuestionStealButton
 
 
 
@@ -131,7 +131,7 @@ async def cleanup_abandoned_trivia_loop():
     games_conn = sqlite3.connect("games.db")
     games_curs = games_conn.cursor()
     # Perform cleanup operations on abandoned trivia sessions
-    games_curs.execute('''SELECT * FROM ActiveTrivia WHERE Timestamp < ?''', (datetime.now() - timedelta(minutes=5),))
+    games_curs.execute('''SELECT * FROM ActiveTrivia WHERE Timestamp < ?''', (datetime.now() - timedelta(minutes=1),))
     abandoned_sessions = games_curs.fetchall()
     games_conn.commit()
     games_curs.close()
@@ -142,24 +142,38 @@ async def cleanup_abandoned_trivia_loop():
     return
 
 async def abandoned_trivia_cleanup(guildID: int, userID: int, messageID: int, questionID: int, questionType: str, questionDifficulty: str, questionText: str):
-    games_conn=sqlite3.connect('games.db')
+    games_conn=sqlite3.connect('games.db',timeout=10)
     games_curs = games_conn.cursor()
     games_curs.execute('''INSERT INTO Scores (GuildID, UserID, Category, Difficulty, Num_Correct, Num_Incorrect) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(GuildID, UserID, Category, Difficulty) DO UPDATE SET Num_Incorrect = Num_Incorrect + 1;''', (guildID, userID, questionType, questionDifficulty, 0, 1))
     games_curs.execute('''UPDATE QuestionList SET GlobalIncorrect = GlobalIncorrect + 1 WHERE ID=?''', (questionID,))
     games_conn.commit()
     games_curs.execute('''SELECT FlagShameChannel, ShameChannel FROM ServerSettings WHERE GuildID=?''', (guildID,))
     shameSettings = games_curs.fetchone()
+    games_curs.execute('''SELECT ID, Question, Answers, Type, Difficulty, ShadowAnswers FROM QuestionList WHERE ID=?''', (questionID,))
+    questionData = games_curs.fetchone()
+    stealButton=QuestionStealButton(questionData,label ="STEAL", style=discord.ButtonStyle.danger)
+    games_curs.execute('''INSERT INTO TriviaEventLog (GuildID, UserID, DailyOrRandom, QuestionType, QuestionDifficulty, QuestionText, QuestionAnswers, UserAnswer, ClassicDecision, LLMDecision, LLMText, CurrentQuestionsAnsweredToday, CurrentQuestionsAnsweredTodayCorrect) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', (guildID, userID, 'abandoned', questionType, questionDifficulty, questionData[1], questionData[2], None, 0, 0, None, 0, 0))
+    games_conn.commit()
+    view=discord.ui.View()
+    view.add_item(stealButton)
     if shameSettings and shameSettings[0] == 1:
         #get the shame channel from the guildID instead
         guild=client.get_guild(guildID)
         shameChannel = guild.get_channel(shameSettings[1])
+        
         if shameChannel:
-            await shameChannel.send(f"Oops! <@{userID}> didn't give an answer to: {questionText}",allowed_mentions=discord.AllowedMentions.none())
+            shameMessage = await shameChannel.send(f"Oops! <@{userID}> didn't give an answer to: {questionText}",allowed_mentions=discord.AllowedMentions.none(),view=view)
+            shameMessageID = shameMessage.id
+            games_curs.execute('''INSERT INTO ActiveSteals (GuildID, ChannelID, MessageID) VALUES (?, ?, ?)''', (guildID, shameChannel.id, shameMessageID))
+            games_conn.commit()
         else:
             #try to get the thread
             shameThread = guild.get_thread(shameSettings[1])
             if shameThread:
-                await shameThread.send(f"Oops! <@{userID}> didn't give an answer to: {questionText}",allowed_mentions=discord.AllowedMentions.none())
+                shameMessage = await shameThread.send(f"Oops! <@{userID}> didn't give an answer to: {questionText}",allowed_mentions=discord.AllowedMentions.none(),view=view)
+                shameMessageID = shameMessage.id
+                games_curs.execute('''INSERT INTO ActiveSteals (GuildID, ChannelID, MessageID) VALUES (?, ?, ?)''', (guildID, shameThread.id, shameMessageID))
+                games_conn.commit()
     games_curs.execute('''DELETE FROM ActiveTrivia WHERE GuildID=? AND UserID=? AND MessageID=?''', (guildID, userID, messageID))
     games_conn.commit()
     games_curs.close()
@@ -213,6 +227,46 @@ async def clear_steals_loop():
     games_conn.close()
     return
     
+@tasks.loop(time=time(hour=0, minute=5, second=10, tzinfo=zoneinfo.ZoneInfo("America/Los_Angeles")))
+async def monthly_ranked_dice_reset():
+    print("Resetting monthly ranked dice stats...")
+    today = datetime.now()
+    if today.day != 1:
+        return
+    games_conn=sqlite3.connect("games.db",timeout=10)
+    games_curs=games_conn.cursor()
+    games_curs.execute('''UPDATE RankedDiceGlobals SET Season = Season + 1''')
+    games_conn.commit()
+    games_curs.execute('''SELECT UserID, GuildID, Rank, Mu, Sigma FROM PlayerSkill''')
+    player_data = games_curs.fetchall()
+    for userID, guildID, rank, mu, sigma in player_data:
+        newMu=((mu-27.82)/2)+27.82
+        newSigma=sigma
+        if sigma<5:
+            newSigma=sigma*2
+        if rank > 20:
+            pointsPayout=int(40*(rank-20))
+            rankedTokenPayout=int((rank-20)//3)
+        else:
+            pointsPayout=20
+            rankedTokenPayout=1
+        games_curs.execute('''UPDATE GamblingUserStats SET RankedDiceTokens = RankedDiceTokens + ? WHERE GuildID=? AND UserID=?''', (rankedTokenPayout, guildID, userID))
+        games_conn.commit()
+        await award_points(pointsPayout, guildID, userID)
+        #try to dm the user about their rewards
+        user = await client.fetch_user(userID)
+        rankName = await rank_number_to_rank_name(rank)
+        try:
+            guildName = client.get_guild(int(guildID)).name
+            embed=discord.Embed(title=f"Ranked Dice Season Ended in {guildName}!", description=f"The current Ranked Dice season has ended! You achieved a final rank of: {rankName}. As a reward, you have received {pointsPayout} points and {rankedTokenPayout} Ranked Dice tokens!\n\nAt the end of each season if you are in diamond rank or higher, your rank will be reset to diamond 1, your MMR will be slightly reduced based on your end of season rank, and your MMR variance score will be increased to help you get moving faster back up.", color=0x52b138)
+            await user.send(embed=embed)
+        except Exception as e:
+            print(f"Failed to send DM to user {userID} in guild {guildID}: {e}")
+            logging.warning(f"Failed to send DM to user {userID} in guild {guildID}: {e}")
+        games_curs.execute('''UPDATE PlayerSkill SET SeasonalWinCount = 0, SeasonalLossCount = 0, SeasonalGamesPlayed = 0, RANK = case when Rank >21 then 21 else Rank end, Mu = ?, Sigma = ? WHERE GuildID = ? AND UserID = ?''', (newMu, newSigma, guildID, userID))
+    games_conn.commit()
+    games_curs.close()
+    games_conn.close()
 
 class MyClient(commands.Bot):
     ignoreList=[]
@@ -278,6 +332,8 @@ class MyClient(commands.Bot):
             daily_achievement_leaderboard_post.start()
         if not grant_ranked_token.is_running():
             grant_ranked_token.start()
+        if not monthly_ranked_dice_reset.is_running():
+            monthly_ranked_dice_reset.start()
         #sched.start()
         #await checkAnswer(question="test",userAnswer="test",correctAnswer="test")
         await client.tree.sync()
@@ -293,7 +349,7 @@ class MyClient(commands.Bot):
         await self.load_extension('cogs.Core')
         await self.load_extension('cogs.Analytics')
 
-        await self.tree.sync()
+        #await self.tree.sync()
         print('synced')
 
     async def on_thread_create(self,thread):

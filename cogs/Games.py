@@ -550,7 +550,9 @@ class RankedLobby(commands.Cog):
             games_curs.close()
             games_conn.close()
             return
-        games_curs.execute('''INSERT INTO LiveRankedDiceMatches (GuildID, ChannelID, MessageID) VALUES (?, ?, ?)''', (interaction.guild.id, msg.channel.id, msg.id))
+        games_curs.execute('''SELECT Season FROM RankedDiceGlobals WHERE Name = "Global"''')
+        season= games_curs.fetchone()
+        games_curs.execute('''INSERT INTO LiveRankedDiceMatches (GuildID, ChannelID, MessageID, Season) VALUES (?, ?, ?, ?)''', (interaction.guild.id, msg.channel.id, msg.id, season['Season']))
         games_conn.commit()
         games_curs.execute('''SELECT * FROM LiveRankedDiceMatches WHERE GuildID = ? AND ChannelID = ? AND MessageID = ?''', (interaction.guild.id, msg.channel.id, msg.id))
         myMatch= games_curs.fetchone()
