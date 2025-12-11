@@ -434,7 +434,7 @@ class MyClient(commands.Bot):
         splitstr=message.content.split()
         if len(message.content)>0:
             games_path = "games.db"
-            games_conn = sqlite3.connect(games_path)
+            games_conn = sqlite3.connect(games_path, timeout=10)
             games_conn.row_factory = sqlite3.Row  # allows dict-like access
             games_curs = games_conn.cursor()
 

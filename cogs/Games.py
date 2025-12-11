@@ -907,8 +907,8 @@ def mu_to_target_rank(mu):
     # Example: scale MMR into your 1–60 rank system (20 bronze→plat + 40 diamond)
     # Adjust min/max as needed
     min_mu = 15
-    max_mu = 40  # pick appropriate scaling
-    max_rank = 40
+    max_mu = 41  # pick appropriate scaling
+    max_rank = 41
     min_rank = 1
     # linear scaling
     rank = (mu - min_mu) / (max_mu - min_mu) * (max_rank - min_rank) + min_rank
