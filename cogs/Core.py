@@ -1,3 +1,4 @@
+from anyio import key
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -230,6 +231,41 @@ class Stats(commands.Cog):
         visibility = "Public" if visibility.value == "public" else "Private"
         await interaction.response.send_message(embed=embed, ephemeral=visibility == "Private")
 
+class RankedDiceStats(commands.Cog):
+    def __init__(self, client: commands.Bot):
+        self.client = client
+    @app_commands.command(name="ranked-dice-stats", description="Displays your ranked dice stats")
+    async def ranked_dice_stats(self, interaction: discord.Interaction):
+        # Implementation for ranked dice stats command
+        games_conn=sqlite3.connect("games.db",timeout=10)
+        games_conn.row_factory = sqlite3.Row
+        games_curs = games_conn.cursor()
+        games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName) VALUES (?, ?, ?)''', (interaction.guild.id, interaction.user.id, "ranked-dice-stats"))
+        games_conn.commit()
+        games_curs.execute('''SELECT * FROM RankedDiceStatsLifetimeView WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
+        row = games_curs.fetchone()
+        games_curs.close()
+        games_conn.close()
+        embed = discord.Embed(title="---WIP---\nJust a table dump for now, will have formatting later", color=discord.Color.purple())
+        outstr = ""
+        outList=[]
+        count = 0
+        if row:
+            for column in row.keys():
+                count += 1
+                if count >20:
+                    outList.append(outstr)
+                    outstr = ""
+                    count = 1
+                outstr += f"{column}: {row[column]}\n"
+                #embed.add_field(name=column, value=row[column], inline=True)
+            outList.append(outstr)
+        else:
+            embed.add_field(name="Ranked Dice Stats", value="No ranked dice stats available.", inline=False)
+        for item in outList:
+            embed.add_field(name="Ranked Dice Stats", value=item, inline=False)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
 class AddAuthorizedUser(commands.Cog):
     def __init__(self, client: commands.Bot):
         self.client = client
@@ -435,3 +471,4 @@ async def setup(client: commands.Bot):
     await client.add_cog(AddAuthorizedUser(client))
     await client.add_cog(Wiki(client))
     await client.add_cog(Achievements(client))
+    await client.add_cog(RankedDiceStats(client))
