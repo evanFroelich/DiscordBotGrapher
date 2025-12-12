@@ -46,6 +46,8 @@ async def grant_ranked_token():
     games_curs=games_conn.cursor()
     games_curs.execute('''UPDATE GamblingUserStats SET RankedDiceTokens = min(RankedDiceTokens + 1, 3)''')
     games_conn.commit()
+    games_curs.execute('''UPDATE PlayerSkill SET Rank = Rank - 0.1 WHERE LastPlayed < ? and ProvisionalGames = 0''', (datetime.now() - timedelta(days=2),))
+    games_conn.commit()
     games_curs.close()
     games_conn.close()
 

@@ -843,6 +843,12 @@ async def lobby_countdown_task(interaction, match_id, message, guild_id, duratio
         try:
             games_curs.execute('''UPDATE PlayerSkill SET Mu = ?, Sigma = max(?, 4), Rank = ?, ProvisionalGames = max(0, ProvisionalGames - 1), GamesPlayed = GamesPlayed + 1, WinCount = WinCount + ?, LossCount = LossCount + ?, SeasonalGamesPlayed = SeasonalGamesPlayed + 1, SeasonalWinCount = SeasonalWinCount + ?, SeasonalLossCount = SeasonalLossCount + ?, LastPlayed = ? WHERE UserID = ? AND GuildID = ?''', (player['EndSkillMu'], player['EndSkillSigma'], newRank, winCount, lossCount, winCount, lossCount, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), player['UserID'], guild_id))
             games_conn.commit()
+            await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="GamesPlayed")
+            await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="WinCount")
+            await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="LossCount")
+            await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="SeasonalGamesPlayed")
+            await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="SeasonalWinCount")
+            await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="SeasonalLossCount")
         except Exception as e:
             print(f"Error updating PlayerSkill for UserID {player['UserID']}: {e}")
             await message.edit(content="An error occurred while updating player skills. Please try again later.")

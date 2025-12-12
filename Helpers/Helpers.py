@@ -233,6 +233,9 @@ async def achievementTrigger(guildID: str, userID: str, eventType: str):
     elif eventType == "bonus":
         games_curs.execute(f'''SELECT Num_Correct FROM Scores WHERE GuildID=? AND UserID=? and Category=?''', (guildID, userID, eventType))
         row = games_curs.fetchone()
+    elif eventType == "GamesPlayed" or eventType == "WinCount" or eventType == "LossCount" or eventType == "SeasonalGamesPlayed" or eventType == "SeasonalWinCount" or eventType == "SeasonalLossCount":
+        games_curs.execute(f'''SELECT {eventType} FROM PlayerSkill WHERE GuildID=? AND UserID=?''', (guildID, userID))
+        row = games_curs.fetchone()
     if row:
         userValue = int(row[0])
         for achievement in achievements:
