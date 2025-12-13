@@ -128,12 +128,12 @@ async def daily_achievement_leaderboard_post():
             if channel:
                 await channel.send(embed=embed)
 
-@tasks.loop(minutes=5)
+@tasks.loop(minutes=5, seconds=0)
 async def cleanup_abandoned_trivia_loop():
     games_conn = sqlite3.connect("games.db")
     games_curs = games_conn.cursor()
     # Perform cleanup operations on abandoned trivia sessions
-    games_curs.execute('''SELECT * FROM ActiveTrivia WHERE Timestamp < ?''', (datetime.now() - timedelta(minutes=1),))
+    games_curs.execute('''SELECT * FROM ActiveTrivia WHERE Timestamp < ?''', (datetime.now() - timedelta(minutes=5),))
     abandoned_sessions = games_curs.fetchall()
     games_conn.commit()
     games_curs.close()
