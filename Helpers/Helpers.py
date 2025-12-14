@@ -236,6 +236,9 @@ async def achievementTrigger(guildID: str, userID: str, eventType: str):
     elif eventType == "GamesPlayed" or eventType == "WinCount" or eventType == "LossCount" or eventType == "SeasonalGamesPlayed" or eventType == "SeasonalWinCount" or eventType == "SeasonalLossCount":
         games_curs.execute(f'''SELECT {eventType} FROM PlayerSkill WHERE GuildID=? AND UserID=?''', (guildID, userID))
         row = games_curs.fetchone()
+    elif eventType == "WinsSpade" or eventType == "WinsHeart" or eventType == "WinsDiamond" or eventType == "WinsClub" or eventType == "PerfectRollSpade" or eventType == "PerfectRollHeart" or eventType == "PerfectRollDiamond" or eventType == "PerfectRollClub" or eventType == "MinRollSpade" or eventType == "MinRollHeart" or eventType == "MinRollDiamond" or eventType == "MinRollClub" or eventType == "D20Wins" or eventType == "FirstPlaceFinishes1v1" or eventType == "FirstPlaceFinishesLargeLobby" or eventType == "D20SpadeWins" or eventType == "D20HeartWins" or eventType == "D20DiamondWins" or eventType == "D20ClubWins":
+        games_curs.execute(f'''SELECT {eventType} FROM RankedDiceStatsLifetimeView WHERE GuildID=? AND UserID=?''', (guildID, userID))
+        row = games_curs.fetchone()
     if row:
         userValue = int(row[0])
         for achievement in achievements:
