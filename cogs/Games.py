@@ -843,11 +843,54 @@ async def lobby_countdown_task(interaction, match_id, message, guild_id, duratio
         try:
             games_curs.execute('''UPDATE PlayerSkill SET Mu = ?, Sigma = max(?, 4), Rank = ?, ProvisionalGames = max(0, ProvisionalGames - 1), GamesPlayed = GamesPlayed + 1, WinCount = WinCount + ?, LossCount = LossCount + ?, SeasonalGamesPlayed = SeasonalGamesPlayed + 1, SeasonalWinCount = SeasonalWinCount + ?, SeasonalLossCount = SeasonalLossCount + ?, LastPlayed = ? WHERE UserID = ? AND GuildID = ?''', (player['EndSkillMu'], player['EndSkillSigma'], newRank, winCount, lossCount, winCount, lossCount, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), player['UserID'], guild_id))
             games_conn.commit()
+            games_curs.execute('''SELECT Modifier, RollResult, StartingRank FROM LiveRankedDicePlayers WHERE MatchID = ? AND UserID = ?''', (match_id, player['UserID']))
+            player_data = games_curs.fetchone()
             await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="GamesPlayed")
-            await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="WinCount")
-            await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="LossCount")
             await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="SeasonalGamesPlayed")
-            await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="SeasonalWinCount")
+            if winCount == 1:
+                await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="WinCount")
+                await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="SeasonalWinCount")
+                await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="FirstPlaceFinishes1v1")
+                await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="FirstPlaceFinishesLargeLobby")
+                if player_data['Modifier'] == 'heart':
+                    await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="WinsHeart")
+                    if player_data['RollResult'] == 20:
+                        await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="PerfectRollHeart")
+                    elif player_data['RollResult'] == 6:
+                        await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="MinRollHeart")
+                elif player_data['Modifier'] == 'spade':
+                    await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="WinsSpade")
+                    if player_data['RollResult'] == 20:
+                        await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="PerfectRollSpade")
+                    elif player_data['RollResult'] == 6:
+                        await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="MinRollSpade")
+                elif player_data['Modifier'] == 'diamond':
+                    await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="WinsDiamond")
+                    if player_data['RollResult'] == 20:
+                        await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="PerfectRollDiamond")
+                    elif player_data['RollResult'] == 1:
+                        await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="MinRollDiamond")
+                elif player_data['Modifier'] == 'club':
+                    await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="WinsClub")
+                    if player_data['RollResult'] == 20:
+                        await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="PerfectRollClub")
+                    elif player_data['RollResult'] == 6:
+                        await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="MinRollClub")
+                if player_data['StartingRank'] > 40:
+                    await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="D20Wins")
+                    if player_data['Modifier'] == 'heart':
+                        await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="D20HeartWins")
+                    elif player_data['Modifier'] == 'spade':
+                        await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="D20SpadeWins")
+                    elif player_data['Modifier'] == 'diamond':
+                        await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="D20DiamondWins")
+                    elif player_data['Modifier'] == 'club':
+                        await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="D20ClubWins")
+            if lossCount == 1:
+                await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="LossCount")
+                await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="SeasonalLossCount")
+            
+            
             await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="SeasonalLossCount")
         except Exception as e:
             print(f"Error updating PlayerSkill for UserID {player['UserID']}: {e}")
