@@ -856,7 +856,7 @@ async def lobby_countdown_task(interaction, match_id, message, guild_id, duratio
                     await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="WinsHeart")
                     if player_data['RollResult'] == 20:
                         await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="PerfectRollHeart")
-                    elif player_data['RollResult'] == 6:
+                    elif player_data['RollResult'] == 1:
                         await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="MinRollHeart")
                 elif player_data['Modifier'] == 'spade':
                     await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="WinsSpade")
@@ -889,9 +889,6 @@ async def lobby_countdown_task(interaction, match_id, message, guild_id, duratio
             if lossCount == 1:
                 await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="LossCount")
                 await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="SeasonalLossCount")
-            
-            
-            await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="SeasonalLossCount")
         except Exception as e:
             print(f"Error updating PlayerSkill for UserID {player['UserID']}: {e}")
             await message.edit(content="An error occurred while updating player skills. Please try again later.")
