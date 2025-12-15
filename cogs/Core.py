@@ -17,7 +17,8 @@ class News(commands.Cog):
         games_curs = games_conn.cursor()
         games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName) VALUES (?, ?, ?)''', (interaction.guild.id, interaction.user.id, "news"))
         games_conn.commit()
-        games_curs.execute('''SELECT Date, Notes, Headline from NewsFeed order by Date desc Limit 3''')
+        #only pull news that was from today or earlier
+        games_curs.execute('''SELECT Date, Notes, Headline from NewsFeed WHERE Date <= date('now') order by Date desc Limit 3''')
         rows = games_curs.fetchall()
         embed = discord.Embed(title="Recent News", color=discord.Color.blue())
         for row in rows:
@@ -245,12 +246,12 @@ class RankedDiceStats(commands.Cog):
         row = games_curs.fetchone()
         games_curs.close()
         games_conn.close()
-        embed = discord.Embed(title="---WIP---\nJust a table dump for now, will have formatting later", color=discord.Color.purple())
+        embed = discord.Embed(title="Ranked dice stats lifetime", color=discord.Color.purple())
         #--General Stats
-        Generalstr=f"♠️: W: {row['WinsSpade']} L: {row['LossesSpade']} WR: {round(row['WRSpade']) if row['WRSpade'] is not None else 0}%\n♦️: W: {row['WinsDiamond']} L: {row['LossesDiamond']} WR: {round(row['WRDiamond']) if row['WRDiamond'] is not None else 0}%\n♣️: W: {row['WinsClub']} L: {row['LossesClub']} WR: {round(row['WRClub']) if row['WRClub'] is not None else 0}%\n♥️: W: {row['WinsHeart']} L: {row['LossesHeart']} WR: {round(row['WRHeart']) if row['WRHeart'] is not None else 0}%\n"
+        Generalstr=f"W: {row['WinsGeneral']} L: {row['LossesGeneral']} WR: {round(row['WRGeneral']) if row['WRGeneral'] is not None else 0}%\n♠️: W: {row['WinsSpade']} L: {row['LossesSpade']} WR: {round(row['WRSpade']) if row['WRSpade'] is not None else 0}%\n♦️: W: {row['WinsDiamond']} L: {row['LossesDiamond']} WR: {round(row['WRDiamond']) if row['WRDiamond'] is not None else 0}%\n♣️: W: {row['WinsClub']} L: {row['LossesClub']} WR: {round(row['WRClub']) if row['WRClub'] is not None else 0}%\n♥️: W: {row['WinsHeart']} L: {row['LossesHeart']} WR: {round(row['WRHeart']) if row['WRHeart'] is not None else 0}%\n🃏: W: {row['WinsJoker']} L: {row['LossesJoker']} WR: {round(row['WRJoker']) if row['WRJoker'] is not None else 0}%\n"
         embed.add_field(name="General Stats", value=Generalstr, inline=True)
         #--D20 stats
-        D20str=f"Wins: {row['D20Wins']}\n♠️ Wins: {row['D20SpadeWins']}\n♦️ Wins: {row['D20DiamondWins']}\n♣️ Wins: {row['D20ClubWins']}\n♥️ Wins: {row['D20HeartWins']}\n"
+        D20str=f"Wins: {row['D20Wins']}\n♠️ Wins: {row['D20SpadeWins']}\n♦️ Wins: {row['D20DiamondWins']}\n♣️ Wins: {row['D20ClubWins']}\n♥️ Wins: {row['D20HeartWins']}\n🃏 Wins: {row['D20JokerWins']}"
         embed.add_field(name="D20 Stats", value=D20str, inline=True)
         #--1v1 Stats
         #embed.add_field(name="\u200b", value="\u200b", inline=True)
@@ -260,10 +261,10 @@ class RankedDiceStats(commands.Cog):
         spadestr=f'''First Places: {row['FirstPlaceFinishesSpade']}
         Perfect Rolls: {row['PerfectRollSpade']}
         Min Rolls: {row['MinRollSpade']}
-        Average position: {round(row['AveragePositionSpade']) if row['AveragePositionSpade'] is not None else "N/A"}
-        Average position 1v1: {round(row['AveragePosition1v1Spade']) if row['AveragePosition1v1Spade'] is not None else "N/A"}
-        Average position small lobby: {round(row['AveragePositionSmallLobbySpade']) if row['AveragePositionSmallLobbySpade'] is not None else "N/A"}
-        Average position large lobby: {round(row['AveragePositionLargeLobbySpade']) if row['AveragePositionLargeLobbySpade'] is not None else "N/A"}
+        Avg fin: {round(row['AveragePositionSpade']) if row['AveragePositionSpade'] is not None else "N/A"}
+        Avg fin 1v1: {round(row['AveragePosition1v1Spade']) if row['AveragePosition1v1Spade'] is not None else "N/A"}
+        Avg fin small lobby: {round(row['AveragePositionSmallLobbySpade']) if row['AveragePositionSmallLobbySpade'] is not None else "N/A"}
+        Avg fin large lobby: {round(row['AveragePositionLargeLobbySpade']) if row['AveragePositionLargeLobbySpade'] is not None else "N/A"}
         WR 1v1: {round(row['WR1v1Spade']) if row['WR1v1Spade'] is not None else "N/A"}%
         WR small lobby: {round(row['WRSmallLobbySpade']) if row['WRSmallLobbySpade'] is not None else "N/A"}%
         WR large lobby: {round(row['WRLargeLobbySpade']) if row['WRLargeLobbySpade'] is not None else "N/A"}%'''
@@ -272,25 +273,37 @@ class RankedDiceStats(commands.Cog):
         diamondstr=f'''First Places: {row['FirstPlaceFinishesDiamond']}
         Perfect Rolls: {row['PerfectRollDiamond']}
         Min Rolls: {row['MinRollDiamond']}
-        Average position: {round(row['AveragePositionDiamond']) if row['AveragePositionDiamond'] is not None else "N/A"}
-        Average position 1v1: {round(row['AveragePosition1v1Diamond']) if row['AveragePosition1v1Diamond'] is not None else "N/A"}
-        Average position small lobby: {round(row['AveragePositionSmallLobbyDiamond']) if row['AveragePositionSmallLobbyDiamond'] is not None else "N/A"}
-        Average position large lobby: {round(row['AveragePositionLargeLobbyDiamond']) if row['AveragePositionLargeLobbyDiamond'] is not None else "N/A"}
+        Avg fin: {round(row['AveragePositionDiamond']) if row['AveragePositionDiamond'] is not None else "N/A"}
+        Avg fin 1v1: {round(row['AveragePosition1v1Diamond']) if row['AveragePosition1v1Diamond'] is not None else "N/A"}
+        Avg fin small lobby: {round(row['AveragePositionSmallLobbyDiamond']) if row['AveragePositionSmallLobbyDiamond'] is not None else "N/A"}
+        Avg fin large lobby: {round(row['AveragePositionLargeLobbyDiamond']) if row['AveragePositionLargeLobbyDiamond'] is not None else "N/A"}
         WR 1v1: {round(row['WR1v1Diamond']) if row['WR1v1Diamond'] is not None else "N/A"}%
         WR small lobby: {round(row['WRSmallLobbyDiamond']) if row['WRSmallLobbyDiamond'] is not None else "N/A"}%
         WR large lobby: {round(row['WRLargeLobbyDiamond']) if row['WRLargeLobbyDiamond'] is not None else "N/A"}%'''
         embed.add_field(name="♦️ Diamond Stats", value=diamondstr, inline=True)
 
-        embed.add_field(name="\u200b", value="\u200b", inline=True)
+        #embed.add_field(name="\u200b", value="\u200b", inline=True)
+        #--Joker Stats
+        jokerstr=f'''First Places: {row['FirstPlaceFinishesJoker']}
+        Perfect Rolls: {row['PerfectRollJoker']}
+        Min Rolls: {row['MinRollJoker']}
+        Avg fin: {round(row['AveragePositionJoker']) if row['AveragePositionJoker'] is not None else "N/A"}
+        Avg fin 1v1: {round(row['AveragePosition1v1Joker']) if row['AveragePosition1v1Joker'] is not None else "N/A"}
+        Avg fin small lobby: {round(row['AveragePositionSmallLobbyJoker']) if row['AveragePositionSmallLobbyJoker'] is not None else "N/A"}
+        Avg fin large lobby: {round(row['AveragePositionLargeLobbyJoker']) if row['AveragePositionLargeLobbyJoker'] is not None else "N/A"}
+        WR 1v1: {round(row['WR1v1Joker']) if row['WR1v1Joker'] is not None else "N/A"}%
+        WR small lobby: {round(row['WRSmallLobbyJoker']) if row['WRSmallLobbyJoker'] is not None else "N/A"}%
+        WR large lobby: {round(row['WRLargeLobbyJoker']) if row['WRLargeLobbyJoker'] is not None else "N/A"}%'''
+        embed.add_field(name="🃏 Joker Stats", value=jokerstr, inline=True)
 
         #--Club Stats
         clubstr=f'''First Places: {row['FirstPlaceFinishesClub']}
         Perfect Rolls: {row['PerfectRollClub']}
         Min Rolls: {row['MinRollClub']}
-        Average position: {round(row['AveragePositionClub']) if row['AveragePositionClub'] is not None else "N/A"}
-        Average position 1v1: {round(row['AveragePosition1v1Club']) if row['AveragePosition1v1Club'] is not None else "N/A"}
-        Average position small lobby: {round(row['AveragePositionSmallLobbyClub']) if row['AveragePositionSmallLobbyClub'] is not None else "N/A"}
-        Average position large lobby: {round(row['AveragePositionLargeLobbyClub']) if row['AveragePositionLargeLobbyClub'] is not None else "N/A"}
+        Avg fin: {round(row['AveragePositionClub']) if row['AveragePositionClub'] is not None else "N/A"}
+        Avg fin 1v1: {round(row['AveragePosition1v1Club']) if row['AveragePosition1v1Club'] is not None else "N/A"}
+        Avg fin small lobby: {round(row['AveragePositionSmallLobbyClub']) if row['AveragePositionSmallLobbyClub'] is not None else "N/A"}
+        Avg fin large lobby: {round(row['AveragePositionLargeLobbyClub']) if row['AveragePositionLargeLobbyClub'] is not None else "N/A"}
         WR 1v1: {round(row['WR1v1Club']) if row['WR1v1Club'] is not None else "N/A"}%
         WR small lobby: {round(row['WRSmallLobbyClub']) if row['WRSmallLobbyClub'] is not None else "N/A"}%
         WR large lobby: {round(row['WRLargeLobbyClub']) if row['WRLargeLobbyClub'] is not None else "N/A"}%'''
@@ -300,10 +313,10 @@ class RankedDiceStats(commands.Cog):
         heartstr=f'''First Places: {row['FirstPlaceFinishesHeart']}
         Perfect Rolls: {row['PerfectRollHeart']}
         Min Rolls: {row['MinRollHeart']}
-        Average position: {round(row['AveragePositionHeart']) if row['AveragePositionHeart'] is not None else "N/A"}
-        Average position 1v1: {round(row['AveragePosition1v1Heart']) if row['AveragePosition1v1Heart'] is not None else "N/A"}
-        Average position small lobby: {round(row['AveragePositionSmallLobbyHeart']) if row['AveragePositionSmallLobbyHeart'] is not None else "N/A"}
-        Average position large lobby: {round(row['AveragePositionLargeLobbyHeart']) if row['AveragePositionLargeLobbyHeart'] is not None else "N/A"}
+        Avg fin: {round(row['AveragePositionHeart']) if row['AveragePositionHeart'] is not None else "N/A"}
+        Avg fin 1v1: {round(row['AveragePosition1v1Heart']) if row['AveragePosition1v1Heart'] is not None else "N/A"}
+        Avg fin small lobby: {round(row['AveragePositionSmallLobbyHeart']) if row['AveragePositionSmallLobbyHeart'] is not None else "N/A"}
+        Avg fin large lobby: {round(row['AveragePositionLargeLobbyHeart']) if row['AveragePositionLargeLobbyHeart'] is not None else "N/A"}
         WR 1v1: {round(row['WR1v1Heart']) if row['WR1v1Heart'] is not None else "N/A"}%
         WR small lobby: {round(row['WRSmallLobbyHeart']) if row['WRSmallLobbyHeart'] is not None else "N/A"}%
         WR large lobby: {round(row['WRLargeLobbyHeart']) if row['WRLargeLobbyHeart'] is not None else "N/A"}%'''

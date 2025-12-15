@@ -613,6 +613,7 @@ class ModifierSelectMenu(discord.ui.Select):
             discord.SelectOption(label="♦️Diamond in the rough♦️", description="Roll 2 D20 and take the higher result", value="diamond"),
             discord.SelectOption(label="♣️Math club♣️", description="Roll 2 D20, average them out, and add 5 to the total", value="club"),
             discord.SelectOption(label="♥️Heart of the cards♥️", description="Roll 1 D20. (Grants enhanced results when calculating MMR and rank changes)", value="heart"),
+            #discord.SelectOption(label="🃏Jokers wild🃏", description="Roll 3 D20, average 2 lowest, add between 3-8. Has dramatically increased mmr gains and losses", value="joker"),
             
         ]
         super().__init__(placeholder="Choose a modifier...", min_values=1, max_values=1, options=options)
@@ -840,6 +841,11 @@ async def lobby_countdown_task(interaction, match_id, message, guild_id, duratio
                 newRank= player['Rank']
         else:
             lossCount=1
+            rankDiff= newRank - player['Rank']
+            if rankDiff > 0:
+                newRank= player['Rank']
+        if player['EndSkillMu'] > 41:
+            player['EndSkillMu'] = 41
         try:
             games_curs.execute('''UPDATE PlayerSkill SET Mu = ?, Sigma = max(?, 4), Rank = ?, ProvisionalGames = max(0, ProvisionalGames - 1), GamesPlayed = GamesPlayed + 1, WinCount = WinCount + ?, LossCount = LossCount + ?, SeasonalGamesPlayed = SeasonalGamesPlayed + 1, SeasonalWinCount = SeasonalWinCount + ?, SeasonalLossCount = SeasonalLossCount + ?, LastPlayed = ? WHERE UserID = ? AND GuildID = ?''', (player['EndSkillMu'], player['EndSkillSigma'], newRank, winCount, lossCount, winCount, lossCount, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), player['UserID'], guild_id))
             games_conn.commit()
@@ -860,7 +866,7 @@ async def lobby_countdown_task(interaction, match_id, message, guild_id, duratio
                         await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="MinRollHeart")
                 elif player_data['Modifier'] == 'spade':
                     await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="WinsSpade")
-                    if player_data['RollResult'] == 20:
+                    if player_data['RollResult'] == 25:
                         await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="PerfectRollSpade")
                     elif player_data['RollResult'] == 6:
                         await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="MinRollSpade")
@@ -872,7 +878,7 @@ async def lobby_countdown_task(interaction, match_id, message, guild_id, duratio
                         await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="MinRollDiamond")
                 elif player_data['Modifier'] == 'club':
                     await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="WinsClub")
-                    if player_data['RollResult'] == 20:
+                    if player_data['RollResult'] == 25:
                         await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="PerfectRollClub")
                     elif player_data['RollResult'] == 6:
                         await achievementTrigger(guildID=guild_id, userID=player['UserID'], eventType="MinRollClub")
@@ -972,15 +978,23 @@ def update_visible_rank(current_rank, target_rank, smoothing=0.3):
 async def user_rolls(modifier:str):
     roll = random.randint(1, 20)
     if modifier == "spade":
-        roll += 5
+        #roll += 5
+        roll += 4
     elif modifier == "diamond":
         roll2 = random.randint(1, 20)
         roll = max(roll, roll2)
     elif modifier == "club":
         roll2 = random.randint(1, 20)
-        roll = int(((roll + roll2) / 2) + 5)
+        #roll = int(((roll + roll2) / 2) + 5)
+        roll = ((roll + roll2) / 2) + 4
     elif modifier == "heart":
         pass  # no change to roll, but may affect MMR later
+    elif modifier == "joker":
+        roll2 = random.randint(1, 20)
+        roll3 = random.randint(1, 20)
+        low_rolls = sorted([roll, roll2, roll3])[:2]
+        roll = int((low_rolls[0] + low_rolls[1]) / 2)
+        roll += random.randint(3, 8)
     return roll
 
 

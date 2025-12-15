@@ -239,10 +239,10 @@ async def monthly_ranked_dice_reset():
     games_curs=games_conn.cursor()
     games_curs.execute('''UPDATE RankedDiceGlobals SET Season = Season + 1''')
     games_conn.commit()
-    games_curs.execute('''SELECT UserID, GuildID, Rank, Mu, Sigma FROM PlayerSkill''')
+    games_curs.execute('''SELECT UserID, GuildID, Rank, Mu, Sigma, ProvisionalGames FROM PlayerSkill''')
     player_data = games_curs.fetchall()
-    for userID, guildID, rank, mu, sigma in player_data:
-        newMu=((mu-27.82)/2)+27.82
+    for userID, guildID, rank, mu, sigma, provisionalGames in player_data:
+        newMu=24#((mu-30)/5)+30
         newSigma=sigma
         if sigma<5:
             newSigma=sigma*2
@@ -258,6 +258,10 @@ async def monthly_ranked_dice_reset():
         #try to dm the user about their rewards
         user = await client.fetch_user(userID)
         rankName = await rank_number_to_rank_name(rank)
+        games_curs.execute('''UPDATE PlayerSkill SET SeasonalWinCount = 0, SeasonalLossCount = 0, SeasonalGamesPlayed = 0, RANK = case when Rank >21 then 21 else Rank end, Mu = ?, Sigma = ? WHERE GuildID = ? AND UserID = ?''', (newMu, newSigma, guildID, userID))
+        games_conn.commit()
+        if provisionalGames > 0:
+            continue  # Skip provisional players for end-of-season rewards
         try:
             guildName = client.get_guild(int(guildID)).name
             embed=discord.Embed(title=f"Ranked Dice Season Ended in {guildName}!", description=f"The current Ranked Dice season has ended! You achieved a final rank of: {rankName}. As a reward, you have received {pointsPayout} points and {rankedTokenPayout} Ranked Dice tokens!\n\nAt the end of each season if you are in diamond rank or higher, your rank will be reset to diamond 1, your MMR will be slightly reduced based on your end of season rank, and your MMR variance score will be increased to help you get moving faster back up.", color=0x52b138)
@@ -265,7 +269,7 @@ async def monthly_ranked_dice_reset():
         except Exception as e:
             print(f"Failed to send DM to user {userID} in guild {guildID}: {e}")
             logging.warning(f"Failed to send DM to user {userID} in guild {guildID}: {e}")
-        games_curs.execute('''UPDATE PlayerSkill SET SeasonalWinCount = 0, SeasonalLossCount = 0, SeasonalGamesPlayed = 0, RANK = case when Rank >21 then 21 else Rank end, Mu = ?, Sigma = ? WHERE GuildID = ? AND UserID = ?''', (newMu, newSigma, guildID, userID))
+        
     games_conn.commit()
     games_curs.close()
     games_conn.close()

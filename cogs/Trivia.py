@@ -85,7 +85,7 @@ async def createQuestion(interaction: discord.Interaction = None, channel: disco
             view.add_item(button)
         messageContent=""
         isPrivate=False
-        games_curs.execute('''SELECT Date, Headline FROM NewsFeed ORDER BY Date DESC LIMIT 1''')
+        games_curs.execute('''SELECT Date, Headline FROM NewsFeed WHERE Date <= date('now') ORDER BY Date DESC LIMIT 1''')
         newsFeed = games_curs.fetchone()
         if newsFeed:
             newsDate = datetime.strptime(newsFeed[0], '%Y-%m-%d')
