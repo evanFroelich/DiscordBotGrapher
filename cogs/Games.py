@@ -978,15 +978,15 @@ def update_visible_rank(current_rank, target_rank, smoothing=0.3):
 async def user_rolls(modifier:str):
     roll = random.randint(1, 20)
     if modifier == "spade":
-        #roll += 5
-        roll += 4
+        roll += 5
+        #roll += 4
     elif modifier == "diamond":
         roll2 = random.randint(1, 20)
         roll = max(roll, roll2)
     elif modifier == "club":
         roll2 = random.randint(1, 20)
-        #roll = int(((roll + roll2) / 2) + 5)
-        roll = ((roll + roll2) / 2) + 4
+        roll = int(((roll + roll2) / 2) + 5)
+        #roll = ((roll + roll2) / 2) + 4
     elif modifier == "heart":
         pass  # no change to roll, but may affect MMR later
     elif modifier == "joker":
