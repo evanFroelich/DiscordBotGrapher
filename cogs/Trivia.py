@@ -95,13 +95,20 @@ async def createQuestion(interaction: discord.Interaction = None, channel: disco
                 messageContent += f"There was new news yesterday! \nUse /news to read about: **{newsFeed[1]}**.\n\n"
             elif newsDate.date() == (datetime.now() - timedelta(days=2)).date():
                 messageContent += f"There was new news a few days ago! \nUse /news to read about: **{newsFeed[1]}**.\n\n"
-        if interaction is not None:
-            messageContent+="Daily pop quiz:"
-            isPrivate=True
-            quizMessage=await interaction.followup.send(messageContent, ephemeral=isPrivate, view=view)
-        else:
-            messageContent+="pop quiz:"
-            quizMessage=await channel.send(messageContent, view=view)
+        try:
+            if interaction is not None:
+                messageContent+="Daily pop quiz:"
+                isPrivate=True
+                quizMessage=await interaction.followup.send(messageContent, ephemeral=isPrivate, view=view)
+            else:
+                messageContent+="pop quiz:"
+                quizMessage=await channel.send(messageContent, view=view)
+        except Exception as e:
+            print(f"Error sending question message: {e}")
+            logging.warning(f"Error sending question message: {e}\nInteraction: {interaction}\nChannel: {channel} and server: {channel.guild.id if channel else 'N/A'}")
+            games_curs.close()
+            games_conn.close()
+            return
         #im pretty sure i can just use the else and thats it
         if interaction is not None:
             games_curs.execute('''SELECT QuestionTimeout FROM ServerSettings WHERE GuildID=?''', (interaction.guild.id,))
