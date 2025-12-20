@@ -405,18 +405,18 @@ class QuestionStealButton(discord.ui.Button):
         if count > 0:
             await interaction.response.send_message("You have already answered this question in the last 24 hours and cannot steal it.", ephemeral=True)
             return
-        if await ButtonLockout(interaction):
-            self.disabled = True
-            self.style = discord.ButtonStyle.secondary
-            await interaction.message.edit(view=self.view)
-            modal = QuestionModal(Question=self.question, isForced=False, retries=0, userID=interaction.user.id, guildID=interaction.guild.id, messageID=interaction.message.id, isSteal=True)
-            await interaction.response.send_modal(modal)
-            games_conn = sqlite3.connect("games.db")
-            games_curs = games_conn.cursor()
-            games_curs.execute('''DELETE FROM ActiveSteals WHERE GuildID=? AND ChannelID=? AND MessageID=?''', (interaction.guild.id, interaction.channel.id, interaction.message.id))
-            games_conn.commit()
-            games_curs.close()
-            games_conn.close()
+        #if await ButtonLockout(interaction):
+        self.disabled = True
+        self.style = discord.ButtonStyle.secondary
+        await interaction.message.edit(view=self.view)
+        modal = QuestionModal(Question=self.question, isForced=False, retries=0, userID=interaction.user.id, guildID=interaction.guild.id, messageID=interaction.message.id, isSteal=True)
+        await interaction.response.send_modal(modal)
+        games_conn = sqlite3.connect("games.db")
+        games_curs = games_conn.cursor()
+        games_curs.execute('''DELETE FROM ActiveSteals WHERE GuildID=? AND ChannelID=? AND MessageID=?''', (interaction.guild.id, interaction.channel.id, interaction.message.id))
+        games_conn.commit()
+        games_curs.close()
+        games_conn.close()
         return
 
 class QuestionModal(discord.ui.Modal):

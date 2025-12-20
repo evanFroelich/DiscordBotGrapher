@@ -826,6 +826,12 @@ async def lobby_countdown_task(interaction, match_id, message, guild_id, duratio
             else:
                 muDiff *= 1-float(ranked_globals['HeartBoostLose'])  # Decrease MMR loss by 25%
             player['EndSkillMu'] = player['Mu'] + muDiff
+        elif player['Modifier'] == 'joker':
+            if muDiff > 0:
+                muDiff *= 1+float(ranked_globals['JokerBoostWin'])  # Increase MMR gain by 50%
+            else:
+                muDiff *= 1-float(ranked_globals['JokerBoostLose'])  # Decrease MMR loss by 50%
+            player['EndSkillMu'] = player['Mu'] + muDiff
         print("i")
         if player['Rank'] < 20:
             if muDiff > 0:
@@ -933,7 +939,6 @@ async def lobby_countdown_task(interaction, match_id, message, guild_id, duratio
                     result_lines.append(f"• {user.display_name} — Roll: {player['RollResult']} Position: **{player['FinalPosition']}** — Rank: ({rank_change_str})")
                 else:
                     result_lines.append(f"• {user.display_name} — Roll: {player['RollResult']} — Position: **{player['FinalPosition']}** — Rank: {oldRankName} → {newRankName} ({rank_change_str})")
-                #result_lines.append(f"• {user.display_name} — Final Roll: **{player['FinalPosition']}** — MMR: {player['StartingSkillMu']:.2f} → {player['EndSkillMu']:.2f} ({mmr_change_str}) — Rank: {player['StartingRank']:.2f} → {player['EndRank']:.2f} ({rank_change_str})")
     except Exception as e:
         print(f"Error generating final results: {e}")
         await message.edit(content="An error occurred while generating final results. Please try again later.")
