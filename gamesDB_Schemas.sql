@@ -346,6 +346,13 @@ CREATE TABLE if not exists RankedDiceGlobals (
 	PRIMARY KEY("Name")
 );
 
+CREATE TABLE if not exists RankedDiceStatsLastMatch (
+	"GuildID"	INTEGER NOT NULL,
+	"UserID"	INTEGER NOT NULL,
+	"MatchID"	INTEGER,
+	PRIMARY KEY("GuildID","UserID")
+);
+
 CREATE VIEW if not exists GamblingUnlockMetricsView AS
 SELECT
     GuildID,
@@ -357,6 +364,32 @@ SELECT
     CoinFlipEarnings AS Game2Condition2,
     CoinFlipDoubleWins AS Game2Condition3
 FROM GamblingUserStats;
+
+CREATE VIEW IF NOT EXISTS ProvisionalMatchFilter AS
+SELECT
+    UserID,
+    GuildID,
+    group_concat(MatchID, ',') AS ProvisionalMatchIDs
+FROM (
+    SELECT
+        ps.UserID,
+        ps.GuildID,
+        m.ID AS MatchID,
+        ROW_NUMBER() OVER (
+            PARTITION BY ps.UserID, ps.GuildID
+            ORDER BY m.TimeInitiated ASC
+        ) AS rn
+    FROM PlayerSkill ps
+    JOIN LiveRankedDicePlayers p
+        ON p.UserID = ps.UserID
+    JOIN LiveRankedDiceMatches m
+        ON m.ID = p.MatchID
+       AND m.GuildID = ps.GuildID
+    WHERE ps.ProvisionalGames = 0
+)
+WHERE rn <= 10
+GROUP BY UserID, GuildID;
+
 
 CREATE VIEW if not exists QuestionTypesView AS
 SELECT 

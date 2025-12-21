@@ -105,7 +105,7 @@ async def createQuestion(interaction: discord.Interaction = None, channel: disco
                 quizMessage=await channel.send(messageContent, view=view)
         except Exception as e:
             print(f"Error sending question message: {e}")
-            logging.warning(f"Error sending question message: {e}\nInteraction: {interaction}\nChannel: {channel} and server: {channel.guild.id if channel else 'N/A'}")
+            logging.warning(f"Error sending question message: {e}\nInteraction: {interaction}\nChannel: {channel.id if channel else 'N/A'} and server: {channel.guild.id if channel else 'N/A'}")
             games_curs.close()
             games_conn.close()
             return

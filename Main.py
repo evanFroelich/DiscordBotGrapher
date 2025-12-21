@@ -46,7 +46,31 @@ async def grant_ranked_token():
     games_curs=games_conn.cursor()
     games_curs.execute('''UPDATE GamblingUserStats SET RankedDiceTokens = min(RankedDiceTokens + 1, 3)''')
     games_conn.commit()
-    games_curs.execute('''UPDATE PlayerSkill SET Rank = Rank - 0.1 WHERE LastPlayed < ? and ProvisionalGames = 0''', (datetime.now() - timedelta(days=2),))
+    games_curs.execute('''SELECT Season FROM RankedDiceGlobals''')
+    current_season = games_curs.fetchone()
+    games_curs.execute('''SELECT ''')
+    #games_curs.execute('''UPDATE PlayerSkill SET Rank = Rank - 0.1 WHERE LastPlayed < ? and ProvisionalGames = 0''', (datetime.now() - timedelta(days=2),))
+    games_curs.execute(
+    '''
+    UPDATE PlayerSkill
+    SET Rank = Rank - 0.1
+    WHERE LastPlayed < ?
+      AND ProvisionalGames = 0
+      AND EXISTS (
+            SELECT 1
+            FROM LiveRankedDicePlayers p
+            JOIN LiveRankedDiceMatches m
+              ON m.ID = p.MatchID
+            WHERE p.UserID = PlayerSkill.UserID
+              AND m.GuildID = PlayerSkill.GuildID
+              AND m.Season = (
+                    SELECT CurrentSeason
+                    FROM RankedDiceGlobals
+              )
+      )
+    ''',
+    (datetime.now() - timedelta(days=2),)
+)
     games_conn.commit()
     games_curs.close()
     games_conn.close()
@@ -405,7 +429,7 @@ class MyClient(commands.Bot):
             except Exception as e:
                 print(f"Failed to clear reaction or update DB: {e}")
                 msg = await reaction.message.channel.send("I do not have permissions to remove reactions in this channel. Please grant me the 'Manage Messages' permission to use this feature, or add this channel to the ignored channels list using /game-settings-set command to disable all interactions in this channel.", allowed_mentions=discord.AllowedMentions.none())
-                await delete_later(msg, 5)
+                await delete_later(msg, 10)
                 logging.warning(f"Failed to clear reaction or update DB: {e} in guild {reaction.message.guild.id}, channel {reaction.message.channel.id}")
         game_curs.close()
         game_conn.close()
