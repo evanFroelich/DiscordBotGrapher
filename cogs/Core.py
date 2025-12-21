@@ -237,6 +237,7 @@ class RankedDiceStats(commands.Cog):
         self.client = client
     @app_commands.command(name="ranked-dice-stats", description="Displays your ranked dice stats")
     async def ranked_dice_stats(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
         # Implementation for ranked dice stats command
         games_conn=sqlite3.connect("games.db",timeout=10)
         games_conn.row_factory = sqlite3.Row
@@ -434,7 +435,7 @@ async def ranked_dice_stats_helper(interaction: discord.Interaction, season: str
     games_curs.close()
     games_conn.close()
     if new:
-        await interaction.response.send_message(embed=embed, ephemeral=True, view=view)
+        await interaction.followup.send(embed=embed, ephemeral=True, view=view)
     else:
         await interaction.response.edit_message(embed=embed, view=view)
 
