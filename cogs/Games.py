@@ -763,6 +763,8 @@ async def lobby_countdown_task(interaction, match_id, message, guild_id, duratio
         targetRank= mu_to_target_rank(player['EndSkillMu'])
         if provisional_games_left > 0:
             # If there are provisional games left, use the target rank
+            targetRank = targetRank if targetRank < 25 else 25
+            #player['EndSkillMu'] = player['EndSkillMu'] if player['EndSkillMu'] < 30 else 30
             newRank= targetRank
         else:
             # If no provisional games left, use the end rank

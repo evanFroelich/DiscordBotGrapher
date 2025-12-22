@@ -411,12 +411,12 @@ async def auction_house_command(interaction: discord.Interaction):
         games_curs.close()
         games_conn.close()
         return
-    games_curs.execute('''SELECT Zone, PercentAuctioned, CurrentPrice, CurrentBidderUserID, CurrentBidderGuildID FROM AuctionHousePrize where Date = ?''', (datetime.now().date(),))
+    games_curs.execute('''SELECT Zone, PercentAuctioned, CurrentPrice, CurrentBidderUserID, CurrentBidderGuildID, HasRollOver FROM AuctionHousePrize where Date = ?''', (datetime.now().date(),))
     auction_data = games_curs.fetchall()
     games_conn.commit()
     games_curs.close()
     games_conn.close()
-    print(f"DEBUG: auction_data fetched: {len(auction_data)} items")
+    #print(f"DEBUG: auction_data fetched: {len(auction_data)} items")
     #if no auction data found
     if not auction_data:
         await interaction.response.send_message("No auction data found for today. Please try again later.", ephemeral=True)
@@ -427,7 +427,8 @@ async def auction_house_command(interaction: discord.Interaction):
             'PercentAuctioned': item['PercentAuctioned'],
             'CurrentPrice': item['CurrentPrice'],
             'CurrentBidderUserID': item['CurrentBidderUserID'],
-            'CurrentBidderGuildID': item['CurrentBidderGuildID']
+            'CurrentBidderGuildID': item['CurrentBidderGuildID'],
+            'HasRollOver': item['HasRollOver']
         }
     #print(f"DEBUG: AUCTIONINFO constructed: {AUCTIONINFO}")
     AUCTIONINFO["AuctionList"]= list(AUCTIONINFO["ZoneInfo"].keys())
@@ -614,11 +615,16 @@ async def auction_text_generator(AUCTIONINFO=None, interaction: discord.Interact
                 userTag = f"*a user from another server*"
             if zoneName == AUCTIONINFO["CurrentAuctionSelected"]:
                 aucName = f"[{int(item['PercentAuctioned']*100)}% of yesterdays total from {zoneName}]"
+                if item['HasRollOver'] == 1:
+                    aucName += " :star:"
                 aucValue = f":right_arrow: Current top bid: {item['CurrentPrice']} by {userTag}"
             else:
                 aucName = f"{int(item['PercentAuctioned']*100)}% of yesterdays total from {zoneName}"
+                if item['HasRollOver'] == 1:
+                    aucName += " :star:"
                 aucValue = f"Current top bid: {item['CurrentPrice']} by {userTag}"
             embed.add_field(name=aucName, value=aucValue, inline=False)
+        embed.set_footer(text="Auctions with a star have rolled over yesterdays unclaimed prizes on top of todays auction.")
     else:
         embed.add_field(name="No auction data available for today.", value="Please check back tomorrow.", inline=False)
         await interaction.response.send_message(embed=embed, ephemeral=True)

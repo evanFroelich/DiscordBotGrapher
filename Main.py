@@ -92,7 +92,7 @@ async def package_daily_gambling():
         for row in yesterday_auction_data:
             games_curs.execute('''select CurrentBalance from GamblingUserStats where GuildID=? and UserID=?''', (row['CurrentBidderGuildID'], row['CurrentBidderUserID']))
             bidder_balance = games_curs.fetchone()
-            if bidder_balance and bidder_balance[0] >= row['CurrentPrice']:
+            if bidder_balance and bidder_balance[0] >= row['CurrentPrice'] and row['CurrentPrice']>0:
                 # Deduct the bid amount from the bidder's balance
                 #new_balance = bidder_balance[0] - row['CurrentPrice']
                 #new_balance = new_balance + int(row['AmountAuctioned'])
