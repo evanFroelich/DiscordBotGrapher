@@ -48,7 +48,7 @@ async def grant_ranked_token():
     games_conn.commit()
     games_curs.execute('''SELECT Season FROM RankedDiceGlobals''')
     current_season = games_curs.fetchone()
-    games_curs.execute('''SELECT ''')
+    #games_curs.execute('''SELECT ''')
     #games_curs.execute('''UPDATE PlayerSkill SET Rank = Rank - 0.1 WHERE LastPlayed < ? and ProvisionalGames = 0''', (datetime.now() - timedelta(days=2),))
     games_curs.execute(
     '''
