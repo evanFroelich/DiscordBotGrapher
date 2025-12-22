@@ -294,12 +294,11 @@ async def leaderboard_generator(guildID: str, type: str, visibility: bool, inter
         embed.title="Bonus Points Leaderboard"
         for row in rows:
             user=interaction.guild.get_member(int(row[0]))
-            if row[2] == 0:
-                continue
-            if user:
-                outstr += f"<@{user.id}>: {row[1]} hits\n"
-            else:
-                outstr += f"User ID {row[0]}: {row[1]} hits\n"
+            if row[1] > 0:
+                if user:
+                    outstr += f"<@{user.id}>: {row[1]} hits\n"
+                else:
+                    outstr += f"User ID {row[0]}: {row[1]} hits\n"
         if outstr == "":
             outstr = "no points yet"
         embed.description=outstr
