@@ -302,6 +302,8 @@ async def leaderboard_generator(guildID: str, type: str, visibility: bool, inter
         if outstr == "":
             outstr = "no points yet"
         embed.description=outstr
+        games_curs.close()
+        games_conn.close()
         return embed
         #await interaction.followup.send(embed=embed, ephemeral=bool(visibility))
     if type == "flip":
@@ -326,6 +328,8 @@ async def leaderboard_generator(guildID: str, type: str, visibility: bool, inter
         embed.description=outstr
         #msg=await interaction.followup.send(embed=embed,ephemeral=bool(visibility))
         #asyncio.create_task(delete_later(message=msg,time=60))
+        games_curs.close()
+        games_conn.close()
         return embed
     if type == "balance":
         #get the current balances for the server
@@ -340,10 +344,14 @@ async def leaderboard_generator(guildID: str, type: str, visibility: bool, inter
             else:
                 outstr += f"User ID {row[0]}: {row[1]} points\n"
         embed.description=outstr
+        games_curs.close()
+        games_conn.close()
         return embed
         #await interaction.followup.send(embed=embed, ephemeral=visibility)
     if type == "achievement-score":
         embed = await achievement_leaderboard_generator(interaction.guild.id)
+        games_curs.close()
+        games_conn.close()
         return embed
         #await interaction.followup.send(embed=embed, ephemeral=bool(visibility))
     if type == "ranked-dice":
@@ -362,6 +370,8 @@ async def leaderboard_generator(guildID: str, type: str, visibility: bool, inter
             else:
                 outstr += f"User ID {row[0]}: {rank_name}\n"
         embed.description=outstr
+        games_curs.close()
+        games_conn.close()
         return embed
         #await interaction.followup.send(embed=embed, ephemeral=bool(visibility))
     games_curs.close()

@@ -175,7 +175,7 @@ class QuestionPickButton(discord.ui.Button):
                     games_conn.close()
                     return
                 games_curs.execute('''UPDATE GamblingUserStats SET QuestionsAnsweredToday = QuestionsAnsweredToday + 1 WHERE GuildID=? AND UserID=?''', (interaction.guild.id, interaction.user.id))
-                
+                games_conn.commit()
                 games_curs.execute('''UPDATE GamblingUserStats SET LastRandomQuestionTime = ? WHERE GuildID=? AND UserID=?''', (curTimeString, interaction.guild.id, interaction.user.id))
                 games_conn.commit() 
             games_curs.execute('''SELECT * FROM QuestionRetries where GuildID = ?''', (interaction.guild.id,))

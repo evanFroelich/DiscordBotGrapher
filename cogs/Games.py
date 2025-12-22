@@ -179,6 +179,7 @@ class FlipButton(discord.ui.Button):
             await achievementTrigger(interaction.guild.id, interaction.user.id, 'TimesFlipped')
         else:
             games_curs.execute('''UPDATE coinFlipLeaderboard SET CurrentStreak = 0, LastFlip=?, TimesFlipped = TimesFlipped + 1, CurrentTailsStreak = CurrentTailsStreak + 1, TotalTails = TotalTails + 1 WHERE UserID=?''', (datetime.now().strftime('%Y-%m-%d %H:%M:%S'), interaction.user.id))
+            games_conn.commit()
         games_conn.commit()
         games_curs.execute('''SELECT * FROM coinFlipLeaderboard WHERE UserID=?''', (interaction.user.id,))
         row = games_curs.fetchone()
