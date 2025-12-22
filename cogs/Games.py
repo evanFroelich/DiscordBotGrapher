@@ -9,7 +9,7 @@ import json
 import re
 import time
 import trueskill
-from Helpers.Helpers import create_user_db_entry, numToGrade, delete_later, isAuthorized, achievementTrigger, achievement_leaderboard_generator, auction_house_command, ButtonLockout, rank_number_to_rank_name
+from Helpers.Helpers import create_user_db_entry, numToGrade, delete_later, isAuthorized, achievementTrigger, achievement_leaderboard_generator, auction_house_command, ButtonLockout, rank_number_to_rank_name, leaderboard_generator
 
 
 class GradeReport(commands.Cog):
@@ -103,89 +103,31 @@ class Leaderboard(commands.Cog):
         games_curs = games_conn.cursor()
         games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName, CommandParameters) VALUES (?, ?, ?, ?)''', (interaction.guild.id, interaction.user.id, "leaderboard", f"subtype: {subtype.value}, visibility: {visibility.value}"))
         games_conn.commit()
-        privMsg=True if visibility.value=="private" else False
-        await interaction.response.defer(thinking=True,ephemeral=privMsg)
-        embed=embed=discord.Embed(title="Leaderboard", color=0x228a65)
-        #print(f"visibility: {visibility.value} privMsg: {privMsg}")
-        if subtype.value == "pip":
-            guild_id = str(interaction.guild.id)
-            games_curs.execute('''SELECT UserID, SUM(Num_Correct) AS TotalPoints
-            FROM Scores WHERE GuildID = ?
-            GROUP BY UserID
-            ORDER BY TotalPoints DESC''', (guild_id,))
-            rows= games_curs.fetchall()
-            outstr=""
-            embed.title="Bonus Points Leaderboard"
-            for row in rows:
-                user=interaction.guild.get_member(int(row[0]))
-                if user:
-                    outstr += f"<@{user.id}>: {row[1]} hits\n"
-                else:
-                    outstr += f"User ID {row[0]}: {row[1]} hits\n"
-            if outstr == "":
-                outstr = "no points yet"
-            embed.description=outstr
-            await interaction.followup.send(embed=embed, ephemeral=privMsg)
-        if subtype.value == "flip":
-            games_curs.execute('''SELECT UserID, CurrentStreak FROM CoinFlipLeaderboard ORDER BY CurrentStreak DESC, LastFlip DESC''')
-            rows= games_curs.fetchall()
-            embed=discord.Embed(color=0x228a65)
-            outstr=""
-            quitQ=0
-            participation=0
-            embed.title="---Coin Flip Leaderboard---"
-            for UserID, CurrentStreak in rows:
-                #--TODO: see if i can pre capture the user ids so i only have to go out to discord once instead of every loop
-                user=interaction.guild.get_member(int(UserID))
-                if user:
-                    if participation == 0 and CurrentStreak==1:
-                        outstr+=f"---Participation Trophy---\n"
-                        participation=1
-                    if quitQ==0 and CurrentStreak == 0:
-                        outstr+=f"---Quitters---\n"
-                        quitQ=1
-                    outstr += f"<@{user.id}>: {CurrentStreak}\n"
-            embed.description=outstr
-            msg=await interaction.followup.send(embed=embed,ephemeral=privMsg)
-            asyncio.create_task(delete_later(message=msg,time=60))
-        if subtype.value == "balance":
-            #get the current balances for the server
-            games_curs.execute('''SELECT UserID, CurrentBalance FROM GamblingUserStats WHERE GuildID = ? ORDER BY CurrentBalance DESC''', (interaction.guild.id,))
-            rows= games_curs.fetchall()
-            outstr=""
-            embed=discord.Embed(title="Gambling Balance Leaderboard", color=0x228a65)
-            for row in rows:
-                user=interaction.guild.get_member(int(row[0]))
-                if user:
-                    outstr += f"<@{user.id}>: {row[1]} points\n"
-                else:
-                    outstr += f"User ID {row[0]}: {row[1]} points\n"
-            embed.description=outstr
-            await interaction.followup.send(embed=embed, ephemeral=privMsg)
-        if subtype.value == "achievement-score":
-            embed = await achievement_leaderboard_generator(interaction.guild.id)
-            await interaction.followup.send(embed=embed, ephemeral=privMsg)
-        if subtype.value == "ranked-dice":
-            games_curs.execute('''SELECT UserID, Rank, Mu, ProvisionalGames FROM PlayerSkill WHERE GuildID = ? ORDER BY ProvisionalGames ASC, Rank DESC, Mu DESC''', (interaction.guild.id,))
-            rows= games_curs.fetchall()
-            outstr=""
-            embed=discord.Embed(title="Ranked Dice Leaderboard", color=0x228a65)
-            for row in rows:
-                user=interaction.guild.get_member(int(row[0]))
-                if row[3] > 0:
-                    rank_name = f"Provisional games {10 - row[3]}/10"
-                else:
-                    rank_name = await rank_number_to_rank_name(row[1])
-                if user:
-                    outstr += f"<@{user.id}>: {rank_name}\n"
-                else:
-                    outstr += f"User ID {row[0]}: {rank_name}\n"
-            embed.description=outstr
-            await interaction.followup.send(embed=embed, ephemeral=privMsg)
         games_curs.close()
         games_conn.close()
+        privMsg=True if visibility.value=="private" else False
+        await interaction.response.defer(thinking=True,ephemeral=privMsg)
+        embed=discord.Embed(title="Leaderboard", color=0x228a65)
+        embed = await leaderboard_generator(guildID = str(interaction.guild.id), type=subtype.value, visibility=privMsg, interaction=interaction, embed=embed)
+        refreshButton = leaderboard_refresh_button(subtype=subtype.value, visibility=privMsg, guild_id=str(interaction.guild.id))
+        view = discord.ui.View(timeout=None)
+        view.add_item(refreshButton)
+        msg = await interaction.followup.send(embed=embed, ephemeral=privMsg, view=view)
+        if subtype.value == "flip":
+            asyncio.create_task(delete_later(message=msg, time=60))
+        
 
+class leaderboard_refresh_button(discord.ui.Button):
+    def __init__(self, subtype: str, visibility: bool, guild_id: str):
+        super().__init__(label="Refresh Leaderboard", style=discord.ButtonStyle.primary)
+        self.subtype = subtype
+        self.visibility = visibility
+        self.guild_id = guild_id
 
+    async def callback(self, interaction: discord.Interaction):
+        embed = discord.Embed(title="Leaderboard", color=0x228a65)
+        embed = await leaderboard_generator(guildID=self.guild_id, type=self.subtype, visibility=self.visibility, interaction=interaction, embed=embed)
+        await interaction.response.edit_message(embed=embed)
 
 
 class FlipGame(commands.Cog):

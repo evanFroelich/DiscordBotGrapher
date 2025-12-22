@@ -411,23 +411,6 @@ async def ranked_dice_stats_helper(interaction: discord.Interaction, season: str
                 current_rank = games_curs.fetchone()
                 if current_rank:
                     rank_values.append(current_rank['Rank'])
-        # plt.figure(figsize=(10, 5))
-        # plt.plot(range(1, len(rank_values) + 1), rank_values)#, marker='o'
-        # #plt.gca().invert_yaxis()
-        # plt.title('Rank Over Time')
-        # plt.xlabel('Number of Games Played')
-        # plt.ylabel('Rank')
-        # plt.grid(True)
-        # #plt.xticks(range(1, len(rank_values) + 1))
-        # #plt.yticks(range(1, 41))
-        # plt.yticks(ticks=[6,11,16,21,25,30,35,40], labels=["Silver1","Gold1","Platinum1","Diamond 1","Diamond 5","Diamond 10","Diamond 15","Diamond 20"])
-        # # Save the plot to a file
-        # plot_filename = f'images/ranked_dice_rank_{interaction.guild.id}_{interaction.user.id}_{season}.png'
-        # plt.savefig(plot_filename)
-        # plt.close()
-        # # Send the plot image in the Discord message
-        # file = discord.File(plot_filename, filename="ranked_dice_rank.png")
-        # embed.set_image(url="attachment://ranked_dice_rank.png")
         embed, file = await send_rank_dice_stats_plot(interaction, season=season, embed=embed, rank_values=rank_values)
         graph_button = GraphButton(label="View Rank Graph", style=discord.ButtonStyle.primary, file=file)
         view.add_item(graph_button)
