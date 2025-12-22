@@ -266,7 +266,7 @@ async def monthly_ranked_dice_reset():
     games_curs.execute('''SELECT UserID, GuildID, Rank, Mu, Sigma, ProvisionalGames FROM PlayerSkill''')
     player_data = games_curs.fetchall()
     for userID, guildID, rank, mu, sigma, provisionalGames in player_data:
-        newMu=24#((mu-30)/5)+30
+        newMu=21#((mu-30)/5)+30
         newSigma=sigma
         if sigma<5:
             newSigma=sigma*2

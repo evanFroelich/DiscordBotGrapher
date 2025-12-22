@@ -251,7 +251,7 @@ class GameSettingsSet(commands.Cog):
     async def gamesettingscommandset(self, interaction: discord.Interaction, numberofquestionsperday: int = None, questiontimeout: int = None, pipchance: float = None, questionchance: float = None, flagshamechannel: int = None, shamechannel: str = None, flagignoredchannels: int = None, ignoredchannels: str = None, flaggoofsgaffs: int = None, flagachievements: int = None):
         games_conn=sqlite3.connect("games.db",timeout=10)
         games_curs = games_conn.cursor()
-        games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName, CommandParameters) VALUES (?, ?, ?, ?)''', (interaction.guild.id, interaction.user.id, "game-settings-set", f"'numberofquestionsperday': {numberofquestionsperday}, 'questiontimeout': {questiontimeout}, 'pipchance': {pipchance}, 'questionchance': {questionchance}, 'flagshamechannel': {flagshamechannel}, 'shamechannel': {shamechannel}, 'flagignoredchannels': {flagignoredchannels}, 'ignoredchannels': {ignoredchannels}, 'flaggoofsgaffs': {flaggoofsgaffs}", f"'flagachievements': {flagachievements}'"))
+        games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName, CommandParameters) VALUES (?, ?, ?, ?)''', (interaction.guild.id, interaction.user.id, "game-settings-set", f"'numberofquestionsperday': {numberofquestionsperday}, 'questiontimeout': {questiontimeout}, 'pipchance': {pipchance}, 'questionchance': {questionchance}, 'flagshamechannel': {flagshamechannel}, 'shamechannel': {shamechannel}, 'flagignoredchannels': {flagignoredchannels}, 'ignoredchannels': {ignoredchannels}, 'flaggoofsgaffs': {flaggoofsgaffs}, 'flagachievements': {flagachievements}'"))
         games_conn.commit()
         games_curs.close()
         games_conn.close()
@@ -544,7 +544,15 @@ class JoinLobbyButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
         if await ButtonLockout(interaction):
             view = discord.ui.View()
-            view.add_item(ModifierSelectMenu(match_id=self.match_id))
+            games_conn=sqlite3.connect("games.db",timeout=10)
+            games_conn.row_factory = sqlite3.Row
+            games_curs = games_conn.cursor()
+            games_curs.execute('''SELECT Season from RankedDiceGlobals WHERE Name = "Global"''')
+            season = games_curs.fetchone()
+            if season['Season'] == 0:
+                view.add_item(ModifierSelectMenu(match_id=self.match_id))
+            else:
+                view.add_item(ModifierSelectMenuS1(match_id=self.match_id))
             await interaction.response.send_message("Select your lobby modifier!", ephemeral=True, view=view)
             return
 
@@ -924,17 +932,26 @@ def update_visible_rank(current_rank, target_rank, smoothing=0.3):
 
 
 async def user_rolls(modifier:str):
+    games_conn=sqlite3.connect("games.db",timeout=10)
+    games_conn.row_factory = sqlite3.Row
+    games_curs = games_conn.cursor()
+    games_curs.execute('''SELECT Season from RankedDiceGlobals where Name = "Global"''')
+    season = games_curs.fetchone()
     roll = random.randint(1, 20)
     if modifier == "spade":
-        roll += 5
-        #roll += 4
+        if season['Season'] == 0:
+            roll += 5
+        else:
+            roll += 4
     elif modifier == "diamond":
         roll2 = random.randint(1, 20)
         roll = max(roll, roll2)
     elif modifier == "club":
         roll2 = random.randint(1, 20)
-        roll = int(((roll + roll2) / 2) + 5)
-        #roll = ((roll + roll2) / 2) + 4
+        if season['Season'] == 0:
+            roll = int(((roll + roll2) / 2) + 5)
+        else:
+            roll = ((roll + roll2) / 2) + 4
     elif modifier == "heart":
         pass  # no change to roll, but may affect MMR later
     elif modifier == "joker":
@@ -945,6 +962,49 @@ async def user_rolls(modifier:str):
         roll += random.randint(3, 8)
     return roll
 
+
+class ModifierSelectMenuS1(discord.ui.Select):
+    def __init__(self,  match_id: int):
+        self.match_id = match_id
+        options = [
+            discord.SelectOption(label="♠️Call a spade a spade♠️", description="Roll 1 D20 and add 5 to the final value", value="spade"),
+            discord.SelectOption(label="♦️Diamond in the rough♦️", description="Roll 2 D20 and take the higher result", value="diamond"),
+            discord.SelectOption(label="♣️Math club♣️", description="Roll 2 D20, average them out, and add 5 to the total", value="club"),
+            discord.SelectOption(label="♥️Heart of the cards♥️", description="Roll 1 D20. (Grants enhanced results when calculating MMR and rank changes)", value="heart"),
+            discord.SelectOption(label="🃏Jokers wild🃏", description="Roll 3 D20, average 2 lowest, add between 3-8. Has dramatically increased mmr gains and losses", value="joker"),
+            
+        ]
+        super().__init__(placeholder="Choose a modifier...", min_values=1, max_values=1, options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        for child in self.view.children:
+            child.disabled = True
+        games_conn=sqlite3.connect("games.db",timeout=10)
+        games_conn.row_factory = sqlite3.Row
+        games_curs = games_conn.cursor()
+        games_curs.execute('''SELECT GameState from LiveRankedDiceMatches WHERE ID = ?''', (self.match_id,))
+        game_state = games_curs.fetchone()
+        if game_state:
+            if game_state['GameState'] != 1:
+                await interaction.response.edit_message(content=f"Cannot join lobby. ",view=None)
+                #await interaction.response.send_message(f"Lobby is already closed.", ephemeral=True)
+                games_curs.close()
+                games_conn.close()
+                return
+        else:
+            await interaction.response.send_message("No game found with that ID.", ephemeral=True)
+        games_curs.execute('''SELECT * FROM PlayerSkill WHERE UserID = ? and GuildID = ?''', (interaction.user.id, interaction.guild.id))
+        player_skills = games_curs.fetchone()
+        if not player_skills:
+            games_curs.execute('''INSERT INTO PlayerSkill (UserID, GuildID) VALUES (?, ?)''', (interaction.user.id, interaction.guild.id))
+            games_conn.commit()
+            games_curs.execute('''SELECT * FROM PlayerSkill WHERE UserID = ? and GuildID = ?''', (interaction.user.id, interaction.guild.id))
+            player_skills = games_curs.fetchone()
+        games_curs.execute('''INSERT INTO LiveRankedDicePlayers (MatchID, UserID, Modifier, StartingSkillMu, StartingSkillSigma, StartingRank) VALUES (?, ?, ?, ?, ?, ?)''', (self.match_id, interaction.user.id, self.values[0], player_skills['Mu'], player_skills['Sigma'], player_skills['Rank']))
+        games_conn.commit()
+        games_curs.close()
+        games_conn.close()
+        await interaction.response.edit_message(content=f"You have joined the lobby and selected {self.values[0]}!",view=self.view)
 
 
 async def setup(client: commands.Bot):
