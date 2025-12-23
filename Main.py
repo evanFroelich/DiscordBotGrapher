@@ -691,9 +691,7 @@ context.bot=client
 script_dir = os.path.dirname(os.path.abspath(__file__))
 os.chdir(script_dir)
 log_file_path = 'log_file.log'
-logging.basicConfig(filename=log_file_path, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-#logging.info('Script started')
+logging.basicConfig(filename=log_file_path, level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 FOToken=open('Token/Token',"r")
-#logging.info('Post token')
 token=FOToken.readline()
 client.run(token)
