@@ -599,6 +599,14 @@ class ModifierSelectMenu(discord.ui.Select):
         games_conn.close()
         await interaction.response.edit_message(content=f"You have joined the lobby and selected {self.values[0]}!",view=self.view)
 
+class jokeButton(discord.ui.Button):
+    def __init__(self):
+        super().__init__(label="Rig match (Admin only)", style=discord.ButtonStyle.red)
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.send_message("Not for you.", ephemeral=True)
+        return
+
 async def lobby_countdown_task(interaction, match_id, message, guild_id, duration=30):
     start_time = time.time()
     timeout = duration  # seconds
@@ -621,9 +629,12 @@ async def lobby_countdown_task(interaction, match_id, message, guild_id, duratio
         try:
         # Format lobby text
             names = []
+            isOwnerInLobby = False
             for p in players:
                 user = message.guild.get_member(int(p["UserID"]))
                 if user:
+                    if int(p['UserID']) == 100344687029665792:
+                        isOwnerInLobby = True
                     games_curs.execute('''SELECT Rank, ProvisionalGames FROM PlayerSkill WHERE GuildID = ? AND UserID = ?''',(guild_id, p['UserID']))
                     player_skill = games_curs.fetchone()
                     if player_skill['ProvisionalGames'] > 0:
@@ -633,11 +644,16 @@ async def lobby_countdown_task(interaction, match_id, message, guild_id, duratio
                         names.append(f"• {user.display_name} (Rank: {rankStr})")# — `{p['Modifier']}`
 
             player_block = "\n".join(names) if names else "*No players yet*"
-
+            view = discord.ui.View()
+            view.add_item(JoinLobbyButton(match_id=match_id))
+            games_curs.execute('''SELECT RiggedJoke from RankedDiceGlobals WHERE Name = "Global"''')
+            riggedJokeRow = games_curs.fetchone()
+            riggedJoke = riggedJokeRow['RiggedJoke']
+            if isOwnerInLobby and riggedJoke==1:
+                view.add_item(jokeButton())
             remaining = int(timeout - elapsed)
             timestamp = f"<t:{int(time.time()) + remaining}:R>"
-
-            await message.edit(content=f"**Ranked Lobby**\nPlayers:\n{player_block}\n\nLobby closes {timestamp}",)
+            await message.edit(content=f"**Ranked Lobby**\nPlayers:\n{player_block}\n\nLobby closes {timestamp}", view=view)
 
             await asyncio.sleep(2)  # update every 2 seconds
         except Exception as e:

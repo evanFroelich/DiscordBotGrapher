@@ -118,7 +118,8 @@ async def package_daily_gambling():
                         print(f"Failed to send DM to user {row['FinalBidderUserID']}: {e}")
             else:
                 rollOverFlag=1
-                rollOverAmount+=row['AmountAuctioned']
+                #rollOverAmount+=row['AmountAuctioned']
+                games_curs.execute('''INSERT INTO DailyGamblingTotals (Date, GuildID, Category, Funds) VALUES (?, ?, ?, ?)''', (today - timedelta(days=1), 9999999999, row['Zone'], row['AmountAuctioned']))
     #set up todays game
     games_curs.execute('''SELECT Category, sum(Funds) from DailyGamblingTotals where Date=date('now', '-1 day', 'localtime') group by Category''')
     yesterday_totals = games_curs.fetchall()
@@ -259,6 +260,7 @@ async def monthly_ranked_dice_reset():
     today = datetime.now()
     if today.day != 1:
         return
+        #pass
     games_conn=sqlite3.connect("games.db",timeout=10)
     games_curs=games_conn.cursor()
     games_curs.execute('''UPDATE RankedDiceGlobals SET Season = Season + 1''')
