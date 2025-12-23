@@ -178,7 +178,7 @@ async def abandoned_trivia_cleanup(guildID: int, userID: int, messageID: int, qu
     shameSettings = games_curs.fetchone()
     games_curs.execute('''SELECT ID, Question, Answers, Type, Difficulty, ShadowAnswers FROM QuestionList WHERE ID=?''', (questionID,))
     questionData = games_curs.fetchone()
-    stealButton=QuestionStealButton(questionData,label ="STEAL", style=discord.ButtonStyle.danger)
+    stealButton=QuestionStealButton(question=questionData,label ="STEAL", style=discord.ButtonStyle.danger)
     games_curs.execute('''INSERT INTO TriviaEventLog (GuildID, UserID, DailyOrRandom, QuestionType, QuestionDifficulty, QuestionText, QuestionAnswers, UserAnswer, ClassicDecision, LLMDecision, LLMText, CurrentQuestionsAnsweredToday, CurrentQuestionsAnsweredTodayCorrect) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', (guildID, userID, 'abandoned', questionType, questionDifficulty, questionData[1], questionData[2], None, 0, 0, None, 0, 0))
     games_conn.commit()
     view=discord.ui.View()
