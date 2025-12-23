@@ -401,6 +401,8 @@ class QuestionStealButton(discord.ui.Button):
         self.question = question
 
     async def callback(self, interaction: discord.Interaction):
+        logging.info(f"~~~~~~~~~~~~~~~~~~~~~~~")
+        logging.info(f"Steal button pressed by user {interaction.user.id} in guild {interaction.guild.id}")
         #await create_user_db_entry(interaction.guild.id, interaction.user.id)
         #check to see if the user trying to steal has answered this question within the last 24 hours
         games_conn = sqlite3.connect("games.db")
@@ -409,21 +411,28 @@ class QuestionStealButton(discord.ui.Button):
         count = games_curs.fetchone()[0]
         games_curs.close()
         games_conn.close()
+        logging.info(f"User {interaction.user.id} has answered this question {count} times in the last 24 hours")
         if count > 0:
             await interaction.response.send_message("You have already answered this question in the last 24 hours and cannot steal it.", ephemeral=True)
             return
+        logging.info(f"User {interaction.user.id} is allowed to steal the question")
         #if await ButtonLockout(interaction):
         self.disabled = True
         self.style = discord.ButtonStyle.secondary
         await interaction.message.edit(view=self.view)
+        logging.info(f"Opening modal for user {interaction.user.id} to steal question")
         modal = QuestionModal(Question=self.question, isForced=False, retries=0, userID=interaction.user.id, guildID=interaction.guild.id, messageID=interaction.message.id, isSteal=True)
+        logging.info(f"Modal created for user {interaction.user.id} to steal question")
         await interaction.response.send_modal(modal)
+        logging.info(f"Modal sent to user {interaction.user.id} to steal question")
         games_conn = sqlite3.connect("games.db")
         games_curs = games_conn.cursor()
         games_curs.execute('''DELETE FROM ActiveSteals WHERE GuildID=? AND ChannelID=? AND MessageID=?''', (interaction.guild.id, interaction.channel.id, interaction.message.id))
         games_conn.commit()
+        logging.info(f"Removed active steal entry for message {interaction.message.id} in guild {interaction.guild.id}")
         games_curs.close()
         games_conn.close()
+        logging.info(f"~~~~~~~~~~~~~~~~~~~~~~~")
         return
 
 class QuestionModal(discord.ui.Modal):

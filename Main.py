@@ -46,8 +46,8 @@ async def grant_ranked_token():
     games_curs=games_conn.cursor()
     games_curs.execute('''UPDATE GamblingUserStats SET RankedDiceTokens = min(RankedDiceTokens + 1, 3)''')
     games_conn.commit()
-    games_curs.execute('''SELECT Season FROM RankedDiceGlobals''')
-    current_season = games_curs.fetchone()
+    #games_curs.execute('''SELECT Season FROM RankedDiceGlobals''')
+    #current_season = games_curs.fetchone()
     #games_curs.execute('''SELECT ''')
     #games_curs.execute('''UPDATE PlayerSkill SET Rank = Rank - 0.1 WHERE LastPlayed < ? and ProvisionalGames = 0''', (datetime.now() - timedelta(days=2),))
     games_curs.execute(
@@ -64,7 +64,7 @@ async def grant_ranked_token():
             WHERE p.UserID = PlayerSkill.UserID
               AND m.GuildID = PlayerSkill.GuildID
               AND m.Season = (
-                    SELECT CurrentSeason
+                    SELECT Season
                     FROM RankedDiceGlobals
               )
       )

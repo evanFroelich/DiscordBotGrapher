@@ -604,7 +604,16 @@ class jokeButton(discord.ui.Button):
         super().__init__(label="Rig match (Admin only)", style=discord.ButtonStyle.red)
 
     async def callback(self, interaction: discord.Interaction):
-        await interaction.response.send_message("Not for you.", ephemeral=True)
+        if interaction.user.id != 100344687029665792:
+            await interaction.response.send_message("Not for you.", ephemeral=True)
+            return
+        games_conn=sqlite3.connect("games.db",timeout=10)
+        games_conn.row_factory = sqlite3.Row
+        games_curs = games_conn.cursor()
+        games_curs.execute('''UPDATE RankedDiceGlobals SET RiggedJoke = 0 WHERE Name = "Global"''')
+        games_conn.commit()
+        games_curs.close()
+        games_conn.close()
         return
 
 async def lobby_countdown_task(interaction, match_id, message, guild_id, duration=30):
