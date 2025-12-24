@@ -79,7 +79,7 @@ async def grant_ranked_token():
     games_curs.close()
     games_conn.close()
 
-@tasks.loop(time=time(hour=6, minute=47, second=0, tzinfo=zoneinfo.ZoneInfo("America/Los_Angeles")))
+@tasks.loop(time=time(hour=0, minute=2, second=0, tzinfo=zoneinfo.ZoneInfo("America/Los_Angeles")))
 async def package_daily_gambling():
     print("Packaging daily gambling totals for auction house...")
     games_conn=sqlite3.connect("games.db",timeout=10)
