@@ -463,7 +463,7 @@ class RefreshAuctionButton(discord.ui.Button):
         games_conn = sqlite3.connect("games.db")
         games_conn.row_factory = sqlite3.Row
         games_curs = games_conn.cursor()
-        games_curs.execute('''SELECT Zone, PercentAuctioned, CurrentPrice, CurrentBidderUserID, CurrentBidderGuildID
+        games_curs.execute('''SELECT Zone, PercentAuctioned, CurrentPrice, CurrentBidderUserID, CurrentBidderGuildID, HasRollOver
                               FROM AuctionHousePrize WHERE Date = ?''', (datetime.now().date(),))
         auction_data = games_curs.fetchall()
         print(f"DEBUG: Refreshed auction_data fetched: {len(auction_data)} items")
@@ -475,7 +475,8 @@ class RefreshAuctionButton(discord.ui.Button):
                 'PercentAuctioned': item['PercentAuctioned'],
                 'CurrentPrice': item['CurrentPrice'],
                 'CurrentBidderUserID': item['CurrentBidderUserID'],
-                'CurrentBidderGuildID': item['CurrentBidderGuildID']
+                'CurrentBidderGuildID': item['CurrentBidderGuildID'],
+                'HasRollOver': item['HasRollOver']
             }
         AUCTIONINFO["AuctionList"]= list(AUCTIONINFO["ZoneInfo"].keys())
         AUCTIONINFO["CurrentAuctionSelected"]=self.AUCTIONINFO["CurrentAuctionSelected"]
