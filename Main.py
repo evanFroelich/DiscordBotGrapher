@@ -210,7 +210,7 @@ async def abandoned_trivia_cleanup(guildID: int, userID: int, messageID: int, qu
 
 
 @tasks.loop(hours=1)
-async def clear_steals_loop():
+async def clear_steals_loop(hard_reset: bool = False):
     print("Clearing old steal messages...")
     games_conn = sqlite3.connect("games.db")
     games_curs = games_conn.cursor()
@@ -221,12 +221,13 @@ async def clear_steals_loop():
         await asyncio.sleep(1)  # to avoid rate limits
         guildID, channelID, messageID, timestamp = steal
         print(f"{datetime.now() - datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S')}")
-        if datetime.now() - datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S') > timedelta(hours=1):
-            print(f"Clearing steal message {messageID} in guild {guildID}, channel {channelID}...")
+        if datetime.now() - datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S') > timedelta(hours=1) or hard_reset:
             guild = client.get_guild(guildID)
             if guild:
+                print(f"a")
                 channel = guild.get_channel(channelID)
                 if channel:
+                    print(f"d")
                     try:
                         message = await channel.fetch_message(messageID)
                         #grey out the button on the message
@@ -245,6 +246,7 @@ async def clear_steals_loop():
                             button=discord.ui.Button(label="STEAL", style=discord.ButtonStyle.gray, disabled=True)
                             view.add_item(button)
                             await message.edit(view=view)
+                            #print(f"Failed to delete steal message {messageID} in guild {guildID}, channel {channelID}: {e}")
                         except Exception as e:
                             print(f"Failed to delete steal message {messageID} in guild {guildID}, thread {channelID}: {e}")
             games_curs.execute('''DELETE FROM ActiveSteals WHERE GuildID=? AND ChannelID=? AND MessageID=?''', (guildID, channelID, messageID))
@@ -352,6 +354,8 @@ class MyClient(commands.Bot):
         #await assignRoles()
         #sched=AsyncIOScheduler()
         #sched.add_job(assignRoles,'interval',seconds=900)
+        await clear_steals_loop(hard_reset=True)
+
         if not cleanup_abandoned_trivia_loop.is_running():
             cleanup_abandoned_trivia_loop.start()
         if not package_daily_gambling.is_running():
@@ -380,6 +384,8 @@ class MyClient(commands.Bot):
         await self.load_extension('cogs.Games')
         await self.load_extension('cogs.Core')
         await self.load_extension('cogs.Analytics')
+
+        
 
         #await self.tree.sync()
         print('synced')
