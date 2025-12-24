@@ -40,12 +40,16 @@ async def daily_question_leaderboard():
             channel = client.get_channel(guildID[2])
             await channel.send(content=printstr, embed=embed, allowed_mentions=discord.AllowedMentions.none())
 
-@tasks.loop(time=time(hour=0, minute=0, second=0, tzinfo=zoneinfo.ZoneInfo("America/Los_Angeles")))
+@tasks.loop(time=time(hour=0, minute=1, second=5, tzinfo=zoneinfo.ZoneInfo("America/Los_Angeles")))
 async def grant_ranked_token():
     games_conn=sqlite3.connect("games.db",timeout=10)
     games_curs=games_conn.cursor()
-    games_curs.execute('''UPDATE GamblingUserStats SET RankedDiceTokens = min(RankedDiceTokens + 1, 3)''')
+    games_curs.execute('''UPDATE GamblingUserStats SET RankedDiceTokens = case when RankedDiceTokens < 3 then RankedDiceTokens + 1 else RankedDiceTokens end''')
     games_conn.commit()
+    #check if its christmas day of any year
+    if datetime.now().month == 12 and datetime.now().day == 25:
+        games_curs.execute('''UPDATE GamblingUserStats SET RankedDiceTokens = RankedDiceTokens + 5''')
+        games_conn.commit()
     #games_curs.execute('''SELECT Season FROM RankedDiceGlobals''')
     #current_season = games_curs.fetchone()
     #games_curs.execute('''SELECT ''')

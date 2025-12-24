@@ -564,12 +564,14 @@ class QuestionModal(discord.ui.Modal):
             games_curs.execute('''SELECT FlagShameChannel, ShameChannel FROM ServerSettings WHERE GuildID=?''', (interaction.guild.id,))
             shameSettings = games_curs.fetchone()
             if shameSettings and shameSettings[0] == 1:
-                stealButton = QuestionStealButton(self.question, label="STEAL", style=discord.ButtonStyle.danger)
+                games_curs.execute('''SELECT ID, Question, Answers, Type, Difficulty, ShadowAnswers FROM QuestionList WHERE ID=?''', (self.question_id,))
+                questionData = games_curs.fetchone()
+                stealButton = QuestionStealButton(question=questionData, label="STEAL", style=discord.ButtonStyle.danger)
                 view = discord.ui.View(timeout=None)
                 view.add_item(stealButton)
                 shameChannel = interaction.guild.get_channel(shameSettings[1])
                 if shameChannel:
-                    shameMessage = await shameChannel.send(f"Oops! <@{interaction.user.id}> didn't know the answer to: {self.question_text}",allowed_mentions=discord.AllowedMentions.none(), view=view)
+                    shameMessage = await shameChannel.send(f"Oops! <@{interaction.user.id}> gave the wrong answer to: {self.question_text}",allowed_mentions=discord.AllowedMentions.none(), view=view)
                     shameMessageID = shameMessage.id
                     games_curs.execute('''INSERT INTO ActiveSteals (GuildID, ChannelID, MessageID) VALUES (?, ?, ?)''', (interaction.guild.id, shameChannel.id, shameMessageID))
                     games_conn.commit()
@@ -577,7 +579,7 @@ class QuestionModal(discord.ui.Modal):
                     #try to get the thread
                     shameThread = interaction.guild.get_thread(shameSettings[1])
                     if shameThread:
-                        shameMessage = await shameThread.send(f"Oops! <@{interaction.user.id}> didn't know the answer to: {self.question_text}",allowed_mentions=discord.AllowedMentions.none(), view=view)
+                        shameMessage = await shameThread.send(f"Oops! <@{interaction.user.id}> gave the wrong answer to: {self.question_text}",allowed_mentions=discord.AllowedMentions.none(), view=view)
                         shameMessageID = shameMessage.id
                         games_curs.execute('''INSERT INTO ActiveSteals (GuildID, ChannelID, MessageID) VALUES (?, ?, ?)''', (interaction.guild.id, shameThread.id, shameMessageID))
                         games_conn.commit()
