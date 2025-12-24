@@ -79,7 +79,7 @@ async def grant_ranked_token():
     games_curs.close()
     games_conn.close()
 
-@tasks.loop(time=time(hour=0, minute=2, second=0, tzinfo=zoneinfo.ZoneInfo("America/Los_Angeles")))
+@tasks.loop(time=time(hour=6, minute=47, second=0, tzinfo=zoneinfo.ZoneInfo("America/Los_Angeles")))
 async def package_daily_gambling():
     print("Packaging daily gambling totals for auction house...")
     games_conn=sqlite3.connect("games.db",timeout=10)
@@ -87,7 +87,7 @@ async def package_daily_gambling():
     games_curs=games_conn.cursor()
     today = datetime.now().date()
     #conclude yesterdays game
-    rollOverFlag=0
+    rollOverFlag={}
     rollOverAmount=0
     games_curs.execute('''select * from AuctionHousePrize where Date=?''', (today - timedelta(days=1),))
     yesterday_auction_data = games_curs.fetchall()
@@ -121,7 +121,7 @@ async def package_daily_gambling():
                     except Exception as e:
                         print(f"Failed to send DM to user {row['FinalBidderUserID']}: {e}")
             else:
-                rollOverFlag=1
+                rollOverFlag[row['Zone']]=1
                 #rollOverAmount+=row['AmountAuctioned']
                 games_curs.execute('''INSERT INTO DailyGamblingTotals (Date, GuildID, Category, Funds) VALUES (?, ?, ?, ?)''', (today - timedelta(days=1), 9999999999, row['Zone'], row['AmountAuctioned']))
     #set up todays game
@@ -136,7 +136,7 @@ async def package_daily_gambling():
         yesterday_total = row[1]
         amount_auctioned = yesterday_total * random_multiplier
         amount_auctioned = round(amount_auctioned)
-        games_curs.execute('''INSERT INTO AuctionHousePrize (Date, Zone, TotalAmount, PercentAuctioned, AmountAuctioned, HasRollOver) VALUES (?, ?, ?, ?, ?, ?)''', (today, category, yesterday_total, random_multiplier, amount_auctioned+rollOverAmount, rollOverFlag))
+        games_curs.execute('''INSERT INTO AuctionHousePrize (Date, Zone, TotalAmount, PercentAuctioned, AmountAuctioned, HasRollOver) VALUES (?, ?, ?, ?, ?, ?)''', (today, category, yesterday_total, random_multiplier, amount_auctioned+rollOverAmount, rollOverFlag[f'{category}'] if category in rollOverFlag else 0))
     games_conn.commit()
     games_curs.close()
     games_conn.close()
@@ -701,7 +701,7 @@ context.bot=client
 script_dir = os.path.dirname(os.path.abspath(__file__))
 os.chdir(script_dir)
 log_file_path = 'log_file.log'
-logging.basicConfig(filename=log_file_path, level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(filename=log_file_path, level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 FOToken=open('Token/Token',"r")
 token=FOToken.readline()
 client.run(token)

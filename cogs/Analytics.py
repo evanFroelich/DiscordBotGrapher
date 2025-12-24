@@ -87,7 +87,7 @@ class ServerGraph(commands.Cog):
         embed=discord.Embed(title="Activity Graph",color=0x228a65)
         embed.set_image(url="attachment://graph.png")
         #TODO: crashes out if guild has no icon
-        embed.set_author(name=guildName, icon_url=interaction.guild.icon.url)
+        embed.set_author(name=guildName, icon_url=interaction.guild.icon.url if interaction.guild.icon else discord.Embed.Empty)
         time4=time.perf_counter()
         t8=time4-time1
         await interaction.followup.send(file=graphFile, embed=embed)
