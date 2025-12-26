@@ -244,9 +244,11 @@ class RankedDiceStats(commands.Cog):
         games_curs = games_conn.cursor()
         games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName) VALUES (?, ?, ?)''', (interaction.guild.id, interaction.user.id, "ranked-dice-stats"))
         games_conn.commit()
+        games_curs.execute('''SELECT Season FROM RankedDiceGlobals where Name = "Global"''')
+        global_season = games_curs.fetchone()
         games_curs.close()
         games_conn.close()
-        await ranked_dice_stats_helper(interaction, season="lifetime")
+        await ranked_dice_stats_helper(interaction, season=f"season {global_season['Season']}")
         
 
 async def ranked_dice_stats_helper(interaction: discord.Interaction, season: str="lifetime", new: bool=True):
