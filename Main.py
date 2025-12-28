@@ -702,8 +702,52 @@ client = MyClient(intents=intents)
 context.bot=client
 script_dir = os.path.dirname(os.path.abspath(__file__))
 os.chdir(script_dir)
-log_file_path = 'log_file.log'
-logging.basicConfig(filename=log_file_path, level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~LOGGING SETUP~~~~~~~~~~~~~~~~~~~~~~~~~~#
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
+formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s')
+class LevelFilter(logging.Filter):
+    def __init__(self, level):
+        super().__init__()
+        self.level = level
+
+    def filter(self, record):
+        return record.levelno == self.level
+debug_handler = logging.FileHandler('logs/debug.log')
+info_handler = logging.FileHandler('logs/info.log')
+warning_handler = logging.FileHandler('logs/warning.log')
+error_handler = logging.FileHandler('logs/error.log')
+for h in (debug_handler, info_handler, warning_handler, error_handler):
+    h.setFormatter(formatter)
+    h.setLevel(logging.DEBUG)
+
+debug_handler.addFilter(LevelFilter(logging.DEBUG))
+info_handler.addFilter(LevelFilter(logging.INFO))
+warning_handler.addFilter(LevelFilter(logging.WARNING))
+error_handler.addFilter(LevelFilter(logging.ERROR))
+
+logger.addHandler(debug_handler)
+logger.addHandler(info_handler)
+logger.addHandler(warning_handler)
+logger.addHandler(error_handler)
+
+unified_handler = logging.FileHandler('logs/log_file.log')
+unified_handler.setLevel(logging.DEBUG)   # capture everything
+unified_handler.setFormatter(logging.Formatter(
+    '%(asctime)s - %(levelname)s - %(message)s'
+))
+
+logger.addHandler(unified_handler)
+
+logger.propagate = False  # Prevent log messages from being propagated to the root logger
+#log_file_path = 'log_file.log' 
+#logging.basicConfig(filename=log_file_path, level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# logger.debug("Debug message")
+# logger.info("Info message")
+# logger.warning("Warning message")
+# logger.error("Error message")
 FOToken=open('Token/Token',"r")
 token=FOToken.readline()
 client.run(token)
