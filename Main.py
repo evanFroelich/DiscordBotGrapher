@@ -740,8 +740,9 @@ unified_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(
 logger.addHandler(unified_handler)
 
 discord_handler = logging.FileHandler('logs/discord.log')
-discord_handler.setLevel(logging.DEBUG)
+discord_handler.setLevel(logging.WARNING)
 discord_handler.setFormatter(formatter)
+logger.addHandler(discord_handler)
 
 logger.propagate = False
 #log_file_path = 'log_file.log' 
@@ -753,4 +754,4 @@ logger.propagate = False
 # logger.error("Error message")
 FOToken=open('Token/Token',"r")
 token=FOToken.readline()
-client.run(token, log_handler=discord_handler, log_level=logging.DEBUG, log_formatter=formatter)
+client.run(token)#, log_handler=discord_handler, log_level=logging.DEBUG, log_formatter=formatter
