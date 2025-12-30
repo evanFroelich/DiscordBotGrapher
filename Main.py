@@ -187,7 +187,7 @@ async def abandoned_trivia_cleanup(guildID: int, userID: int, messageID: int, qu
     stealButton=QuestionStealButton(question=questionData,label ="STEAL", style=discord.ButtonStyle.danger)
     games_curs.execute('''INSERT INTO TriviaEventLog (GuildID, UserID, DailyOrRandom, QuestionType, QuestionDifficulty, QuestionText, QuestionAnswers, UserAnswer, ClassicDecision, LLMDecision, LLMText, CurrentQuestionsAnsweredToday, CurrentQuestionsAnsweredTodayCorrect) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', (guildID, userID, 'abandoned', questionType, questionDifficulty, questionData[1], questionData[2], None, 0, 0, None, 0, 0))
     games_conn.commit()
-    view=discord.ui.View()
+    view=discord.ui.View(timeout=None)
     view.add_item(stealButton)
     if shameSettings and shameSettings[0] == 1:
         #get the shame channel from the guildID instead
@@ -204,6 +204,7 @@ async def abandoned_trivia_cleanup(guildID: int, userID: int, messageID: int, qu
             shameThread = guild.get_thread(shameSettings[1])
             if shameThread:
                 shameMessage = await shameThread.send(f"Oops! <@{userID}> didn't give an answer to: {questionText}",allowed_mentions=discord.AllowedMentions.none(),view=view)
+                logging.info(f"view fin: {view.is_finished()} and view dispatched: {view.is_dispatchable()}")
                 shameMessageID = shameMessage.id
                 games_curs.execute('''INSERT INTO ActiveSteals (GuildID, ChannelID, MessageID) VALUES (?, ?, ?)''', (guildID, shameThread.id, shameMessageID))
                 games_conn.commit()
