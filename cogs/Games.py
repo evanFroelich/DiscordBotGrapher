@@ -544,15 +544,12 @@ class JoinLobbyButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
         if await ButtonLockout(interaction):
             view = discord.ui.View()
-            games_conn=sqlite3.connect("games.db",timeout=10)
-            games_conn.row_factory = sqlite3.Row
-            games_curs = games_conn.cursor()
-            games_curs.execute('''SELECT Season from RankedDiceGlobals WHERE Name = "Global"''')
-            season = games_curs.fetchone()
-            if season['Season'] == 0:
-                view.add_item(ModifierSelectMenu(match_id=self.match_id))
-            else:
-                view.add_item(ModifierSelectMenuS1(match_id=self.match_id))
+            # games_conn=sqlite3.connect("games.db",timeout=10)
+            # games_conn.row_factory = sqlite3.Row
+            # games_curs = games_conn.cursor()
+            # games_curs.execute('''SELECT Season from RankedDiceGlobals WHERE Name = "Global"''')
+            # season = games_curs.fetchone()
+            view.add_item(ModifierSelectMenu(match_id=self.match_id))
             await interaction.response.send_message("Select your lobby modifier!", ephemeral=True, view=view)
             return
 
@@ -560,11 +557,11 @@ class ModifierSelectMenu(discord.ui.Select):
     def __init__(self,  match_id: int):
         self.match_id = match_id
         options = [
-            discord.SelectOption(label="♠️Call a spade a spade♠️", description="Roll 1 D20 and add 5 to the final value", value="spade"),
+            discord.SelectOption(label="♠️Call a spade a spade♠️", description="Roll 1 D20 and add 4 to the final value", value="spade"),
             discord.SelectOption(label="♦️Diamond in the rough♦️", description="Roll 2 D20 and take the higher result", value="diamond"),
-            discord.SelectOption(label="♣️Math club♣️", description="Roll 2 D20, average them out, and add 5 to the total", value="club"),
+            discord.SelectOption(label="♣️Math club♣️", description="Roll 2 D20, average them out, and add 4 to the total", value="club"),
             discord.SelectOption(label="♥️Heart of the cards♥️", description="Roll 1 D20. (Grants enhanced results when calculating MMR and rank changes)", value="heart"),
-            #discord.SelectOption(label="🃏Jokers wild🃏", description="Roll 3 D20, average 2 lowest, add between 3-8. Has dramatically increased mmr gains and losses", value="joker"),
+            discord.SelectOption(label="🃏Jokers wild🃏", description="Roll 3 D20, average 2 lowest, add between 3-8. Has dramatically increased mmr gains and losses", value="joker"),
             
         ]
         super().__init__(placeholder="Choose a modifier...", min_values=1, max_values=1, options=options)
