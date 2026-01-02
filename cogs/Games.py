@@ -976,6 +976,8 @@ async def user_rolls(modifier:str):
             roll = int(((roll + roll2) / 2) + 5)
         else:
             roll = ((roll + roll2) / 2) + 4
+            if roll == int(roll):
+                roll = int(roll)
     elif modifier == "heart":
         pass  # no change to roll, but may affect MMR later
     elif modifier == "joker":
