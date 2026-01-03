@@ -805,7 +805,7 @@ async def lobby_countdown_task(interaction, match_id, message, guild_id, duratio
             if muDiff > 0:
                 muDiff *= 1+float(ranked_globals['JokerBoostWin'])  # Increase MMR gain by 50%
             else:
-                muDiff *= 1-float(ranked_globals['JokerBoostLose'])  # Decrease MMR loss by 50%
+                muDiff *= 1+float(ranked_globals['JokerBoostLose'])  # Decrease MMR loss by 50%
             player['EndSkillMu'] = player['Mu'] + muDiff
         print("i")
         if player['Rank'] < 20:
