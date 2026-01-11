@@ -5,7 +5,7 @@ import sqlite3
 import random
 import json
 import logging
-from Helpers.Helpers import delete_later
+from Helpers.Helpers import delete_later, generate_yesterdays_doku_data
 
 
 
@@ -123,12 +123,16 @@ class Test(commands.Cog):
 
     @app_commands.command(name="test", description="test command")
     async def test_command(self, interaction: discord.Interaction):
-        view = discord.ui.View()
-        test_select_menu = TestSelectMenu()
-        view.add_item(test_select_menu)
-        #await interaction.response.send_message("This is a test command.", view=view)
-        modal = TestModal()
-        await interaction.response.send_modal(modal)
+        # view = discord.ui.View()
+        # test_select_menu = TestSelectMenu()
+        # view.add_item(test_select_menu)
+        # #await interaction.response.send_message("This is a test command.", view=view)
+        # modal = TestModal()
+        # await interaction.response.send_modal(modal)
+        if interaction.user.id != 100344687029665792:  #replace with your user id
+            await interaction.response.send_message("You are not authorized to use this command.", ephemeral=True)
+            return
+        generate_yesterdays_doku_data()
 
 class TestModal(discord.ui.Modal, title="Test Modal"):
     def __init__(self):
@@ -154,6 +158,14 @@ class TestSelectMenu(discord.ui.Select):
 
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.send_message(f"You selected {self.values[0]}")
+
+class GenerateDokuData(commands.Cog):
+    def __init__(self, client: commands.Bot):
+        self.client = client
+
+    @app_commands.command(name="generate-doku-data", description="Generate data for Doku")
+    async def generate_doku_data(self, interaction: discord.Interaction):
+        await interaction.response.send_message("Generating Doku data... (not implemented yet)")
 
 async def setup(client: commands.Bot):
     await client.add_cog(Ping(client))

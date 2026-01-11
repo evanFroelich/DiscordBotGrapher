@@ -1032,7 +1032,6 @@ class ModifierSelectMenuS1(discord.ui.Select):
         games_conn.close()
         await interaction.response.edit_message(content=f"You have joined the lobby and selected {self.values[0]}!",view=self.view)
 
-
 async def setup(client: commands.Bot):
     await client.add_cog(GradeReport(client))
     await client.add_cog(Leaderboard(client))

@@ -123,7 +123,7 @@ async def package_daily_gambling():
             else:
                 rollOverFlag[row['Zone']]=1
                 #rollOverAmount+=row['AmountAuctioned']
-                games_curs.execute('''INSERT INTO DailyGamblingTotals (Date, GuildID, Category, Funds) VALUES (?, ?, ?, ?)''', (today - timedelta(days=1), 9999999999, row['Zone'], row['AmountAuctioned']))
+                games_curs.execute('''INSERT INTO DailyGamblingTotals (Date, GuildID, Category, Funds) VALUES (?, ?, ?, ?)''', (today - timedelta(days=1), 9999999999, row['Zone'], row['TotalAmount']))
                 games_conn.commit()
     #set up todays game
     games_curs.execute('''SELECT Category, sum(Funds) from DailyGamblingTotals where Date=date('now', '-1 day', 'localtime') group by Category''')

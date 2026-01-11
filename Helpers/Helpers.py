@@ -3,7 +3,9 @@ import sqlite3
 import asyncio
 import numpy as np
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
+PST = ZoneInfo("America/Los_Angeles")
 import json
 import context
 import logging
@@ -685,3 +687,6 @@ async def rank_number_to_rank_name(rank_number):
         # Add more ranks as needed
     }
     return rank_names.get(int(rank_number), "Unranked")
+
+async def generate_yesterdays_doku_data():
+    return
