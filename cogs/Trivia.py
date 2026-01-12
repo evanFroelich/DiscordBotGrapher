@@ -644,7 +644,7 @@ class GamblingIntroModal(discord.ui.Modal):
         self.user_id = user_id
         self.guild_id = guild_id
         self.funds = funds
-        self.storyMessage=discord.ui.TextDisplay(content=f"*First things first, you need to decide how much to bring along. As much or as little as you want, as long as it's not more than the {self.funds} you have or more than 1000.*")
+        self.storyMessage=discord.ui.TextDisplay(content=f"*First things first, you need to decide how much to bring along. As much or as little as you want, as long as it's not more than the {self.funds} you have or more than 2000.*")
         self.funds_input = discord.ui.TextInput(label=f"Funds brought:", max_length=10, required=True,placeholder="e.g. 1000", style=discord.TextStyle.short)
         self.add_item(self.storyMessage)
         self.add_item(self.funds_input) #i dont think i need this
@@ -652,9 +652,9 @@ class GamblingIntroModal(discord.ui.Modal):
     async def on_submit(self, interaction: discord.Interaction):
         fundsInput = self.funds_input.value
         view=discord.ui.View()
-        if not fundsInput.isdigit() or int(fundsInput) > self.funds or int(fundsInput)<10 or int(fundsInput)>1000:
+        if not fundsInput.isdigit() or int(fundsInput) > self.funds or int(fundsInput)<10 or int(fundsInput)>2000:
             view.add_item(GamblingButton(label="want to try that again?", user_id=self.user_id, guild_id=self.guild_id, style=discord.ButtonStyle.primary))
-            await interaction.response.send_message(f"*I cant bring that amount.*\n(cannot bring more than you have or less than 10 or more than 1000)", ephemeral=True, view=view)
+            await interaction.response.send_message(f"*I cant bring that amount.*\n(cannot bring more than you have or less than 10 or more than 2000)", ephemeral=True, view=view)
             return
         
         gamesDB = "games.db"
@@ -930,6 +930,25 @@ class BlackjackBetButton(discord.ui.Button):
             blackjackBetModal=BlackjackBetModal(guildID=self.guildID, userID=self.userID, GAMEINFO=self.GAMEINFO)
             await interaction.response.send_modal(blackjackBetModal)
 
+class SameBetButton(discord.ui.Button):
+    def __init__(self, label: str, userID, guildID, style=discord.ButtonStyle.primary, GAMEINFO=None, betAmount=0):
+        super().__init__(label=label, style=style)
+        self.userID = userID
+        self.guildID = guildID
+        self.GAMEINFO = GAMEINFO
+        self.bet_input = betAmount
+        games_conn = sqlite3.connect("games.db")
+        games_curs = games_conn.cursor()
+        games_curs.execute('''SELECT CurrentBalance FROM GamblingUserStats WHERE GuildID=? AND UserID=?''', (self.guildID, self.userID))
+        row = games_curs.fetchone()
+        games_curs.close()
+        games_conn.close()
+        self.balance = int(row[0]) if row else 0
+
+    async def callback(self, interaction: discord.Interaction):
+        await start_blackjack_game(self, interaction, rebet=True)
+        return
+
 class BlackjackBetModal(discord.ui.Modal, title="Place your bet"):
     def __init__(self, guildID, userID, GAMEINFO=None):
         super().__init__()
@@ -951,41 +970,52 @@ class BlackjackBetModal(discord.ui.Modal, title="Place your bet"):
     async def on_submit(self, interaction: discord.Interaction):
         #edit the message passed in to show the bet amount
         #make sure its a valid number greater than 0
-        if not self.bet_input.value.isdigit() or int(self.bet_input.value) <= 0 or int(self.bet_input.value) > 1500 or int(self.bet_input.value)>self.balance:
+        await start_blackjack_game(self, interaction)
+
+async def start_blackjack_game(self, interaction: discord.Interaction, rebet=False):
+    #see if the bet_input is an int
+    if rebet:
+        if self.bet_input > self.balance or self.bet_input <=0 or self.bet_input >1500:
             betButton=BlackjackBetButton(label="Place your bet", userID=self.userID, guildID=self.guildID, GAMEINFO=self.GAMEINFO)
             view = discord.ui.View()
             view.add_item(betButton)
-            await interaction.response.send_message(content="Please enter a valid bet amount greater than 0 and less than 1500 or your current balance.", view=view,ephemeral=True)
+            await interaction.response.send_message(content="You do not have enough points to place that bet.", view=view,ephemeral=True)
             return
-        games_conn = sqlite3.connect("games.db")
-        games_curs = games_conn.cursor()
-        games_curs.execute('''SELECT CurrentBalance FROM GamblingUserStats WHERE GuildID=? AND UserID=?''', (self.guildID, self.userID))
-        row = games_curs.fetchone()
-        if row:
-            current_balance = row[0]
-            bet_amount = int(self.bet_input.value)
-            if bet_amount > current_balance:
-                betButton=BlackjackBetButton(label="Place your bet", userID=self.userID, guildID=self.guildID, GAMEINFO=self.GAMEINFO)
-                view = discord.ui.View()
-                view.add_item(betButton)
-                await interaction.response.send_message(content="You do not have enough points to place that bet.", view=view,ephemeral=True)
-                return
-            else:
-                self.GAMEINFO["betAmount"] = bet_amount
-
-        #print(f"the message is: {self.message}")
-        #generate hands for the user and the dealer
-        random.shuffle(self.GAMEINFO["deck"])
-        self.GAMEINFO["userHand"] = [self.GAMEINFO["deck"].pop(), self.GAMEINFO["deck"].pop()]
-        self.GAMEINFO["dealerHand"] = [self.GAMEINFO["deck"].pop(), self.GAMEINFO["deck"].pop()]
-        #display the hands
+    elif not self.bet_input.value.isdigit() or int(self.bet_input.value) <= 0 or int(self.bet_input.value) > 1500 or int(self.bet_input.value)>self.balance:
+        betButton=BlackjackBetButton(label="Place your bet", userID=self.userID, guildID=self.guildID, GAMEINFO=self.GAMEINFO)
         view = discord.ui.View()
-        hitButton=HitButton(label="Hit", userID=self.userID, guildID=self.guildID, GAMEINFO=self.GAMEINFO)
-        view.add_item(hitButton)
-        standButton=StandButton(label="Stand", userID=self.userID, guildID=self.guildID, GAMEINFO=self.GAMEINFO)
-        view.add_item(standButton)
-        #edit this to be a new message instead of an edit
-        await interaction.response.send_message(content=await game_state_display(self.GAMEINFO), view=view,ephemeral=True)
+        view.add_item(betButton)
+        await interaction.response.send_message(content="Please enter a valid bet amount greater than 0 and less than 1500 or your current balance.", view=view,ephemeral=True)
+        return
+    games_conn = sqlite3.connect("games.db")
+    games_curs = games_conn.cursor()
+    games_curs.execute('''SELECT CurrentBalance FROM GamblingUserStats WHERE GuildID=? AND UserID=?''', (self.guildID, self.userID))
+    row = games_curs.fetchone()
+    if row:
+        current_balance = row[0]
+        bet_amount = int(self.bet_input.value) if not rebet else self.bet_input
+        if bet_amount > current_balance:
+            betButton=BlackjackBetButton(label="Place your bet", userID=self.userID, guildID=self.guildID, GAMEINFO=self.GAMEINFO)
+            view = discord.ui.View()
+            view.add_item(betButton)
+            await interaction.response.send_message(content="You do not have enough points to place that bet.", view=view,ephemeral=True)
+            return
+        else:
+            self.GAMEINFO["betAmount"] = bet_amount
+
+    #print(f"the message is: {self.message}")
+    #generate hands for the user and the dealer
+    random.shuffle(self.GAMEINFO["deck"])
+    self.GAMEINFO["userHand"] = [self.GAMEINFO["deck"].pop(), self.GAMEINFO["deck"].pop()]
+    self.GAMEINFO["dealerHand"] = [self.GAMEINFO["deck"].pop(), self.GAMEINFO["deck"].pop()]
+    #display the hands
+    view = discord.ui.View()
+    hitButton=HitButton(label="Hit", userID=self.userID, guildID=self.guildID, GAMEINFO=self.GAMEINFO)
+    view.add_item(hitButton)
+    standButton=StandButton(label="Stand", userID=self.userID, guildID=self.guildID, GAMEINFO=self.GAMEINFO)
+    view.add_item(standButton)
+    #edit this to be a new message instead of an edit
+    await interaction.response.send_message(content=await game_state_display(self.GAMEINFO), view=view,ephemeral=True)
 
 class HitButton(discord.ui.Button):
     def __init__(self, label: str, userID, guildID, style=discord.ButtonStyle.primary, GAMEINFO=None):
@@ -1018,8 +1048,10 @@ class HitButton(discord.ui.Button):
                 return
             #newGameButton=BlackJackIntroButton(label="Start a new game", userID=self.userID, guildID=self.guildID)
             newGameButton=BlackjackBetButton(label="Place your bet", userID=self.userID, guildID=self.guildID, GAMEINFO={"deck": self.GAMEINFO["deck"],"userHand": [], "dealerHand": [], "betAmount": 0, "roundsLeft": self.GAMEINFO["roundsLeft"]-1})
+            reBetButton=SameBetButton(label=f"Bet: {self.GAMEINFO['betAmount']}", userID=self.userID, guildID=self.guildID, GAMEINFO={"deck": self.GAMEINFO["deck"],"userHand": [], "dealerHand": [], "betAmount": 0, "roundsLeft": self.GAMEINFO["roundsLeft"]-1}, betAmount=self.GAMEINFO["betAmount"])
             view = discord.ui.View()
             view.add_item(newGameButton)
+            view.add_item(reBetButton)
             #use game state display
             await interaction.response.edit_message(content=f"{await game_state_display(self.GAMEINFO)}\n\nYou went bust! Try again next time.", view=view)
             return
@@ -1127,8 +1159,10 @@ class StandButton(discord.ui.Button):
             await msg.edit(content=f"{await game_state_display(self.GAMEINFO, hidden=False)}\n{result}\nNo rounds left. Game over.", view=view)
             return
         newGameButton=BlackjackBetButton(label="Place your next bet", userID=self.userID, guildID=self.guildID, GAMEINFO={"deck": self.GAMEINFO["deck"],"userHand": [], "dealerHand": [], "betAmount": 0, "roundsLeft": self.GAMEINFO["roundsLeft"]-1})
+        reBetButton=SameBetButton(label=f"Bet: {self.GAMEINFO['betAmount']}", userID=self.userID, guildID=self.guildID, GAMEINFO={"deck": self.GAMEINFO["deck"],"userHand": [], "dealerHand": [], "betAmount": 0, "roundsLeft": self.GAMEINFO["roundsLeft"]-1}, betAmount=self.GAMEINFO["betAmount"])
         view = discord.ui.View()
         view.add_item(newGameButton)
+        view.add_item(reBetButton)
         await msg.edit(content=f"{await game_state_display(self.GAMEINFO, hidden=False)}\n\n{result}", view=view)
         #await interaction.response.edit_message(content=f"{await game_state_display(self.GAMEINFO, hidden=False)}\n\n{result}", view=view)
 
