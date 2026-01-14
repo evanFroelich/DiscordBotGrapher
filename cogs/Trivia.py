@@ -867,10 +867,18 @@ class PassPhraseModal(discord.ui.Modal, title="Enter the Casino"):
             view = discord.ui.View()
             view.add_item(walkinButton)
             await interaction.response.send_message("Welcome in bud.", ephemeral=True, view=view)
+        elif self.passphrase_input.value.strip().lower() == "secret shop":
+            await secret_shop_opener(self, interaction)
+            return
         else:
             await interaction.response.send_message("Access denied! Incorrect pass phrase.", ephemeral=True)
         games_curs.close()
         games_conn.close()
+
+async def secret_shop_opener(self, interaction: discord.Interaction):
+    embed = discord.Embed(title="Secret Shop", description="Welcome to the secret shop! Here you can find exclusive items and offers.", color=0x00ff00)
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+    return
 
 class WalkIntoCasinoButton(discord.ui.Button):
     def __init__(self, label: str, userID, guildID, style=discord.ButtonStyle.primary):
@@ -946,8 +954,9 @@ class SameBetButton(discord.ui.Button):
         self.balance = int(row[0]) if row else 0
 
     async def callback(self, interaction: discord.Interaction):
-        await start_blackjack_game(self, interaction, rebet=True)
-        return
+        if await ButtonLockout(interaction):
+            await start_blackjack_game(self, interaction, rebet=True)
+            return
 
 class BlackjackBetModal(discord.ui.Modal, title="Place your bet"):
     def __init__(self, guildID, userID, GAMEINFO=None):
