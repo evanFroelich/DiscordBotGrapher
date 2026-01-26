@@ -413,8 +413,8 @@ async def ranked_dice_stats_helper(interaction: discord.Interaction, season: str
                 current_rank = games_curs.fetchone()
                 if current_rank:
                     rank_values.append(current_rank['Rank'])
-        embed, file = await send_rank_dice_stats_plot(interaction, season=season, embed=embed, rank_values=rank_values)
-        graph_button = GraphButton(label="View Rank Graph", style=discord.ButtonStyle.primary, file=file)
+        #embed, file = await send_rank_dice_stats_plot(season=season, rank_values=rank_values)
+        graph_button = GraphButton(label="View Rank Graph", style=discord.ButtonStyle.primary, guild_id=interaction.guild.id, user_id=interaction.user.id, season=season, rank_values=rank_values)
         view.add_item(graph_button)
 
     games_curs.close()
@@ -425,15 +425,20 @@ async def ranked_dice_stats_helper(interaction: discord.Interaction, season: str
         await interaction.response.edit_message(embed=embed, view=view)
 
 class GraphButton(discord.ui.Button):
-    def __init__(self, label=None, style=discord.ButtonStyle.primary, file=None):
+    def __init__(self, label=None, style=discord.ButtonStyle.primary, guild_id=None, user_id=None, season: str="lifetime", rank_values: list=[]):
         super().__init__(label=label, style=style)
-        self.file = file
+        self.guild_id = guild_id
+        self.user_id = user_id
+        self.season = season
+        self.rank_values = rank_values
 
     async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
         #send the file in an emphemeral message
-        await interaction.response.send_message(file=self.file, ephemeral=True)
+        file = await send_rank_dice_stats_plot(guild_id=self.guild_id, user_id=self.user_id, season=self.season, rank_values=self.rank_values)
+        await interaction.followup.send(file=file, ephemeral=True)
 
-async def send_rank_dice_stats_plot(interaction: discord.Interaction, season: str="lifetime", embed: discord.Embed= None, rank_values: list=[]):
+async def send_rank_dice_stats_plot(season: str="lifetime", rank_values: list=[], guild_id: int=None, user_id: int=None):
     plt.figure(figsize=(10, 5))
     plt.plot(range(1, len(rank_values) + 1), rank_values)#, marker='o'
     #plt.gca().invert_yaxis()
@@ -445,13 +450,13 @@ async def send_rank_dice_stats_plot(interaction: discord.Interaction, season: st
     #plt.yticks(range(1, 41))
     plt.yticks(ticks=[6,11,16,21,25,30,35,40], labels=["Silver1","Gold1","Platinum1","Diamond 1","Diamond 5","Diamond 10","Diamond 15","Diamond 20"])
     # Save the plot to a file
-    plot_filename = f'images/ranked_dice_rank_{interaction.guild.id}_{interaction.user.id}_{season}.png'
+    plot_filename = f'images/ranked_dice_rank_{guild_id}_{user_id}_{season}.png'
     plt.savefig(plot_filename)
     plt.close()
     # Send the plot image in the Discord message
     file = discord.File(plot_filename, filename="ranked_dice_rank.png")
-    embed.set_image(url="attachment://ranked_dice_rank.png")
-    return embed, file
+    #embed.set_image(url="attachment://ranked_dice_rank.png")
+    return file
 
 class AddAuthorizedUser(commands.Cog):
     def __init__(self, client: commands.Bot):
