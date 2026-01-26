@@ -383,6 +383,7 @@ async def ranked_dice_stats_helper(interaction: discord.Interaction, season: str
         options.append(discord.SelectOption(label=f"Season {season_row['Season']}", value=f"season {season_row['Season']}"))
     seasonSelectorMenu = discord.ui.Select(placeholder="Select Season", options=options)
     async def season_select_callback(interaction: discord.Interaction):
+        await interaction.response.defer(thinking=False, ephemeral=True)
         await ranked_dice_stats_helper(interaction, season=seasonSelectorMenu.values[0], new=False)
     seasonSelectorMenu.callback = season_select_callback
     view = discord.ui.View()
@@ -422,7 +423,8 @@ async def ranked_dice_stats_helper(interaction: discord.Interaction, season: str
     if new:
         await interaction.followup.send(embed=embed, ephemeral=True, view=view)
     else:
-        await interaction.response.edit_message(embed=embed, view=view)
+        await interaction.edit_original_response(embed=embed, view=view)
+        #await interaction.response.edit_message(embed=embed, view=view)
 
 class GraphButton(discord.ui.Button):
     def __init__(self, label=None, style=discord.ButtonStyle.primary, guild_id=None, user_id=None, season: str="lifetime", rank_values: list=[]):
@@ -442,7 +444,7 @@ async def send_rank_dice_stats_plot(season: str="lifetime", rank_values: list=[]
     plt.figure(figsize=(10, 5))
     plt.plot(range(1, len(rank_values) + 1), rank_values)#, marker='o'
     #plt.gca().invert_yaxis()
-    plt.title('Rank Over Time')
+    plt.title(f'Rank Over Time: {season}')
     plt.xlabel('Number of Games Played')
     plt.ylabel('Rank')
     plt.grid(True)
