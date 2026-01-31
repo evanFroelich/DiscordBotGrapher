@@ -3,7 +3,7 @@ import sqlite3
 import asyncio
 import numpy as np
 import random
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, time
 from zoneinfo import ZoneInfo
 PST = ZoneInfo("America/Los_Angeles")
 import json
@@ -688,5 +688,151 @@ async def rank_number_to_rank_name(rank_number):
     }
     return rank_names.get(int(rank_number), "Unranked")
 
-async def generate_yesterdays_doku_data():
+async def generate_yesterdays_doku_data(self, interaction: discord.Interaction):
+   
+    nowPst = datetime.now(PST)
+    target_date = (nowPst - timedelta(days=1))
+    startPst = datetime.combine(target_date, time.min, tzinfo=PST)
+    endPst = datetime.combine(target_date, time.max, tzinfo=PST)
+    startUTC = startPst.astimezone(timezone.utc)
+    endUTC = endPst.astimezone(timezone.utc)
+
+    dataStructure = {
+        # (guildId, userId) -> counts
+                # example:
+                # (123, 456): {
+                #     "MessageCount": 0,
+                #     "AttachmentCount": 0,
+                #     "LinkCount": 0,
+                #     "ReactionCount": 0,
+                #     "PingCount": 0
+                # }
+        "totals": {},
+        # (guildId, userId) -> {(type, channelId): count}
+        "channels": {}
+    }
+
+    for guild in self.client.guilds:
+        print(f"Processing guild: {guild.name} ({guild.id})")
+        for channel in guild.text_channels:
+            print(f"Processing channel: {channel.name} ({channel.id})")
+            await process_channel(channel, startUTC, endUTC, dataStructure)
+            for thread in channel.threads:
+                print(f"Processing thread: {thread.name} ({thread.id})")
+                await process_channel(thread, startUTC, endUTC, dataStructure)
+            try:
+                async for thread in channel.archived_threads(limit=None):
+                    print(f"Processing archived thread: {thread.name} ({thread.id})")
+                    await process_channel(thread, startUTC, endUTC, dataStructure)
+            except Exception as e:
+                print(f"Failed to fetch archived threads in channel {channel.id}: {e}")
+                logging.warning(f"Failed to fetch archived threads in channel {channel.id}: {e}")
+    games_conn = sqlite3.connect("games.db", timeout=10)
+    games_curs = games_conn.cursor()
+    for (guild_id, user_id), totals in dataStructure["totals"].items():
+        games_curs.execute("""
+            INSERT INTO DiscorDokuRawTotals
+            (Date, GuildID, UserID, MessageCount, AttachmentCount, LinkCount, ReactionCount, PingCount)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            startPst.date().isoformat(),
+            guild_id,
+            user_id,
+            totals["MessageCount"],
+            totals["AttachmentCount"],
+            totals["LinkCount"],
+            totals["ReactionCount"],
+            totals["PingCount"]
+        ))
+
+        parent_id = games_curs.lastrowid
+
+        for (type_name, channel_id), count in dataStructure["channels"].get((guild_id, user_id), {}).items():
+            games_curs.execute("""
+                INSERT INTO DiscorDokuRawChannels
+                (ID, Type, ChannelID, Count)
+                VALUES (?, ?, ?, ?)
+            """, (parent_id, type_name, channel_id, count))
+
+    games_conn.commit()
+    games_curs.close()
+    games_conn.close()
+    return
+
+async def process_channel(channel: discord.TextChannel, startUTC: datetime, endUTC: datetime, dataStructure: dict):
+    try:
+        count=0
+        countNB=0
+        async for message in channel.history(limit=None, after=startUTC, before=endUTC):
+            count+=1
+            # skip bots if desired
+            if message.author.bot:
+                continue
+            countNB+=1
+            key = (channel.guild.id, message.author.id)
+            if key not in dataStructure["totals"]:
+                dataStructure["totals"][key] = {
+                    "MessageCount": 0,
+                    "AttachmentCount": 0,
+                    "LinkCount": 0,
+                    "ReactionCount": 0,
+                    "PingCount": 0
+                }
+            if key not in dataStructure["channels"]:
+                dataStructure["channels"][key] = {}
+            totals = dataStructure["totals"][key]
+            channels = dataStructure["channels"][key]
+
+            totals["MessageCount"] += 1
+            channels[("MessageCount", channel.id)] = channels.get(("MessageCount", channel.id), 0) + 1
+
+            if message.attachments:
+                totals["AttachmentCount"] += len(message.attachments)
+                channels[("AttachmentCount", channel.id)] = channels.get(("AttachmentCount", channel.id), 0) + len(message.attachments)
+
+            if message.mentions:
+                ping_count = len(message.mentions)
+                totals["PingCount"] += ping_count
+                channels[("PingCount", channel.id)] = channels.get(("PingCount", channel.id), 0) + ping_count
+
+            if "http://" in message.content or "https://" in message.content:
+                link_count = message.content.count("http://") + message.content.count("https://")
+                totals["LinkCount"] += link_count
+                channels[("LinkCount", channel.id)] = channels.get(("LinkCount", channel.id), 0) + link_count
+
+            if message.reactions:
+                for reaction in message.reactions:
+                    try:
+                        async for user in reaction.users():
+                            # skip bots if desired
+                            if user.bot:
+                                continue
+
+                            r_key = (channel.guild.id, user.id)
+
+                            # init reacting user if missing
+                            if r_key not in dataStructure["totals"]:
+                                dataStructure["totals"][r_key] = {
+                                    "MessageCount": 0,
+                                    "AttachmentCount": 0,
+                                    "LinkCount": 0,
+                                    "ReactionCount": 0,
+                                    "PingCount": 0
+                                }
+                                dataStructure["channels"][r_key] = {}
+
+                            dataStructure["totals"][r_key]["ReactionCount"] += 1
+                            r_channels = dataStructure["channels"][r_key]
+                            r_channels[("ReactionCount", channel.id)] = r_channels.get(
+                                ("ReactionCount", channel.id), 0
+                            ) + 1
+
+                    except Exception as e:
+                        # reaction.users() can fail on deleted messages / permissions
+                        print(f"Reaction scan failed on message {message.id}: {e}")
+        print(f"Finished processing channel: {channel.name} ({channel.id}) with {count} total messages, {countNB} non-bot messages.")
+        logging.info(f"Finished processing channel: {channel.name} ({channel.id}) with {count} total messages, {countNB} non-bot messages.")
+    except Exception as e:
+        print(f"Failed to fetch messages in channel {channel.id}: {e}")
+        logging.warning(f"Failed to fetch messages in channel {channel.id}: {e}")
     return

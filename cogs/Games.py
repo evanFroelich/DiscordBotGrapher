@@ -9,7 +9,8 @@ import json
 import re
 import time
 import trueskill
-from Helpers.Helpers import create_user_db_entry, numToGrade, delete_later, isAuthorized, achievementTrigger, achievement_leaderboard_generator, auction_house_command, ButtonLockout, rank_number_to_rank_name, leaderboard_generator
+import logging
+from Helpers.Helpers import create_user_db_entry, numToGrade, delete_later, isAuthorized, achievementTrigger, achievement_leaderboard_generator, auction_house_command, ButtonLockout, rank_number_to_rank_name, leaderboard_generator, generate_yesterdays_doku_data
 
 
 class GradeReport(commands.Cog):
@@ -1032,6 +1033,21 @@ class ModifierSelectMenuS1(discord.ui.Select):
         games_conn.close()
         await interaction.response.edit_message(content=f"You have joined the lobby and selected {self.values[0]}!",view=self.view)
 
+class DDTest(commands.Cog):
+    def __init__(self, client: commands.Bot):
+        self.client = client
+
+    @app_commands.command(name="ddtest")
+    async def ddtest(self, interaction: discord.Interaction):
+        #check if user is me
+        if interaction.user.id != 100344687029665792:
+            await interaction.response.send_message("Not for you.", ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        await generate_yesterdays_doku_data(self=self,interaction=interaction)
+        await interaction.followup.send("Done.")
+        logging.info(f"DDTest command used by {interaction.user.id} in guild {interaction.guild.id} has completed.")
+
 async def setup(client: commands.Bot):
     await client.add_cog(GradeReport(client))
     await client.add_cog(Leaderboard(client))
@@ -1042,3 +1058,4 @@ async def setup(client: commands.Bot):
     await client.add_cog(GoofsSettingsSet(client))
     await client.add_cog(AuctionHouse(client))
     await client.add_cog(RankedLobby(client))
+    await client.add_cog(DDTest(client))

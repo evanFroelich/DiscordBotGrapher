@@ -353,6 +353,27 @@ CREATE TABLE if not exists RankedDiceStatsLastMatch (
 	PRIMARY KEY("GuildID","UserID")
 );
 
+CREATE TABLE if not exists DiscorDokuRawTotals (
+	"ID"	INTEGER NOT NULL UNIQUE,
+	"Date"	TEXT NOT NULL DEFAULT (date('now', 'localtime')),
+	"GuildID"	INTEGER NOT NULL,
+	"UserID"	INTEGER NOT NULL,
+	"MessageCount"	INTEGER NOT NULL DEFAULT 0,
+	"AttachmentCount"	INTEGER NOT NULL DEFAULT 0,
+	"LinkCount"	INTEGER NOT NULL DEFAULT 0,
+	"ReactionCount"	INTEGER NOT NULL DEFAULT 0,
+	"PingCount"	INTEGER NOT NULL DEFAULT 0,
+	PRIMARY KEY("ID" AUTOINCREMENT)
+);
+
+CREATE TABLE if not exists DiscorDokuRawChannels (
+	"ID"	INTEGER NOT NULL,
+	"Type"	TEXT NOT NULL,
+	"ChannelID"	INTEGER NOT NULL,
+	"Count"	INTEGER,
+	PRIMARY KEY("ChannelID","Type","ID")
+);
+
 CREATE VIEW if not exists GamblingUnlockMetricsView AS
 SELECT
     GuildID,

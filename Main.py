@@ -277,7 +277,7 @@ async def monthly_ranked_dice_reset():
     games_curs.execute('''SELECT UserID, GuildID, Rank, Mu, Sigma, ProvisionalGames FROM PlayerSkill''')
     player_data = games_curs.fetchall()
     for userID, guildID, rank, mu, sigma, provisionalGames in player_data:
-        newMu=21#((mu-30)/5)+30
+        newMu=((mu-25)/5)+25
         newSigma=sigma
         if sigma<5:
             newSigma=sigma*2
@@ -297,6 +297,11 @@ async def monthly_ranked_dice_reset():
         games_conn.commit()
         if provisionalGames > 0:
             continue  # Skip provisional players for end-of-season rewards
+        #check if a user played the previous season
+        games_curs.execute('''SELECT COUNT(*) FROM LiveRankedDicePlayers p JOIN LiveRankedDiceMatches m ON p.MatchID = m.ID WHERE p.UserID = ? AND m.GuildID = ? AND m.Season = (SELECT Season - 1 FROM RankedDiceGlobals)''', (userID, guildID))
+        played_last_season = games_curs.fetchone()[0]
+        if played_last_season == 0:
+            continue  # Skip users who didn't play last season
         try:
             guildName = client.get_guild(int(guildID)).name
             embed=discord.Embed(title=f"Ranked Dice Season Ended in {guildName}!", description=f"The current Ranked Dice season has ended! You achieved a final rank of: {rankName}. As a reward, you have received {pointsPayout} points and {rankedTokenPayout} Ranked Dice tokens!\n\nAt the end of each season if you are in diamond rank or higher, your rank will be reset to diamond 1, your MMR will be slightly reduced based on your end of season rank, and your MMR variance score will be increased to help you get moving faster back up.", color=0x52b138)
