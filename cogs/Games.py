@@ -562,7 +562,7 @@ class ModifierSelectMenu(discord.ui.Select):
             discord.SelectOption(label="♦️Diamond in the rough♦️", description="Roll 2 D20 and take the higher result", value="diamond"),
             discord.SelectOption(label="♣️Math club♣️", description="Roll 2 D20, average them out, and add 4 to the total", value="club"),
             discord.SelectOption(label="♥️Heart of the cards♥️", description="Roll 1 D20. (Grants enhanced results when calculating MMR and rank changes)", value="heart"),
-            discord.SelectOption(label="🃏Jokers wild🃏", description="Roll 3 D20, average 2 lowest, add between 3-8. Has dramatically increased mmr gains and losses", value="joker"),
+            discord.SelectOption(label="🃏Jokers wild🃏", description="Roll 3 D20, average 2 lowest, add between 2-7. Has dramatically increased mmr gains and losses", value="joker"),
             
         ]
         super().__init__(placeholder="Choose a modifier...", min_values=1, max_values=1, options=options)
@@ -947,10 +947,10 @@ def mu_to_target_rank(mu):
     rank = (mu - min_mu) / (max_mu - min_mu) * (max_rank - min_rank) + min_rank
     return max(min(rank, max_rank), min_rank)
 
-def update_visible_rank(current_rank, target_rank, smoothing=0.3):
+def update_visible_rank(current_rank, target_rank, smoothing=0.35):
     """
     Move the shown rank fractionally toward the target.
-    smoothing=0.3 → moves 30% of the gap each update
+    smoothing=0.35 → moves 35% of the gap each update
     """
     return current_rank + (target_rank - current_rank) * smoothing
 
@@ -986,7 +986,7 @@ async def user_rolls(modifier:str):
         roll3 = random.randint(1, 20)
         low_rolls = sorted([roll, roll2, roll3])[:2]
         roll = int((low_rolls[0] + low_rolls[1]) / 2)
-        roll += random.randint(3, 8)
+        roll += random.randint(2, 7)
     return roll
 
 
