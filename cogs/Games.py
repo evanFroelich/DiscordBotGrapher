@@ -562,7 +562,7 @@ class ModifierSelectMenu(discord.ui.Select):
             discord.SelectOption(label="♦️Diamond in the rough♦️", description="Roll 2 D20 and take the higher result", value="diamond"),
             discord.SelectOption(label="♣️Math club♣️", description="Roll 2 D20, average them out, and add 4 to the total", value="club"),
             discord.SelectOption(label="♥️Heart of the cards♥️", description="Roll 1 D20. (Grants enhanced results when calculating MMR and rank changes)", value="heart"),
-            discord.SelectOption(label="🃏Jokers wild🃏", description="Roll 3 D20, average 2 lowest, add between 2-7. Has dramatically increased mmr gains and losses", value="joker"),
+            discord.SelectOption(label="🃏Jokers wild🃏", description="Roll 3 D20, average 2 lowest, add between 3-8. Has dramatically increased mmr gains and losses", value="joker"),
             
         ]
         super().__init__(placeholder="Choose a modifier...", min_values=1, max_values=1, options=options)
@@ -986,7 +986,7 @@ async def user_rolls(modifier:str):
         roll3 = random.randint(1, 20)
         low_rolls = sorted([roll, roll2, roll3])[:2]
         roll = int((low_rolls[0] + low_rolls[1]) / 2)
-        roll += random.randint(2, 7)
+        roll += random.randint(3, 8)
     return roll
 
 
