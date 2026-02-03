@@ -730,10 +730,11 @@ async def generate_yesterdays_doku_data(self, interaction: discord.Interaction):
     games_conn = sqlite3.connect("games.db", timeout=10)
     games_curs = games_conn.cursor()
     for (guild_id, user_id), totals in dataStructure["totals"].items():
+        #print(f"Inserting data for GuildID: {guild_id}, UserID: {user_id}")
         games_curs.execute("""
             INSERT INTO DiscorDokuRawTotals
-            (Date, GuildID, UserID, MessageCount, AttachmentCount, LinkCount, ReactionCount, PingCount)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (Date, GuildID, UserID, MessageCount, AttachmentCount, LinkCount, ReactionCount, PingCount, MentionCount)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             startPst.date().isoformat(),
             guild_id,
@@ -742,7 +743,8 @@ async def generate_yesterdays_doku_data(self, interaction: discord.Interaction):
             totals["AttachmentCount"],
             totals["LinkCount"],
             totals["ReactionCount"],
-            totals["PingCount"]
+            totals["PingCount"],
+            totals["MentionCount"]
         ))
 
         parent_id = games_curs.lastrowid
@@ -766,8 +768,8 @@ async def process_channel(channel: discord.TextChannel, startUTC: datetime, endU
         async for message in channel.history(limit=None, after=startUTC, before=endUTC):
             count+=1
             # skip bots if desired
-            if message.author.bot:
-                continue
+            #if message.author.bot:
+                #continue
             countNB+=1
             key = (channel.guild.id, message.author.id)
             if key not in dataStructure["totals"]:
@@ -776,7 +778,8 @@ async def process_channel(channel: discord.TextChannel, startUTC: datetime, endU
                     "AttachmentCount": 0,
                     "LinkCount": 0,
                     "ReactionCount": 0,
-                    "PingCount": 0
+                    "PingCount": 0,
+                    "MentionCount": 0
                 }
             if key not in dataStructure["channels"]:
                 dataStructure["channels"][key] = {}
@@ -791,9 +794,18 @@ async def process_channel(channel: discord.TextChannel, startUTC: datetime, endU
                 channels[("AttachmentCount", channel.id)] = channels.get(("AttachmentCount", channel.id), 0) + len(message.attachments)
 
             if message.mentions:
-                ping_count = len(message.mentions)
-                totals["PingCount"] += ping_count
-                channels[("PingCount", channel.id)] = channels.get(("PingCount", channel.id), 0) + ping_count
+                mention_count = len(message.mentions)
+                totals["MentionCount"] += mention_count
+                channels[("MentionCount", channel.id)] = channels.get(("MentionCount", channel.id), 0) + mention_count
+            
+            if message.role_mentions:
+                role_mention_count = len(message.role_mentions)
+                totals["PingCount"] += role_mention_count
+                channels[("PingCount", channel.id)] = channels.get(("PingCount", channel.id), 0) + role_mention_count
+            
+            if message.mention_everyone:
+                totals["PingCount"] += 1
+                channels[("PingCount", channel.id)] = channels.get(("PingCount", channel.id), 0) + 1
 
             if "http://" in message.content or "https://" in message.content:
                 link_count = message.content.count("http://") + message.content.count("https://")
@@ -817,7 +829,8 @@ async def process_channel(channel: discord.TextChannel, startUTC: datetime, endU
                                     "AttachmentCount": 0,
                                     "LinkCount": 0,
                                     "ReactionCount": 0,
-                                    "PingCount": 0
+                                    "PingCount": 0,
+                                    "MentionCount": 0
                                 }
                                 dataStructure["channels"][r_key] = {}
 
