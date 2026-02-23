@@ -5,7 +5,8 @@ import sqlite3
 import random
 import json
 import logging
-from Helpers.Helpers import delete_later, generate_yesterdays_doku_data
+from datetime import datetime, timedelta, timezone
+from Helpers.Helpers import delete_later, generate_yesterdays_doku_data, create_doku_board, generate_doku_board_solution
 
 
 
@@ -122,7 +123,9 @@ class Test(commands.Cog):
         self.client = client
 
     @app_commands.command(name="test", description="test command")
-    async def test_command(self, interaction: discord.Interaction):
+    @app_commands.describe(server="The server to test with")
+    async def test_command(self, interaction: discord.Interaction, server: str):
+        await interaction.response.defer(thinking=True)
         # view = discord.ui.View()
         # test_select_menu = TestSelectMenu()
         # view.add_item(test_select_menu)
@@ -132,7 +135,14 @@ class Test(commands.Cog):
         if interaction.user.id != 100344687029665792:  #replace with your user id
             await interaction.response.send_message("You are not authorized to use this command.", ephemeral=True)
             return
-        generate_yesterdays_doku_data()
+        #generate_yesterdays_doku_data()
+        baseDokuBoard = await create_doku_board()
+        #get yesterdays date in pst time zone as a string
+        yesterday = (datetime.now(tz=timezone(timedelta(hours=-8))) - timedelta(days=1)).strftime("%Y-%m-%d")
+        print(f"Yesterdays date: {yesterday}")
+        #yesterday = (datetime.now(tz=timezone.pst) - timedelta(days=1)).strftime("%Y-%m-%d")
+        boardSolutions = await generate_doku_board_solution(board = baseDokuBoard, date = yesterday, guildID=int(server))#1192954425413746729
+        await interaction.followup.send(f"todays board:\n{baseDokuBoard}\ntodays solution:\n{boardSolutions}")
 
 class TestModal(discord.ui.Modal, title="Test Modal"):
     def __init__(self):

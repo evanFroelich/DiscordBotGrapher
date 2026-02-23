@@ -849,3 +849,46 @@ async def process_channel(channel: discord.TextChannel, startUTC: datetime, endU
         print(f"Failed to fetch messages in channel {channel.id}: {e}")
         logging.warning(f"Failed to fetch messages in channel {channel.id}: {e}")
     return
+
+#mode 0 = easy. only base 6 metrics
+async def create_doku_board(mode: int = 0):
+    if mode == 0:
+        mode0MetricList=[
+            "MessageCount",
+            "AttachmentCount",
+            "LinkCount",
+            "ReactionCount",
+            "PingCount",
+            "MentionCount"
+        ]
+        random.shuffle(mode0MetricList)
+        board={
+            "rows": [
+                {"metric": mode0MetricList[0], "threshold": 0 if mode0MetricList[0]=="PingCount" else 1,},
+                {"metric": mode0MetricList[1], "threshold": 0 if mode0MetricList[1]=="PingCount" else 1},
+                {"metric": mode0MetricList[2], "threshold": 0 if mode0MetricList[2]=="PingCount" else 1}
+            ],
+            "columns": [
+                {"metric": mode0MetricList[3], "threshold": 0 if mode0MetricList[3]=="PingCount" else 1},
+                {"metric": mode0MetricList[4], "threshold": 0 if mode0MetricList[4]=="PingCount" else 1},
+                {"metric": mode0MetricList[5], "threshold": 0 if mode0MetricList[5]=="PingCount" else 1}
+            ]
+        }
+    print(f"Generated Doku Board: {board}")
+    return board
+
+
+async def generate_doku_board_solution(date: str, guildID: str, board: dict, mode: int = 0):
+    solutions = {}
+    games_conn = sqlite3.connect("games.db", timeout=10)
+    games_curs = games_conn.cursor()
+    if mode == 0:
+        for metricH in board["rows"]:
+            for metricC in board["columns"]:
+                games_curs.execute(f'''SELECT UserID from  DiscorDokuRawTotals WHERE Date = ? AND GuildID = ? AND {metricH["metric"]} >= ? AND {metricC["metric"]} >= ?''', (date, guildID, metricH["threshold"], metricC["threshold"]))
+                cellSolutions=games_curs.fetchall()
+                solutions[(metricH["metric"], metricC["metric"])] = [row[0] for row in cellSolutions]
+    games_curs.close()
+    games_conn.close()
+    print(f"Generated Doku Board Solutions: {solutions}")
+    return solutions
