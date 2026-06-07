@@ -6,7 +6,7 @@ import random
 import json
 import logging
 from datetime import datetime, timedelta, timezone
-from Helpers.Helpers import delete_later, generate_yesterdays_doku_data, create_doku_board, generate_doku_board_solution
+from Helpers.Helpers import delete_later, generate_yesterdays_doku_data, create_doku_board, generate_doku_board_solution, boil_doku_board
 
 
 
@@ -142,7 +142,9 @@ class Test(commands.Cog):
         print(f"Yesterdays date: {yesterday}")
         #yesterday = (datetime.now(tz=timezone.pst) - timedelta(days=1)).strftime("%Y-%m-%d")
         boardSolutions = await generate_doku_board_solution(board = baseDokuBoard, date = yesterday, guildID=int(server))#1192954425413746729
-        await interaction.followup.send(f"todays board:\n{baseDokuBoard}\ntodays solution:\n{boardSolutions}")
+        numSolutions = await boil_doku_board(board = baseDokuBoard, date = yesterday, guildID=int(server))#1192954425413746729
+        embed = discord.Embed(title="Doku Data", description=f"Yesterdays board:\n{baseDokuBoard}\nYesterdays solution:\n{boardSolutions}\nNumber of solutions per cell:\n{numSolutions}")
+        await interaction.followup.send(embed=embed)
 
 class TestModal(discord.ui.Modal, title="Test Modal"):
     def __init__(self):

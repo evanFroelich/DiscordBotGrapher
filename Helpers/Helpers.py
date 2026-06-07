@@ -892,3 +892,10 @@ async def generate_doku_board_solution(date: str, guildID: str, board: dict, mod
     games_conn.close()
     print(f"Generated Doku Board Solutions: {solutions}")
     return solutions
+
+async def boil_doku_board(board: dict, date: str, guildID: str):
+    curSolutions = await generate_doku_board_solution(date, guildID, board)
+    numSolutions = {cell: len(users) for cell, users in curSolutions.items()}
+    print(f"Number of solutions per cell: {numSolutions}")
+    
+    return numSolutions

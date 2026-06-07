@@ -124,7 +124,11 @@ class Stats(commands.Cog):
         unlocked_games = games_curs.fetchone()
         games_curs.execute('''SELECT TotalScore FROM UserAchievementScoresView WHERE GuildID=? AND UserID=?''', (guild_id, user_id))
         achievement_score = games_curs.fetchone()
-        games_curs.execute('''with Names as (select ID, Name from AchievementDefinitions), OwnedAchievements as (select AchievementID, GuildID, UserID from UserAchievements), achievement_scores as (select AchievementID, Score, Earners from DynamicAchievementScoresView) select a.Name, c.Earners, c.Score from Names a left join OwnedAchievements b on a.ID = b.AchievementID left join achievement_scores c on c.AchievementID = b.AchievementID where b.UserID = ? and b.GuildID = ? order by c.Score DESC limit 3''', (user_id, guild_id))
+        games_curs.execute('''with Names as (select ID, Name from AchievementDefinitions), 
+        OwnedAchievements as (select AchievementID, GuildID, UserID from UserAchievements), 
+        achievement_scores as (select GuildID, AchievementID, Score, Earners from DynamicAchievementScoresView) 
+        select a.Name, c.Earners, c.Score from Names a left join OwnedAchievements b on a.ID = b.AchievementID left join achievement_scores c on c.AchievementID = b.AchievementID and c.GuildID = b.GuildID 
+        where b.UserID = ? and b.GuildID = ? order by c.Score DESC limit 3''', (user_id, guild_id))
         top_achievements = games_curs.fetchall()
         games_curs.execute('''SELECT GamesPlayed, WinCount, LossCount, CAST(WinCount AS FLOAT) / (WinCount + LossCount) * 100 as WinRate, Rank, ProvisionalGames FROM PlayerSkill WHERE GuildID=? AND UserID=?''', (guild_id, user_id))
         player_skill = games_curs.fetchone()
