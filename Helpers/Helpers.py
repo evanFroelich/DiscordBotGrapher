@@ -391,7 +391,10 @@ async def achievement_leaderboard_generator(guildID: str):
     outstr=""
     embed=discord.Embed(title="Achievement Score Leaderboard", color=0x228a65)
     for row in rows:
-        user=context.bot.get_guild(guildID).get_member(int(row[0]))
+        guild=context.bot.get_guild(guildID)
+        if guild is None:
+            continue
+        user=guild.get_member(int(row[0]))
         if user:
             outstr += f"<@{user.id}>: {int(row[1])} points\t:trophy: {user_achievement_counts.get(user.id, 0)}\n"
         else:
