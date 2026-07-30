@@ -25,6 +25,9 @@ async def daily_question_leaderboard():
     games_curs.execute('''SELECT GuildID, FlagShameChannel, ShameChannel from ServerSettings''')
     guilds=games_curs.fetchall()
     for guildID in guilds:
+        #check if the guild is invalid or if the guild is not in the bot's guilds
+        if guildID[0] not in [guild.id for guild in client.guilds]:
+            continue
         if guildID[1]==1 and guildID[2]:
             games_curs.execute('''SELECT UserID, QuestionsAnsweredTodayCorrect FROM GamblingUserStats WHERE GuildID = ? and (date(LastDailyQuestionTime) = date('now', 'localtime') OR date(LastRandomQuestionTime) = date('now', 'localtime')) order by QuestionsAnsweredTodayCorrect desc''', (guildID[0],))
             leaderboardResults = games_curs.fetchall()
