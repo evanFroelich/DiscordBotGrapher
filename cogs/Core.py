@@ -250,11 +250,15 @@ class RankedDiceStats(commands.Cog):
         games_conn.commit()
         games_curs.execute('''SELECT Season FROM RankedDiceGlobals where Name = "Global"''')
         global_season = games_curs.fetchone()
+        #check if the user has played any ranked dice games in this current global season, and if not, default to lifetime stats
+        games_curs.execute('''SELECT COUNT(*) as GameCount FROM LiveRankedDicePlayers p JOIN LiveRankedDiceMatches m ON m.ID = p.MatchID WHERE m.GuildID=? AND p.UserID=? AND m.Season=?''', (interaction.guild.id, interaction.user.id, global_season['Season']))
+        game_count = games_curs.fetchone()['GameCount']
         games_curs.close()
         games_conn.close()
-        await ranked_dice_stats_helper(interaction, season="lifetime")#f"season {global_season['Season']}")
-        
-
+        if game_count == 0:
+            await ranked_dice_stats_helper(interaction, season="lifetime")
+        else:
+            await ranked_dice_stats_helper(interaction, season=f"season {global_season['Season']}")
 async def ranked_dice_stats_helper(interaction: discord.Interaction, season: str="lifetime", new: bool=True):
     games_conn=sqlite3.connect("games.db",timeout=10)
     games_conn.row_factory = sqlite3.Row
