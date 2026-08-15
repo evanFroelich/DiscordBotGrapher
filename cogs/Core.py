@@ -252,7 +252,7 @@ class RankedDiceStats(commands.Cog):
         global_season = games_curs.fetchone()
         games_curs.close()
         games_conn.close()
-        await ranked_dice_stats_helper(interaction, season=f"season {global_season['Season']}")
+        await ranked_dice_stats_helper(interaction, season="lifetime")#f"season {global_season['Season']}")
         
 
 async def ranked_dice_stats_helper(interaction: discord.Interaction, season: str="lifetime", new: bool=True):
