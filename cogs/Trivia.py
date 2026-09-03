@@ -266,7 +266,7 @@ async def questionSpawner(message):
 
 class QuestionThankYouButton(discord.ui.Button):
     def __init__(self):
-        super().__init__(label="Tip your Quizmaster", style=discord.ButtonStyle.success)  # No timeout
+        super().__init__(label="Thank your Quizmaster", style=discord.ButtonStyle.success)  # No timeout
 
     async def callback(self, interaction: discord.Interaction):
         await interaction.response.defer(thinking=False, ephemeral=True)
