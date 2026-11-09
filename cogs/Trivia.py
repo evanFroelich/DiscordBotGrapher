@@ -413,8 +413,13 @@ class QuestionStealButton(discord.ui.Button):
         #check to see if the user trying to steal has answered this question within the last 24 hours
         #logging.info(f"~~~~~~~~~~~~~~~~~~~~~~~")
         #logging.info(f"Steal button pressed by user {interaction.user.id} in guild {interaction.guild.id}")
+        await resetDailyQuestionCorrect(interaction.guild.id, interaction.user.id)
         games_conn = sqlite3.connect("games.db")
         games_curs = games_conn.cursor()
+        curTime= datetime.now()
+        curTimeString = curTime.strftime('%Y-%m-%d %H:%M:%S')
+        games_curs.execute('''UPDATE GamblingUserStats SET LastRandomQuestionTime = ? WHERE GuildID=? AND UserID=?''', (curTimeString, interaction.guild.id, interaction.user.id))
+        games_conn.commit()
         games_curs.execute('''SELECT count(*) from TriviaEventLog WHERE GuildID=? and UserID=? and QuestionText=? and Timestamp >= datetime('now', '-24 hours')''', (interaction.guild.id, interaction.user.id, self.question[1]))
         count = games_curs.fetchone()[0]
         games_curs.close()
