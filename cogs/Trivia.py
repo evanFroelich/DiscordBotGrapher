@@ -102,7 +102,7 @@ async def createQuestion(interaction: discord.Interaction = None, channel: disco
                 quizMessage=await interaction.followup.send(messageContent, ephemeral=isPrivate, view=view)
             else:
                 #5% chance to send only the first question and put the question text itself in the message content with only 1 button to press for that question
-                if random.random() < 0.15:
+                if random.random() < 0.25:
                     question = buttonList[0].question
                     messageContent += f"Special pop quiz:\n**{question[1]}**"
                     view = discord.ui.View(timeout=None)
@@ -884,9 +884,69 @@ class PassPhraseModal(discord.ui.Modal, title="Enter the Casino"):
         games_conn.close()
 
 async def secret_shop_opener(self, interaction: discord.Interaction):
-    embed = discord.Embed(title="Secret Shop", description="Welcome to the secret shop! Here you can find exclusive items and offers.", color=0x00ff00)
-    await interaction.response.send_message(embed=embed, ephemeral=True)
+    embed = discord.Embed(title="Secret Shop", description="Welcome to the secret shop! Here you can find exclusive items and offers.\nRemove an incorrect answer from your report card:\t2000", color=0x00ff00)
+    view = discord.ui.View()
+    view.add_item(ShopSelect(guildID=self.guildID, userID=self.userID))
+    await interaction.response.send_message(embed=embed, ephemeral=True, view=view)
     return
+
+class ShopSelect(discord.ui.Select):
+    def __init__(self, guildID, userID):
+        options = [
+            discord.SelectOption(label="Remove an incorrect answer from your report card", description="Cost: 2000", value="remove_incorrect_answer"),
+        ]
+        super().__init__(placeholder="Select an item to purchase...", min_values=1, max_values=1, options=options)
+        self.guildID = guildID
+        self.userID = userID
+
+    async def callback(self, interaction: discord.Interaction):
+        if self.values[0] == "remove_incorrect_answer":
+            await interaction.response.send_modal(WhiteOutModal(self.guildID, self.userID))
+
+class WhiteOutModal(discord.ui.Modal, title="Removing bad marks"):
+    subjectInput = discord.ui.TextInput(label="Subject", placeholder="Enter the subject of the incorrect answer", required=True)
+    gradeInput = discord.ui.TextInput(label="Grade", placeholder="Enter the grade of the incorrect answer", required=True)
+
+    def __init__(self, guildID, userID):
+        super().__init__()
+        self.guildID = guildID
+        self.userID = userID
+        #self.add_item(self.subjectInput)
+        #self.add_item(self.gradeInput)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        #capitalize the first letter of the subject if it isnt already capitalized
+        
+        subject=self.subjectInput.value.strip()
+        subject = subject.capitalize()
+        grade=self.gradeInput.value.strip()
+        gamesDB = "games.db"
+        games_conn = sqlite3.connect(gamesDB)
+        games_curs = games_conn.cursor()
+        games_curs.execute('''SELECT CurrentBalance FROM GamblingUserStats WHERE GuildID=? AND UserID=?''', (self.guildID, self.userID))
+        row = games_curs.fetchone()
+        #check if the user has enough funds
+        if row and row[0] >= 2000:
+            #check if the user has an incorrect answer for the given subject and grade in the database and that the RemovedIncorrect column value is less than the Num_Incorrect column in the Scores table
+            games_curs.execute('''SELECT Num_Incorrect, RemovedIncorrect FROM Scores WHERE GuildID=? AND UserID=? AND Category=? AND Difficulty=?''', (self.guildID, self.userID, subject, grade))
+            score_row = games_curs.fetchone()
+            print(f"score_row: {score_row}")
+            if score_row and score_row[0] > score_row[1]+1:
+                #increment the RemovedIncorrect column value by 1
+                new_removed_incorrect = score_row[1] + 1
+                games_curs.execute('''UPDATE Scores SET RemovedIncorrect=? WHERE GuildID=? AND UserID=? AND Category=? AND Difficulty=?''', (new_removed_incorrect, self.guildID, self.userID, subject, grade))
+                games_conn.commit()
+                #deduct 2000 from the user's balance
+                new_balance = row[0] - 2000
+                games_curs.execute('''UPDATE GamblingUserStats SET CurrentBalance=? WHERE GuildID=? AND UserID=?''', (new_balance, self.guildID, self.userID))
+                games_conn.commit()
+                await interaction.response.send_message(f"Success! The incorrect answer for {subject} with grade {grade} has been removed from your report card. Your new balance is {new_balance}.", ephemeral=True)
+            else:
+                await interaction.response.send_message(f"You do not have an incorrect answer for {subject} with grade {grade} or you have as many removed incorrect answers for this subject and grade as you are able to.", ephemeral=True)
+        else:
+            await interaction.response.send_message("You do not have enough funds to remove the incorrect answer.", ephemeral=True)
+        games_curs.close()
+        games_conn.close()
 
 class WalkIntoCasinoButton(discord.ui.Button):
     def __init__(self, label: str, userID, guildID, style=discord.ButtonStyle.primary):

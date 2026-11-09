@@ -28,7 +28,7 @@ class GradeReport(commands.Cog):
         games_curs.execute('''INSERT INTO CommandLog (GuildID, UserID, CommandName, CommandParameters) VALUES (?, ?, ?, ?)''', (interaction.guild.id, interaction.user.id, "grade-report", f"visibility: {visibility.value}"))
         games_conn.commit()
         await create_user_db_entry(interaction.guild.id, interaction.user.id)
-        games_curs.execute('''select Category, Difficulty, Num_Correct, Num_Incorrect from Scores where GuildID = ? and UserID = ? order by category, difficulty''', (interaction.guild.id, interaction.user.id))
+        games_curs.execute('''select Category, Difficulty, Num_Correct, Num_Incorrect, RemovedIncorrect from Scores where GuildID = ? and UserID = ? order by category, difficulty''', (interaction.guild.id, interaction.user.id))
         rows = games_curs.fetchall()
         if not rows:
             await interaction.response.send_message("You have no scores recorded for this server.", ephemeral=True)
@@ -44,7 +44,8 @@ class GradeReport(commands.Cog):
             difficulty = row[1]
             num_correct = row[2]
             num_incorrect = row[3]
-            total = num_correct + num_incorrect
+            removed_incorrect = row[4]
+            total = num_correct + (num_incorrect - removed_incorrect)
             if total>0:
                 if previousCategory != category:
                     fillSlashes=5-previousDifficulty
