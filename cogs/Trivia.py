@@ -101,8 +101,16 @@ async def createQuestion(interaction: discord.Interaction = None, channel: disco
                 isPrivate=True
                 quizMessage=await interaction.followup.send(messageContent, ephemeral=isPrivate, view=view)
             else:
-                messageContent+="pop quiz:"
-                quizMessage=await channel.send(messageContent, view=view)
+                #5% chance to send only the first question and put the question text itself in the message content with only 1 button to press for that question
+                if random.random() < 0.15:
+                    question = buttonList[0].question
+                    messageContent += f"Special pop quiz:\n**{question[1]}**"
+                    view = discord.ui.View(timeout=None)
+                    view.add_item(QuestionPickButton(Question=question, isForced=isForced))
+                    quizMessage=await channel.send(messageContent, view=view)
+                else:
+                    messageContent+="pop quiz:"
+                    quizMessage=await channel.send(messageContent, view=view)
         except Exception as e:
             print(f"Error sending question message: {e}")
             logging.warning(f"Error sending question message: {e}\nInteraction: {interaction}\nChannel: {channel.id if channel else 'N/A'} and server: {channel.guild.id if channel else 'N/A'}")

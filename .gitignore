@@ -22,3 +22,4 @@ __pycache__/
 *.pyc
 *.db-shm
 *.db-wal
+sql/featrue_9.5.sql
