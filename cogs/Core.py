@@ -170,7 +170,7 @@ class Stats(commands.Cog):
         if achievement_score:
             embed.add_field(name="Achievement Score", value=achievement_score['TotalScore'], inline=False)
         if user_stats:
-            embed.add_field(name="Ping Responses", value=f"Pong:{user_stats['PingPongCount']}\nSong: {user_stats['PingSongCount']}\nDong: {user_stats['PingDongCount']}\nLong: {user_stats['PingLongCount']}\nKong: {user_stats['PingKongCount']}\nGoldStar: {user_stats['PingGoldStarCount']}", inline=False)
+            embed.add_field(name="Ping Responses", value=f"Pong:{user_stats['PingPongCount']}\nSong: {user_stats['PingSongCount']}\nDong: {user_stats['PingDongCount']}\nLong: {user_stats['PingLongCount']}\nKong: {user_stats['PingKongCount']}\n:star::   {user_stats['PingGoldStarCount']}", inline=False)
             #divide hits and misses to get a percent rounded to the whole number. if miss is 0 then default to 100%
             hitRate=0
             if user_stats['HorseMissCount'] == 0:
